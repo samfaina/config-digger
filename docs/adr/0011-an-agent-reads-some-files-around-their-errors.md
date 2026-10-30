@@ -8,4 +8,4 @@ VS Code starts both servers of an agent plugin's `.mcp.json` with `,,` between t
 - A setting a definition reads, such as `chat.mcp.discovery.enabled`, can read around the error too, with the same field; it takes no other reaction.
 - A workspace file's member folders are always read around the error, for every Agent: they belong to the Project, not to one Agent's reading.
 - An Operation that would write the file is refused, as for any Read failure. A Disable whose switch lives in another file, such as VS Code's `state.vscdb`, still works.
-- Only `,,` is tested against the real VS Code; the other errors follow `node-jsonc-parser`'s code, under an Unverified mark until the release gate tests them.
+- Five errors are tested against the real VS Code, in a plugin's `.mcp.json` and a `.code-workspace` file: `,,`, a missing comma, a key with no value, an object left open at the end of the file and a string left open inside a member (#437). Other errors follow `node-jsonc-parser`'s code.

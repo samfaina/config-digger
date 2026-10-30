@@ -2025,6 +2025,189 @@ fn a_plugin_mcp_json_with_an_error_lists_the_servers_around_it_with_no_caveat() 
     );
 }
 
+// Four errors besides `,,`, in the texts `vscode.mjs` gives the real VS
+// Code, each case asserting what it started or opened (#437).
+
+/// The servers config-digger lists from the fixture plugin's `.mcp.json`
+/// holding `text`, in the default profile.
+fn plugin_servers(text: &str) -> Vec<String> {
+    let fs = with_home(vscode()).with_file(review_kit().join(".mcp.json"), text);
+    let inventory = inventory(&fs);
+    let mut names: Vec<String> = inventory
+        .items
+        .iter()
+        .filter(|item| {
+            item.agent == "vscode"
+                && item.home == "default"
+                && item
+                    .entries
+                    .iter()
+                    .any(|entry| entry.path == review_kit().join(".mcp.json"))
+        })
+        .map(|item| item.name.clone())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_plugin_mcp_json_missing_a_comma_between_servers_lists_them_all() {
+    let text = r#"{ "mcpServers": {
+  "cd-throwaway-plugin-a": {"command":"a"}
+  "cd-throwaway-plugin-b": {"command":"b"},
+  "cd-throwaway-plugin-c": {"command":"c"}
+} }"#;
+
+    assert_eq!(
+        plugin_servers(text),
+        [
+            "cd-throwaway-plugin-a",
+            "cd-throwaway-plugin-b",
+            "cd-throwaway-plugin-c"
+        ]
+    );
+}
+
+#[test]
+fn a_plugin_mcp_json_key_with_no_value_lists_the_servers_after_it() {
+    let text = r#"{ "mcpServers": {
+  "cd-throwaway-plugin-a": ,
+  "cd-throwaway-plugin-b": {"command":"b"},
+  "cd-throwaway-plugin-c": {"command":"c"}
+} }"#;
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-b", "cd-throwaway-plugin-c"]
+    );
+}
+
+#[test]
+fn a_plugin_mcp_json_left_open_at_its_end_lists_its_servers() {
+    let text = r#"{ "mcpServers": {
+  "cd-throwaway-plugin-a": {"command":"a"},
+  "cd-throwaway-plugin-b": {"command":"b"}
+"#;
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-a", "cd-throwaway-plugin-b"]
+    );
+}
+
+#[test]
+fn a_string_left_open_in_a_plugin_s_server_takes_the_next_server_into_it() {
+    // The string runs to the end of its line, swallowing the `}` and `,`,
+    // so the next server is read as a member of `plugin-b`.
+    let text = r#"{ "mcpServers": {
+  "cd-throwaway-plugin-a": {"command":"a"},
+  "cd-throwaway-plugin-b": {"command":"b", "note": "open },
+  "cd-throwaway-plugin-c": {"command":"c"}
+} }"#;
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-a", "cd-throwaway-plugin-b"]
+    );
+}
+
+/// What config-digger reads of a workspace file around its error.
+#[derive(Debug, PartialEq)]
+struct ReadAround {
+    /// The member folders whose servers it lists.
+    folders: Vec<&'static str>,
+    /// Whether the file's `chat.mcp.discovery.enabled` turns Claude
+    /// Desktop's servers on.
+    discovery: bool,
+    /// Whether it lists the file's own server.
+    servers: bool,
+}
+
+/// What config-digger reads of the fixture workspace file holding `text`,
+/// with Claude Desktop's config beside it, each case checked to be a Read
+/// failure whose servers VS Code skips.
+fn workspace_read_around(text: &str) -> ReadAround {
+    let fs = with_claude_desktop(with_project(vscode(), "multi")).with_file(workspace(), text);
+    let inventory = inventory_at(&fs, &workspace());
+    assert_eq!(reaction(&inventory, &workspace()), "ignores_file");
+    ReadAround {
+        folders: [("api", "api-only"), ("web", "web-only")]
+            .into_iter()
+            .filter(|(_, server)| inventory.items.iter().any(|item| item.name == *server))
+            .map(|(folder, _)| folder)
+            .collect(),
+        discovery: discovered(&inventory) == ("blocked".to_owned(), "not_approved".to_owned()),
+        servers: inventory.items.iter().any(|item| item.name == "docs"),
+    }
+}
+
+/// The fixture workspace's two member folders, as one member of its file.
+const WORKSPACE_FOLDERS: &str = r#""folders": [{"path":"api"},{"path":"web"}]"#;
+/// Settings turning on Claude Desktop's servers and adding the server
+/// `docs`, as one member of a workspace file.
+const WORKSPACE_SETTINGS: &str = r#""settings": {"chat.mcp.discovery.enabled":{"claude-desktop":true},"mcp":{"servers":{"docs":{"url":"https://docs.example.com/mcp"}}}}"#;
+
+/// Both member folders read, discovery on, and the file's server skipped.
+fn both_folders() -> ReadAround {
+    ReadAround {
+        folders: vec!["api", "web"],
+        discovery: true,
+        servers: false,
+    }
+}
+
+#[test]
+fn a_workspace_file_missing_a_comma_between_folders_and_settings_keeps_both() {
+    let text = format!("{{\n  {WORKSPACE_FOLDERS}\n  {WORKSPACE_SETTINGS}\n}}");
+
+    assert_eq!(workspace_read_around(&text), both_folders());
+}
+
+#[test]
+fn a_workspace_file_key_with_no_value_between_folders_and_settings_keeps_both() {
+    let text =
+        format!("{{\n  {WORKSPACE_FOLDERS},\n  \"cd-throwaway-a\": ,\n  {WORKSPACE_SETTINGS}\n}}");
+
+    assert_eq!(workspace_read_around(&text), both_folders());
+}
+
+#[test]
+fn a_workspace_file_whose_settings_are_left_open_at_its_end_keeps_both() {
+    let text = format!(
+        r#"{{
+  {WORKSPACE_FOLDERS},
+  "settings": {{
+    "chat.mcp.discovery.enabled": {{"claude-desktop":true}},
+    "mcp": {{"servers":{{"docs":{{"url":"https://docs.example.com/mcp"}}}}}}
+"#
+    );
+
+    assert_eq!(workspace_read_around(&text), both_folders());
+}
+
+#[test]
+fn a_string_left_open_in_a_workspace_folder_drops_the_folder_after_it() {
+    // The string swallows the rest of its line, so the object of the next
+    // folder is skipped as a missing property name.
+    let text = format!(
+        r#"{{
+  "folders": [
+    {{ "path": "api", "name": "open }},
+    {{ "path": "web" }}
+  ],
+  {WORKSPACE_SETTINGS}
+}}"#
+    );
+
+    assert_eq!(
+        workspace_read_around(&text),
+        ReadAround {
+            folders: vec!["api"],
+            ..both_folders()
+        }
+    );
+}
+
 #[test]
 fn vs_code_skips_the_servers_of_a_workspace_file_it_cannot_parse() {
     let file = workspace();
