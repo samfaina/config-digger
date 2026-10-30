@@ -111,7 +111,10 @@ describe("a keyboard focus that scrolls its control into view", () => {
       </ul>,
     );
     const button = screen.getByRole("button", { name: "Copy" });
-    vi.spyOn(button, "getBoundingClientRect").mockReturnValue(DOMRect.fromRect({ x: 300, y: 100, width: 40, height: 20 }));
+    // The browser scrolls the button into view before it sends the focus: below the list until then, at y 100 after.
+    vi.spyOn(button, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect({ x: 300, y: document.activeElement === button ? 100 : 160, width: 40, height: 20 }),
+    );
     await user.tab();
     expect(document.activeElement).toBe(button);
     return { list: screen.getByTestId("list"), tip: screen.getByRole("tooltip", { hidden: true }) };
