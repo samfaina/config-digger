@@ -683,7 +683,14 @@
           }
         },
         "ignore_files": {
-          "description": "Whether the `.gitignore` and `.ignore` files of the folders the walk\nenters and of those above the Project folder leave out the folders\nthey match, as git reads their patterns, the deepest file deciding\nand an `.ignore` over a `.gitignore`. They apply to the folders the\nwalk passes through on the way to the path and to the path's first\nfolder, such as `.cursor`, not below it. A repo's\n`.git\\info\\exclude` and git's global excludes are not read.",
+          "description": "The names of the ignore files, such as `.gitignore`, whose patterns,\nin the folders the walk enters and in those above the Project\nfolder, leave out the folders they match, as git reads them: the\ndeepest file of a name that matches decides, and a name over those\nafter it. They apply to the folders the walk passes through on the\nway to the path, not below it. A repo's `.git\\info\\exclude` and\ngit's global excludes are not read. Empty, nothing is left out.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ignores_path": {
+          "description": "Whether the ignore files leave out the path's first folder too, such\nas `.cursor`. Without it, they leave out only the folders that may\nhold the path, as Claude Code asks git about the folder holding\n`.claude` and not about `.claude`.",
           "type": "boolean"
         },
         "follow_links": {
@@ -699,6 +706,7 @@
         "needs_git",
         "skip",
         "ignore_files",
+        "ignores_path",
         "follow_links"
       ]
     },
@@ -2561,6 +2569,11 @@
             "null"
           ]
         },
+        "loaded_on_file_under_folder": {
+          "description": "Whether the Agent loads the Entries of a location a walk down reads\nonly once it reads or edits a file under the folder the walk found\nholding the path, such as Claude Code's nested skills. Each Entry\nkeeps its State and carries a Note naming that folder.",
+          "type": "boolean",
+          "default": false
+        },
         "switch_id": {
           "description": "What the Agent's Disable switches hold an Entry of this location by,\nwhen not by its name, such as the server ids VS Code pairs with\n`true` or `false` in `mcp.enablement`: a template of `{name}`, the\nEntry's name; `{folder_index}`, the position of its folder among\nthose of the Project, 0 for a folder Project; `{uri_path}`, the path\nof the `file:` URI of its file or skill folder, such as `/C:/x`;\n`{skill_file}`, the absolute path of a skill's `SKILL.md`, the links\nof its folder and of the folders above it resolved;\n`{plugin_uri}`, the `file:` URI of its plugin's folder; and\n`{extension}`, the key `*` stands for in its root up to a `/`, in\nlower case.",
           "type": [
@@ -3915,6 +3928,17 @@
                 }
               ]
             },
+            "apart": {
+              "description": "The locations whose Entries compete with none, and how the Agent\nnames one while another Entry has its name. Omitted, every location\ncompetes.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Apart"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "exact-name"
@@ -4063,6 +4087,31 @@
       "required": [
         "locations",
         "sources"
+      ]
+    },
+    "Apart": {
+      "description": "Locations a walk down reads whose Entries compete with none, each its\nown Item, such as Claude Code's nested skills.",
+      "type": "object",
+      "properties": {
+        "locations": {
+          "description": "The ids of the locations.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "on_clash": {
+          "description": "The name the Agent gives such an Entry while another Entry of its\nkind in the context has its name, apart or not: a template of\n`{name}`, the Entry's own name, and `{subfolder}`, the folder the\nwalk found holding its location, relative to the Project folder and\n`/`-separated, such as Claude Code's `{subfolder}:{name}`.",
+          "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "locations",
+        "on_clash"
       ]
     },
     "SettingIs": {

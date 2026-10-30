@@ -1209,6 +1209,15 @@ pub(crate) fn untrusted_folder_blocks(agent_name: &str) -> String {
     )
 }
 
+/// The note on an Entry that `agent_name` loads only once it reads or edits
+/// a file under `folder`, relative to the Project folder.
+pub(crate) fn loaded_on_file_under_folder(agent_name: &str, folder: &Path) -> String {
+    format!(
+        "{agent_name} loads it only once it reads or edits a file under `{}` in the Project.",
+        folder.display()
+    )
+}
+
 /// A Blocked Entry's reason: `agent_name` has not trusted the Entry `name`
 /// it discovered in the file `path` as it is now.
 pub(crate) fn not_trusted(agent_name: &str, name: &str, path: &Path) -> Reason {

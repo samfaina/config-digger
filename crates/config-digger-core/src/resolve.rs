@@ -185,12 +185,16 @@ pub(crate) fn resolve(
             under_name_rule(definition, snapshot, entry, project_key.map(String::as_str))
         })
         .collect();
+    let project_folder = context_project.as_ref().map(|project| project.path);
+    let in_context = named_apart(definitions, in_context, project_folder);
     let in_context: Vec<&ScannedEntry> = in_context.iter().map(AsRef::as_ref).collect();
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
     for &entry in &in_context {
         let definition = &definitions[entry.agent_index];
         let location = definition.location(&entry.location);
-        let key = if competes(definition, snapshot, entry, project_key.map(String::as_str)) {
+        let key = if competes(definition, snapshot, entry, project_key.map(String::as_str))
+            && apart_rules(definition, entry).is_none()
+        {
             let project = project_key.map(String::as_str);
             item_key(definition, snapshot, &in_context, entry, project, &unread)
         } else {
@@ -1044,6 +1048,11 @@ pub(crate) fn resolve(
                                 entry,
                                 project_key.map(String::as_str),
                             ))
+                            .chain(loaded_on_file_under_folder(
+                                definition,
+                                entry,
+                                project_folder,
+                            ))
                             .chain(cli_view_differs(
                                 merge,
                                 merged.as_ref(),
@@ -1578,6 +1587,73 @@ enum ItemKey {
     Endpoint(String),
     /// The Entry's own name, path and key path, when it competes with none.
     Alone(String, PathBuf, Vec<String>),
+}
+
+/// The rules of the competition that keeps `entry` apart, which say how
+/// the Agent names it while another Entry has its name, if it competes with
+/// none.
+fn apart_rules<'d>(
+    definition: &'d AgentDefinition,
+    entry: &ScannedEntry,
+) -> Option<&'d blocks::Apart> {
+    let kind = definition.location(&entry.location).kind;
+    definition
+        .rules(kind)
+        .competition
+        .apart()
+        .filter(|apart| apart.locations.contains(&entry.location))
+}
+
+/// The folder a walk down found holding the location of `entry`, relative
+/// to the Project folder `project`, if a walk down read it.
+fn subfolder<'e>(entry: &'e ScannedEntry, project: Option<&Path>) -> Option<&'e Path> {
+    let folder = entry.found_in.as_deref()?;
+    Some(
+        project
+            .and_then(|project| folder.strip_prefix(project).ok())
+            .unwrap_or(folder),
+    )
+}
+
+/// The Entries `entries` of a context, with each that competes with none
+/// renamed as its Agent names it while another Entry of its Agent home and
+/// kind has its name. The context's Project folder is `project`.
+fn named_apart<'e>(
+    definitions: &[AgentDefinition],
+    entries: Vec<Cow<'e, ScannedEntry>>,
+    project: Option<&Path>,
+) -> Vec<Cow<'e, ScannedEntry>> {
+    let key = |entry: &ScannedEntry| {
+        let kind = definitions[entry.agent_index]
+            .location(&entry.location)
+            .kind;
+        (
+            entry.agent_index,
+            entry.home.clone(),
+            kind,
+            entry.name.clone(),
+        )
+    };
+    let mut named: BTreeMap<(usize, String, ItemKind, String), usize> = BTreeMap::new();
+    for entry in &entries {
+        *named.entry(key(entry)).or_default() += 1;
+    }
+    entries
+        .into_iter()
+        .map(|entry| {
+            let Some(apart) = apart_rules(&definitions[entry.agent_index], &entry) else {
+                return entry;
+            };
+            let Some(subfolder) = subfolder(&entry, project).filter(|_| named[&key(&entry)] > 1)
+            else {
+                return entry;
+            };
+            let subfolder = subfolder.to_path_buf();
+            let mut entry = entry.into_owned();
+            entry.rename(|name| apart.clash_name(name, &subfolder));
+            Cow::Owned(entry)
+        })
+        .collect()
 }
 
 /// Whether the Entries of the Agent home of `entry` compete in the context
@@ -2486,6 +2562,27 @@ fn needs_trusted_folder(
             switch: None,
             sentence: explain::untrusted_folder_blocks(&definition.agent.name),
         })
+}
+
+/// The note on an Entry its Agent loads only once it reads or edits a file
+/// under the folder below the Project folder `project` that holds it.
+fn loaded_on_file_under_folder(
+    definition: &AgentDefinition,
+    entry: &ScannedEntry,
+    project: Option<&Path>,
+) -> Option<api::Note> {
+    if !definition
+        .location(&entry.location)
+        .loaded_on_file_under_folder
+    {
+        return None;
+    }
+    let folder = subfolder(entry, project)?;
+    Some(api::Note {
+        code: api::NoteCode::LoadedOnFileUnderFolder,
+        switch: None,
+        sentence: explain::loaded_on_file_under_folder(&definition.agent.name, folder),
+    })
 }
 
 /// Whether the Feature gate `name` of the Agent home of `entry` is on in

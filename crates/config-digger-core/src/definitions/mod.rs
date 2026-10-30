@@ -961,6 +961,12 @@ pub(crate) struct LocationDefinition {
     /// `project-{folder_index}-{folder}-{name}`. Without it, an Entry goes
     /// by its own name.
     pub name_template: Option<String>,
+    /// Whether the Agent loads the Entries of a location a walk down reads
+    /// only once it reads or edits a file under the folder the walk found
+    /// holding the path, such as Claude Code's nested skills. Each Entry
+    /// keeps its State and carries a Note naming that folder.
+    #[serde(default)]
+    pub loaded_on_file_under_folder: bool,
     /// What the Agent's Disable switches hold an Entry of this location by,
     /// when not by its name, such as the server ids VS Code pairs with
     /// `true` or `false` in `mcp.enablement`: a template of `{name}`, the
@@ -1919,6 +1925,11 @@ impl AgentDefinition {
                     )));
                 }
             }
+            if location.loaded_on_file_under_folder && location.anchor.walks_down().is_none() {
+                return Err(context(
+                    "only a location a walk down reads is loaded_on_file_under_folder".into(),
+                ));
+            }
             if location.one_entry {
                 let in_plugin_file =
                     location.anchor.plugin().is_some() && location.format.file().is_some();
@@ -2141,15 +2152,26 @@ impl AgentDefinition {
                 return Err(context(format!("precedence leaves out location `{id}`")));
             }
             let same_url = rules.competition.same_url();
+            let apart = rules.competition.apart();
             if let Some(id) = rules
                 .competition
                 .endpoint_locations()
                 .iter()
                 .chain(same_url.iter().flat_map(|block| &block.locations))
+                .chain(apart.iter().flat_map(|block| &block.locations))
                 .find(|id| !declared.contains(id.as_str()))
             {
                 return Err(context(format!(
                     "competition names `{id}`, which is not a location of this kind"
+                )));
+            }
+            if let Some(id) = apart
+                .iter()
+                .flat_map(|block| &block.locations)
+                .find(|id| self.location(id).anchor.walks_down().is_none())
+            {
+                return Err(context(format!(
+                    "competition keeps `{id}` apart, which no walk down reads"
                 )));
             }
             if let Some(block) = same_url {
@@ -3855,7 +3877,7 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
         }
     }
 
-    const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = true, follow_links = false } }"#;
+    const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = [".ignore", ".gitignore"], ignores_path = true, follow_links = false } }"#;
 
     /// Every walk a location can take, as a TOML value.
     const WALKS: [&str; 3] = [r#""up-to-repo-root""#, r#""up-to-below-root""#, DOWN];
@@ -3875,8 +3897,16 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
                 "unknown field `depth`",
             ),
             (
-                DOWN.replace(", ignore_files = true", ""),
+                DOWN.replace(r#", ignore_files = [".ignore", ".gitignore"]"#, ""),
                 "missing field `ignore_files`",
+            ),
+            (
+                DOWN.replace(", ignores_path = true", ""),
+                "missing field `ignores_path`",
+            ),
+            (
+                DOWN.replace(r#"".ignore""#, r#""a/.ignore""#),
+                "ignore file `a/.ignore` must be one file name",
             ),
             (
                 DOWN.replace(r#"".git""#, r#""a/b""#),
@@ -3891,6 +3921,76 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
                 format!(r#"{{ block = "project", path = ".test/skills", walk = {walk} }}"#);
             let text = with_skills(&anchor, SKILL_FORMAT, CHECKS);
             assert!(error(&text).contains(message), "{walk}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn only_a_location_a_walk_down_reads_waits_for_a_file_under_its_folder() {
+        let waiting = |anchor: &str| {
+            with_skills(anchor, SKILL_FORMAT, CHECKS).replace(
+                "\n\n[items.skill]",
+                "\nloaded_on_file_under_folder = true\n\n[items.skill]",
+            )
+        };
+        let down = format!(r#"{{ block = "project", path = ".test/skills", walk = {DOWN} }}"#);
+        assert!(
+            parse("test.toml", &waiting(&down)).is_ok(),
+            "{}",
+            error(&waiting(&down))
+        );
+        let up = r#"{ block = "project", path = ".test/skills", walk = "up-to-repo-root" }"#;
+        assert!(
+            error(&waiting(up)).contains("only a location a walk down reads"),
+            "{}",
+            error(&waiting(up))
+        );
+    }
+
+    #[test]
+    fn a_location_kept_apart_is_read_by_a_walk_down_and_named_by_its_subfolder_on_a_clash() {
+        // The skills' competition, which comes after the servers'.
+        let apart = |anchor: &str, apart: &str| {
+            let mut text = with_skills(anchor, SKILL_FORMAT, CHECKS);
+            let competition = r#"competition = { block = "exact-name" }"#;
+            let at = text.rfind(competition).unwrap();
+            text.replace_range(
+                at..at + competition.len(),
+                &format!(r#"competition = {{ block = "exact-name", apart = {apart} }}"#),
+            );
+            text
+        };
+        let down = format!(r#"{{ block = "project", path = ".test/skills", walk = {DOWN} }}"#);
+        let up = r#"{ block = "project", path = ".test/skills", walk = "up-to-repo-root" }"#;
+        let named = r#"{ locations = ["user-skills"], on_clash = "{subfolder}:{name}" }"#;
+        assert!(
+            parse("test.toml", &apart(&down, named)).is_ok(),
+            "{}",
+            error(&apart(&down, named))
+        );
+        for (anchor, block, message) in [
+            (
+                up,
+                named,
+                "keeps `user-skills` apart, which no walk down reads",
+            ),
+            (
+                &down,
+                r#"{ locations = ["other"], on_clash = "{subfolder}:{name}" }"#,
+                "names `other`, which is not a location of this kind",
+            ),
+            (
+                &down,
+                r#"{ locations = ["user-skills"], on_clash = "{name}" }"#,
+                "on_clash must hold `{subfolder}`",
+            ),
+            (
+                &down,
+                r#"{ locations = ["user-skills"], on_clash = "{subfolder}" }"#,
+                "on_clash must hold `{name}` once",
+            ),
+        ] {
+            let text = apart(anchor, block);
+            assert!(error(&text).contains(message), "{block}: {}", error(&text));
         }
     }
 

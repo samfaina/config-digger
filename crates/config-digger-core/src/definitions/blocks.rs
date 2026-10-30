@@ -647,14 +647,19 @@ pub(crate) struct DownWalk {
     /// enters at any depth, nor reads a path through, below the path it
     /// finds too, such as `node_modules`.
     pub skip: Vec<String>,
-    /// Whether the `.gitignore` and `.ignore` files of the folders the walk
-    /// enters and of those above the Project folder leave out the folders
-    /// they match, as git reads their patterns, the deepest file deciding
-    /// and an `.ignore` over a `.gitignore`. They apply to the folders the
-    /// walk passes through on the way to the path and to the path's first
-    /// folder, such as `.cursor`, not below it. A repo's
-    /// `.git\info\exclude` and git's global excludes are not read.
-    pub ignore_files: bool,
+    /// The names of the ignore files, such as `.gitignore`, whose patterns,
+    /// in the folders the walk enters and in those above the Project
+    /// folder, leave out the folders they match, as git reads them: the
+    /// deepest file of a name that matches decides, and a name over those
+    /// after it. They apply to the folders the walk passes through on the
+    /// way to the path, not below it. A repo's `.git\info\exclude` and
+    /// git's global excludes are not read. Empty, nothing is left out.
+    pub ignore_files: Vec<String>,
+    /// Whether the ignore files leave out the path's first folder too, such
+    /// as `.cursor`. Without it, they leave out only the folders that may
+    /// hold the path, as Claude Code asks git about the folder holding
+    /// `.claude` and not about `.claude`.
+    pub ignores_path: bool,
     /// Whether the walk enters links and junctions to folders.
     pub follow_links: bool,
 }
@@ -668,12 +673,12 @@ impl DownWalk {
 
 impl Validate for DownWalk {
     fn validate(&self) -> Result<(), String> {
-        if let Some(name) = self
-            .skip
-            .iter()
-            .find(|name| name.is_empty() || name.contains(['/', '\\']))
-        {
+        let not_one_name = |name: &&String| name.is_empty() || name.contains(['/', '\\']);
+        if let Some(name) = self.skip.iter().find(not_one_name) {
             return Err(format!("skipped folder `{name}` must be one folder name"));
+        }
+        if let Some(name) = self.ignore_files.iter().find(not_one_name) {
+            return Err(format!("ignore file `{name}` must be one file name"));
         }
         Ok(())
     }
@@ -4043,6 +4048,17 @@ impl Competition {
         }
     }
 
+    /// The locations whose Entries compete with none, if any.
+    pub fn apart(&self) -> Option<&Apart> {
+        match self {
+            Competition::ExactName(block) => block.apart.as_ref(),
+            Competition::CaseInsensitiveName(_)
+            | Competition::PathKey(_)
+            | Competition::SameUrl(_)
+            | Competition::Never(_) => None,
+        }
+    }
+
     /// The ids of the locations whose Entries compete by endpoint.
     pub fn endpoint_locations(&self) -> &[String] {
         match self {
@@ -4201,10 +4217,70 @@ pub(crate) struct ExactName {
     /// How the Agent ranks the Entries of some `by_endpoint` locations by
     /// the place of their plugin in a setting. Omitted, by location alone.
     pub plugin_order: Option<PluginOrder>,
+    /// The locations whose Entries compete with none, and how the Agent
+    /// names one while another Entry has its name. Omitted, every location
+    /// competes.
+    pub apart: Option<Apart>,
+}
+
+/// Locations a walk down reads whose Entries compete with none, each its
+/// own Item, such as Claude Code's nested skills.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Apart {
+    /// The ids of the locations.
+    pub locations: Vec<String>,
+    /// The name the Agent gives such an Entry while another Entry of its
+    /// kind in the context has its name, apart or not: a template of
+    /// `{name}`, the Entry's own name, and `{subfolder}`, the folder the
+    /// walk found holding its location, relative to the Project folder and
+    /// `/`-separated, such as Claude Code's `{subfolder}:{name}`.
+    pub on_clash: String,
+}
+
+/// The `on_clash` segment that stands for the folder holding the Entry's
+/// location, relative to the Project folder.
+pub(crate) const SUBFOLDER: &str = "{subfolder}";
+
+impl Apart {
+    /// The name the Agent gives the Entry named `name` whose location the
+    /// folder `subfolder` of the Project holds, while another Entry has its
+    /// name.
+    pub fn clash_name(&self, name: &str, subfolder: &Path) -> String {
+        let subfolder: Vec<String> = subfolder
+            .components()
+            .map(|part| part.as_os_str().to_string_lossy().into_owned())
+            .collect();
+        self.on_clash
+            .replace(SUBFOLDER, &subfolder.join("/"))
+            .replace(super::ENTRY_NAME, name)
+    }
+}
+
+impl Validate for Apart {
+    fn validate(&self) -> Result<(), String> {
+        if self.locations.is_empty() {
+            return Err("apart needs locations".into());
+        }
+        if self.on_clash.matches(super::ENTRY_NAME).count() != 1 {
+            return Err(format!(
+                "apart: on_clash must hold `{}` once",
+                super::ENTRY_NAME
+            ));
+        }
+        // Without it, the renamed Entries would clash again.
+        if !self.on_clash.contains(SUBFOLDER) {
+            return Err(format!("apart: on_clash must hold `{SUBFOLDER}`"));
+        }
+        Ok(())
+    }
 }
 
 impl Validate for ExactName {
     fn validate(&self) -> Result<(), String> {
+        if let Some(apart) = &self.apart {
+            apart.validate()?;
+        }
         let Some(order) = &self.plugin_order else {
             return Ok(());
         };

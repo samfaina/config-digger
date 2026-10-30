@@ -2261,6 +2261,9 @@ pub enum NoteCode {
     /// The Agent uses the Entry only when it starts in a folder the user
     /// trusts, which config-digger cannot tell with no Project.
     UntrustedFolderBlocks,
+    /// The Agent loads the Entry only once it reads or edits a file under
+    /// the folder below the Project that holds it.
+    LoadedOnFileUnderFolder,
     /// The Agent's own command that lists servers shows the server built
     /// from this Entry and another as that other alone, hiding this one.
     CliViewDiffers,

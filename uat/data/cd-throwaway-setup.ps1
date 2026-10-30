@@ -14,6 +14,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   adds a git Project whose git-versioned Codex layer declares a server
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex skills whose frontmatter is not YAML
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  adds a Claude Desktop package beside a classic folder in desktop-appdata
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -NestedSkills  adds Claude Code skills in a .claude\skills deeper in the Project
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
@@ -24,7 +25,8 @@ param(
     [switch]$PlainString,
     [switch]$CodexLayer,
     [switch]$Frontmatter,
-    [switch]$DesktopOverlay
+    [switch]$DesktopOverlay,
+    [switch]$NestedSkills
 )
 $ErrorActionPreference = "Stop"
 
@@ -349,6 +351,25 @@ description: Throwaway skill for testing config-digger. Does nothing.
     git init -q "$Root\cursor-project"
     if ($LASTEXITCODE -ne 0) {
         throw "Cannot run git init in $Root\cursor-project: install Git for Windows."
+    }
+}
+
+# With -NestedSkills, skills in a .claude\skills deeper in the Project, which
+# Claude Code loads once it works on a file under apps\web: one of its own
+# name, and one with the name of the Project's own skill. config-digger reads
+# them only in a git repo, so the Project becomes one.
+if ($NestedSkills) {
+    foreach ($name in "cd-throwaway-nested-skill", "cd-throwaway-project-skill") {
+        Write-TestFile "$Root\project\apps\web\.claude\skills\$name\SKILL.md" @"
+---
+name: $name
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    }
+    git init -q "$Root\project"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot run git init in $Root\project: install Git for Windows."
     }
 }
 
