@@ -50,14 +50,14 @@ fn synced_home() -> FakeFileSystem {
         )
 }
 
-fn inventory_with(fs: &FakeFileSystem, env: FakeEnvironment) -> Inventory {
+fn inventory_with(fs: &FakeFileSystem, env: FakeEnvironment, context: &Context) -> Inventory {
     let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    core.resolve(&snapshot, &Context::default())
+    core.resolve(&snapshot, context)
 }
 
 fn inventory(fs: &FakeFileSystem) -> Inventory {
-    inventory_with(fs, FakeEnvironment::with_home(HOME))
+    inventory_with(fs, FakeEnvironment::with_home(HOME), &Context::default())
 }
 
 fn item<'i>(inventory: &'i Inventory, name: &str) -> &'i Item {
@@ -230,15 +230,16 @@ fn with_more_in_synced_demo(fs: FakeFileSystem) -> FakeFileSystem {
     )
 }
 
-/// The provenance, State and reason code of each Entry of the Item `name`.
-fn provenances_and_states(inventory: &Inventory, name: &str) -> Vec<(String, String, String)> {
+/// The value at the JSON pointer `first`, the State and the reason code of
+/// each Entry of the Item `name`.
+fn rows_by(inventory: &Inventory, name: &str, first: &str) -> Vec<(String, String, String)> {
     item(inventory, name)
         .entries
         .iter()
         .map(|entry| {
             let entry = entry_json(entry);
             (
-                entry["provenance"].as_str().unwrap().to_owned(),
+                entry.pointer(first).unwrap().as_str().unwrap().to_owned(),
                 entry["state"].as_str().unwrap().to_owned(),
                 entry["reason"]["code"]
                     .as_str()
@@ -249,8 +250,14 @@ fn provenances_and_states(inventory: &Inventory, name: &str) -> Vec<(String, Str
         .collect()
 }
 
-fn of(provenance: &str, state: &str, code: &str) -> (String, String, String) {
-    (provenance.to_owned(), state.to_owned(), code.to_owned())
+/// The provenance, State and reason code of each Entry of the Item `name`.
+fn provenances_and_states(inventory: &Inventory, name: &str) -> Vec<(String, String, String)> {
+    rows_by(inventory, name, "/provenance")
+}
+
+/// A row of [`rows_by`].
+fn row(first: &str, state: &str, code: &str) -> (String, String, String) {
+    (first.to_owned(), state.to_owned(), code.to_owned())
 }
 
 #[test]
@@ -263,8 +270,8 @@ fn an_installed_plugin_of_the_same_name_shadows_the_synced_one_whole() {
         assert_eq!(
             provenances_and_states(&inventory, name),
             [
-                of("plugin", "effective", ""),
-                of("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
+                row("plugin", "effective", ""),
+                row("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
             ],
             "{name}"
         );
@@ -273,7 +280,7 @@ fn an_installed_plugin_of_the_same_name_shadows_the_synced_one_whole() {
     for name in ["plugin:demo:search", "demo:extra"] {
         assert_eq!(
             provenances_and_states(&inventory, name),
-            [of(
+            [row(
                 "cloud_mirror",
                 "shadowed",
                 "shadowed_by_same_named_plugin"
@@ -313,28 +320,19 @@ fn a_synced_plugin_kept_out_whole_shadows_no_server_of_its_endpoint() {
 
     let inventory = inventory(&fs);
 
-    // The manifest's server would rank above `.mcp.json`'s, were `demo` loaded.
-    let entries: Vec<(String, String, String)> = item(&inventory, "plugin:other:zeta")
-        .entries
-        .iter()
-        .map(|entry| {
-            let entry = entry_json(entry);
-            (
-                entry["plugin"]["id"].as_str().unwrap().to_owned(),
-                entry["state"].as_str().unwrap().to_owned(),
-                entry["reason"]["code"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_owned(),
-            )
-        })
-        .collect();
+    // The manifest's server would rank above `.mcp.json`'s, were `demo`
+    // loaded; kept out, it stands alone.
     assert_eq!(
-        entries,
-        [
-            of("other@synced", "effective", ""),
-            of("demo@synced", "shadowed", "shadowed_by_same_named_plugin"),
-        ]
+        rows_by(&inventory, "plugin:other:zeta", "/plugin/id"),
+        [row("other@synced", "effective", "")]
+    );
+    assert_eq!(
+        rows_by(&inventory, "plugin:demo:alpha", "/plugin/id"),
+        [row(
+            "demo@synced",
+            "shadowed",
+            "shadowed_by_same_named_plugin"
+        )]
     );
 }
 
@@ -356,8 +354,8 @@ fn an_installed_plugin_turned_off_keeps_the_synced_one_of_its_name_loaded() {
             assert_eq!(
                 provenances_and_states(&inventory, name),
                 [
-                    of("plugin", "disabled", "plugin_disabled"),
-                    of("cloud_mirror", "effective", ""),
+                    row("plugin", "disabled", "plugin_disabled"),
+                    row("cloud_mirror", "effective", ""),
                 ],
                 "{settings}: {name}"
             );
@@ -365,21 +363,49 @@ fn an_installed_plugin_turned_off_keeps_the_synced_one_of_its_name_loaded() {
         for name in ["plugin:demo:search", "demo:extra"] {
             assert_eq!(
                 provenances_and_states(&inventory, name),
-                [of("cloud_mirror", "effective", "")],
+                [row("cloud_mirror", "effective", "")],
                 "{settings}: {name}"
             );
         }
     }
 }
 
+#[test]
+fn an_installed_plugin_the_managed_settings_force_off_keeps_the_synced_one_loaded() {
+    let program_files = r"C:\Program Files";
+    let fs = with_more_in_synced_demo(with_installed_demo(synced_home())).with_file(
+        PathBuf::from(program_files).join(r"ClaudeCode\managed-settings.json"),
+        json!({ "enabledPlugins": { "demo@acme": false } }).to_string(),
+    );
+    let env = FakeEnvironment::with_home(HOME).with_var("ProgramFiles", program_files);
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    for name in ["plugin:demo:docs", "demo:notes"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [
+                row("plugin", "blocked", "policy"),
+                row("cloud_mirror", "effective", ""),
+            ],
+            "{name}"
+        );
+    }
+    for name in ["plugin:demo:search", "demo:extra"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [row("cloud_mirror", "effective", "")],
+            "{name}"
+        );
+    }
+}
+
 /// The Inventory of `fs` in the context of the Project `project`, or of none.
 fn inventory_in(fs: &FakeFileSystem, project: Option<&str>) -> Inventory {
-    let core = Core::new(fake::ports(fs.clone(), FakeEnvironment::with_home(HOME))).unwrap();
-    let snapshot = core.scan(&ScanOptions::default()).unwrap();
     let context = Context {
         project: project.map(PathBuf::from),
     };
-    core.resolve(&snapshot, &context)
+    inventory_with(fs, FakeEnvironment::with_home(HOME), &context)
 }
 
 #[test]
@@ -412,7 +438,7 @@ fn an_installed_plugin_of_one_project_keeps_the_synced_one_out_there_alone() {
         for name in ["plugin:demo:search", "demo:extra"] {
             assert_eq!(
                 provenances_and_states(&inventory, name),
-                [of("cloud_mirror", state, code)],
+                [row("cloud_mirror", state, code)],
                 "{project:?}: {name}"
             );
         }
@@ -432,8 +458,8 @@ fn an_installed_plugin_that_fails_to_load_still_keeps_the_synced_one_out() {
         assert_eq!(
             provenances_and_states(&inventory, name),
             [
-                of("plugin", "invalid", "plugin_failed_to_load"),
-                of("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
+                row("plugin", "invalid", "plugin_failed_to_load"),
+                row("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
             ],
             "{name}"
         );
@@ -441,7 +467,7 @@ fn an_installed_plugin_that_fails_to_load_still_keeps_the_synced_one_out() {
     for name in ["plugin:demo:search", "demo:extra"] {
         assert_eq!(
             provenances_and_states(&inventory, name),
-            [of(
+            [row(
                 "cloud_mirror",
                 "shadowed",
                 "shadowed_by_same_named_plugin"

@@ -203,7 +203,15 @@ pub(crate) fn resolve(
             && apart_rules(definition, entry).is_none()
         {
             let project = project_key.map(String::as_str);
-            item_key(definition, snapshot, &in_context, entry, project, &absent)
+            item_key(
+                definition,
+                snapshot,
+                &in_context,
+                entry,
+                project,
+                &unread,
+                &kept_out,
+            )
         } else {
             ItemKey::Alone(
                 entry.name.clone(),
@@ -1725,16 +1733,21 @@ fn competes(
 /// the name of the Entry the Agent ranks highest among those of other
 /// locations that have its endpoint and are read, or else its endpoint; or
 /// for a remote Entry that competes by URL, its URL. The context's Project
-/// has the key `project`.
+/// has the key `project`. `unread` says whether the Agent reads an Entry,
+/// and `kept_out` whether a same-named plugin keeps its plugin out whole:
+/// such an Entry competes by none of these, and goes by its name.
+#[allow(clippy::too_many_arguments)]
 fn item_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     in_context: &[&ScannedEntry],
     entry: &ScannedEntry,
     project: Option<&str>,
-    absent: &dyn Fn(&ScannedEntry) -> bool,
+    unread: &dyn Fn(&ScannedEntry) -> bool,
+    kept_out: &dyn Fn(&ScannedEntry) -> bool,
 ) -> ItemKey {
-    if let Some(url) = url_key(definition, snapshot, entry, project, absent) {
+    let absent = |entry: &ScannedEntry| unread(entry) || kept_out(entry);
+    if let Some(url) = url_key(definition, snapshot, entry, project, &absent) {
         return ItemKey::Url(url);
     }
     let location = definition.location(&entry.location);
@@ -1751,7 +1764,9 @@ fn item_key(
     }
     // Of same-named Entries that compete by endpoint, such as a plugin's
     // servers in two of its files, the Agent keeps the one it ranks
-    // highest: they compete with the others by its endpoint.
+    // highest: they compete with the others by its endpoint. One a
+    // same-named plugin keeps out goes with the others of its name, or by
+    // its name alone.
     let same_name = in_context
         .iter()
         .filter(|other| {
@@ -1759,7 +1774,7 @@ fn item_key(
                 && other.home == entry.home
                 && other.name == entry.name
                 && competition.by_endpoint(&other.location)
-                && (std::ptr::eq(**other, entry) || !absent(other))
+                && !kept_out(other)
         })
         .min_by_key(|other| {
             (
@@ -1767,8 +1782,10 @@ fn item_key(
                 definition.rank(definition.location(&other.location)),
             )
         })
-        .copied()
-        .unwrap_or(entry);
+        .copied();
+    let Some(same_name) = same_name else {
+        return by_name(entry);
+    };
     let Some(endpoint) = blocks::endpoint(&same_name.config) else {
         return by_name(entry);
     };
@@ -2071,7 +2088,7 @@ fn kept_out_by<'e>(
     project: Option<&str>,
 ) -> Option<&'e ScannedPlugin> {
     let plugin = entry.plugin.as_ref()?;
-    plugin.loses_to.iter().find(|winner| {
+    plugin.winners.iter().find(|winner| {
         (winner.project.is_none() || winner.project.as_deref() == project)
             && !disable::plugin_off(definition, snapshot, entry, winner, project)
     })
@@ -3122,17 +3139,18 @@ fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
 }
 
 /// The URL `entry` competes by, when its location's remote Entries compete
-/// by URL, the Feature gate that makes them is on, and it is read.
+/// by URL, the Feature gate that makes them is on, and it is not `absent`:
+/// read, and not kept out by a same-named plugin.
 fn url_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
-    unread: &dyn Fn(&ScannedEntry) -> bool,
+    absent: &dyn Fn(&ScannedEntry) -> bool,
 ) -> Option<String> {
     let location = definition.location(&entry.location);
     let block = definition.rules(location.kind).competition.same_url()?;
-    if unread(entry) || !gate_on(definition, snapshot, entry, &block.gate, project) {
+    if absent(entry) || !gate_on(definition, snapshot, entry, &block.gate, project) {
         return None;
     }
     block.url_of(&location.id, &entry.config)

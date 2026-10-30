@@ -763,7 +763,8 @@ pub(crate) struct PluginsDefinition {
     /// context, and is not turned off there, has a plugin's name, every
     /// Entry of the plugin is Shadowed, with `shadowed_by_same_named_plugin`,
     /// and competes with no other. The name is the one the list reads.
-    pub loses_to: Option<Vec<String>>,
+    #[serde(default)]
+    pub loses_to: Vec<String>,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -844,9 +845,6 @@ impl PluginsDefinition {
         }
         if self.unique_names && self.same_names_invalid {
             return Err("plugins that share a name are renamed or invalid, not both".into());
-        }
-        if self.loses_to.as_ref().is_some_and(Vec::is_empty) {
-            return Err("loses_to needs a plugins list".into());
         }
         if self
             .uninstall
@@ -1738,7 +1736,7 @@ impl AgentDefinition {
         for (index, plugins) in self.plugins.iter().enumerate() {
             let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
             plugins.validate().map_err(context)?;
-            for id in plugins.loses_to.iter().flatten() {
+            for id in &plugins.loses_to {
                 match self.plugins.iter().position(|other| other.id == *id) {
                     None => return Err(context(format!("loses_to `{id}` is no plugins list"))),
                     Some(at) if at == index => {
@@ -4953,52 +4951,53 @@ locations = {locations}
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
     }
 
-    /// `with_plugins` plus the list `synced` after `installed`, which loses
-    /// whole to the same-named plugins of the lists `loses_to`.
-    fn with_losing_list(loses_to: &str) -> String {
+    /// `with_plugins` plus the list `synced` after `installed`, each list
+    /// losing whole to the same-named plugins of the lists its `loses_to`
+    /// names.
+    fn with_losing_lists(installed_loses_to: &str, synced_loses_to: &str) -> String {
         with_plugins(&format!(
             r#"
 [[plugins]]
 id = "synced"
 registry = {{ block = "plugin-folders", anchor = {{ block = "home", root = "plugins", path = "synced" }}, depth = 1 }}
-loses_to = {loses_to}
+loses_to = {synced_loses_to}
 "#
         ))
+        .replacen(
+            "id = \"installed\"\n",
+            &format!("id = \"installed\"\nloses_to = {installed_loses_to}\n"),
+            1,
+        )
     }
 
     #[test]
     fn a_plugin_list_loses_whole_only_to_earlier_lists() {
-        let text = with_losing_list(r#"["installed"]"#);
+        let text = with_losing_lists("[]", r#"["installed"]"#);
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
-        for (loses_to, refusal) in [
+        for (installed, synced, refusal) in [
             (
+                "[]",
                 r#"["market"]"#,
                 "plugins `synced`: loses_to `market` is no plugins list",
             ),
             (
+                "[]",
                 r#"["synced"]"#,
                 "plugins `synced`: loses_to `synced` is its own list",
             ),
-            (r#"[]"#, "plugins `synced`: loses_to needs a plugins list"),
+            (
+                r#"["synced"]"#,
+                "[]",
+                "plugins `installed`: loses_to `synced` comes after it",
+            ),
         ] {
-            let text = with_losing_list(loses_to);
+            let text = with_losing_lists(installed, synced);
             assert!(
                 error(&text).contains(refusal),
-                "{loses_to}: {}",
+                "{installed} {synced}: {}",
                 error(&text)
             );
         }
-        // `installed` comes before `synced`, so it cannot lose to it.
-        let text = with_losing_list("[]").replace(
-            "uninstall = \"agent plugin uninstall {id} --scope {scope}\"",
-            "uninstall = \"agent plugin uninstall {id} --scope {scope}\"\nloses_to = [\"synced\"]",
-        );
-        let text = text.replace("loses_to = []\n", "");
-        assert!(
-            error(&text).contains("plugins `installed`: loses_to `synced` comes after it"),
-            "{}",
-            error(&text)
-        );
     }
 
     /// `with_plugins`, its plugin servers competing by endpoint and ranked
