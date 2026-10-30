@@ -117,29 +117,31 @@ await p.check("locations[managed-settings-mcp]", "a `managedMcpServers` entry wi
 // loaded is read from that name's line in `claude mcp list`: the user
 // server's command, or the managed entry's command or URL.
 {
-  const shadowHome = path.join(base, "shadow-home");
-  write(path.join(shadowHome, ".claude.json"), {
-    mcpServers: { "cd-throwaway-shadow-stdio": stdio("user-stdio"), "cd-throwaway-shadow-plain": stdio("user-plain") },
-  });
+  const competeHome = path.join(base, "compete-home");
+  const users = { "cd-throwaway-shadow-stdio": stdio("user-stdio"), "cd-throwaway-shadow-plain": stdio("user-plain") };
+  write(path.join(competeHome, ".claude.json"), { mcpServers: users });
   const dropped = {
     "cd-throwaway-shadow-stdio": stdio("managed-stdio"),
     "cd-throwaway-shadow-plain": { type: "http", url: "http://cd-throwaway-shadow-plain.invalid/mcp" },
   };
+  // What `claude mcp list` prints of a server after its name.
+  const shown = (server) => server.url ?? [server.command, ...server.args].join(" ");
   const loaded = async () => {
-    const { stdout, stderr } = await run(bin, ["mcp", "list"], { cwd: proj, env: { ...env, CLAUDE_CONFIG_DIR: shadowHome } });
+    const { stdout, stderr } = await run(bin, ["mcp", "list"], { cwd: proj, env: { ...env, CLAUDE_CONFIG_DIR: competeHome } });
     const lines = (stdout + stderr).split("\n").map((l) => l.trim());
     return Object.fromEntries(Object.keys(dropped).map((n) => {
       const line = lines.find((l) => l.startsWith(`${n}:`));
       if (line === undefined) return [n, "nothing"];
-      if (line.includes("cmd /c user-")) return [n, "user"];
-      if (line.includes("cmd /c managed-") || line.includes("cd-throwaway-shadow-plain.invalid")) return [n, "managed"];
+      if (line.includes(shown(users[n]))) return [n, "user"];
+      if (line.includes(shown(dropped[n]))) return [n, "managed"];
       return [n, `other: ${line}`];
     }));
   };
 
   await p.check("locations[managed-settings-mcp]", "a `managedMcpServers` entry with a command, or at an `http://` URL, in `managed-settings.json` or the HKLM value, is dropped and a user server of its name loads", async () => {
+    const settings = JSON.stringify({ managedMcpServers: dropped });
     const seen = {};
-    for (const [label, sources] of [["file", { file: JSON.stringify({ managedMcpServers: dropped }) }], ["hklm", { hklmText: JSON.stringify({ managedMcpServers: dropped }) }]]) {
+    for (const [label, sources] of [["file", { file: settings }], ["hklm", { hklmText: settings }]]) {
       await deploy(sources);
       seen[label] = await loaded();
     }
