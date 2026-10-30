@@ -1280,7 +1280,7 @@ fn a_plugin_vs_code_installed_from_a_marketplace_is_read_where_installed_json_sa
 
 /// The default profile's server Entries of agent plugins in `inventory`,
 /// each `<name> <state> <file name>`, sorted.
-fn plugin_servers_of(inventory: &Inventory) -> Vec<String> {
+fn plugin_server_states(inventory: &Inventory) -> Vec<String> {
     let mut servers: Vec<String> = inventory
         .items
         .iter()
@@ -1297,64 +1297,67 @@ fn plugin_servers_of(inventory: &Inventory) -> Vec<String> {
 }
 
 #[test]
-fn a_manifest_in_claude_plugin_or_plugin_adds_the_file_its_mcp_servers_names_and_one_in_github_plugin_does_not()
- {
+fn a_manifest_names_a_file_of_servers_from_claude_plugin_or_plugin_not_github_plugin() {
     // The probe's `manifests` launch: each manifest names `servers.json`.
     // VS Code 1.129.1 to 1.141.0 never take `.github/plugin/plugin.json` for
     // a plugin's manifest.
-    let manifest = r#"{ "name": "named", "mcpServers": "./servers.json" }"#;
-    let dot = |tag: &str| format!(r#"{{ "mcpServers": {{ "{tag}-dot": {{ "command": "x" }} }} }}"#);
-    let file =
-        |tag: &str| format!(r#"{{ "mcpServers": {{ "{tag}-file": {{ "command": "x" }} }} }}"#);
-    let (github, claude, open) = (
-        [dot("github"), file("github")],
-        [dot("claude"), file("claude")],
-        [dot("open"), file("open")],
-    );
+    let manifest = |tag: &str| {
+        format!(r#"{{ "name": "cd-throwaway-{tag}", "mcpServers": "./servers.json" }}"#)
+    };
+    let servers = |tag: &str| {
+        format!(r#"{{ "mcpServers": {{ "cd-throwaway-{tag}": {{ "command": "x" }} }} }}"#)
+    };
+    let [github, claude, open] = ["github", "claude", "open"].map(|tag| {
+        [
+            manifest(tag),
+            servers(&format!("{tag}-dot")),
+            servers(&format!("{tag}-file")),
+        ]
+    });
     let fs = with_listed(
         with_home(vscode()),
         &[
             (
                 "github",
                 &[
-                    (".github/plugin/plugin.json", manifest),
-                    (".mcp.json", &github[0]),
-                    ("servers.json", &github[1]),
+                    (".github/plugin/plugin.json", &github[0]),
+                    (".mcp.json", &github[1]),
+                    ("servers.json", &github[2]),
                 ],
             ),
             (
                 "claude",
                 &[
-                    (".claude-plugin/plugin.json", manifest),
-                    (".mcp.json", &claude[0]),
-                    ("servers.json", &claude[1]),
+                    (".claude-plugin/plugin.json", &claude[0]),
+                    (".mcp.json", &claude[1]),
+                    ("servers.json", &claude[2]),
                 ],
             ),
             (
                 "open",
                 &[
-                    (".plugin/plugin.json", manifest),
-                    (".mcp.json", &open[0]),
-                    ("servers.json", &open[1]),
+                    (".plugin/plugin.json", &open[0]),
+                    (".mcp.json", &open[1]),
+                    ("servers.json", &open[2]),
                 ],
             ),
         ],
     );
 
     assert_eq!(
-        plugin_servers_of(&inventory(&fs)),
+        plugin_server_states(&inventory(&fs)),
         [
-            "claude-dot effective .mcp.json",
-            "claude-file effective servers.json",
-            "github-dot effective .mcp.json",
-            "open-dot effective .mcp.json",
-            "open-file effective servers.json",
+            "cd-throwaway-claude-dot effective .mcp.json",
+            "cd-throwaway-claude-file effective servers.json",
+            "cd-throwaway-github-dot effective .mcp.json",
+            "cd-throwaway-open-dot effective .mcp.json",
+            "cd-throwaway-open-file effective servers.json",
         ]
     );
 }
 
 #[test]
-fn of_a_server_both_a_plugin_s_mcp_json_and_its_named_file_name_the_mcp_json_s_wins() {
+fn a_plugin_s_mcp_json_server_shadows_the_one_of_its_name_in_the_file_its_manifest_names() {
     let fs = with_listed(
         with_home(vscode()),
         &[(

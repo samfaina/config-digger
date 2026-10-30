@@ -108,12 +108,14 @@ workspace_files = true
 # from a marketplace sits in VS Code's clone of it, `<host>\<owner>\<repo>`
 # in this folder, and its item names the marketplace by its URL and the
 # plugin by its name in the marketplace [test]; VS Code 1.143.1 adds the
-# folder's path below this one, `relativePath`. A folder directly here
-# that `installed.json` does not list is not read [test]. A plugin's id is
-# its folder below this one, so two marketplaces' plugins of one name stay
-# apart. A plugin is
-# named by its manifest's `name`, or else by its folder. VS Code uninstalls
-# one in the Extensions view. `chat.pluginLocations` in the user's settings
+# folder's path below this one, `relativePath` [test]. A folder directly
+# here that `installed.json` does not list is not read [test]. A plugin's
+# id is its folder below this one, so two marketplaces' plugins of one
+# name stay apart. A plugin is named by its manifest's `name`, or else by
+# its folder; its name is read in the four manifest places, though VS Code
+# 1.129.1 to 1.141.0 read no manifest in `.github\plugin` (see
+# `plugin-manifest-mcp`), and how VS Code names a plugin was not tested.
+# VS Code uninstalls one in the Extensions view. `chat.pluginLocations` in the user's settings
 # adds plugins by their path [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
@@ -325,11 +327,10 @@ risks = ["agent_may_drop_entries"]
 # which `plugin-manifest-mcp` reads; a manifest's inline `mcpServers` takes
 # the `.mcp.json`'s place (see `plugin-manifest-mcp`). VS Code reads a
 # `.mcp.json` it cannot parse around the error, and starts the servers it
-# finds there [test]: it
-# keeps what `node-jsonc-parser`'s code keeps around `,,`, a missing comma,
-# a key with no value, which drops that key, an object left open at the
-# end of the file, and a string left open in a server, which takes the
-# next server into it [test].
+# finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
+# around `,,`, a missing comma, a key with no value, which drops that key,
+# an object left open at the end of the file, and a string left open in a
+# server, which takes the next server into it [test].
 [[locations]]
 id = "plugin-mcp"
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
@@ -347,9 +348,9 @@ on_read_failure = "reads_around_error"
 # such as `"./servers.json"`, which VS Code reads after the plugin's
 # `.mcp.json`, the manifest at its root, in `.claude-plugin` or in
 # `.plugin` [test]. A manifest in `.github\plugin` is not read: its
-# `mcpServers` adds nothing [test], though VS Code 1.143.1 reads it. VS
-# Code takes the first of `.plugin`, `.claude-plugin` and the root for the
-# manifest [binary]. Of a server the two files both name, VS Code starts
+# `mcpServers` adds nothing [test], though VS Code 1.143.1 reads it
+# [test]. VS Code takes the first of `.plugin`, `.claude-plugin` and the
+# root for the manifest [binary]. Of a server the two files both name, VS Code starts
 # the `.mcp.json`'s only, the named file's never [test], so the
 # `.mcp.json`'s ranks first. An inline object of servers in `mcpServers`
 # takes the place of the `.mcp.json`, whose servers do not start, and a

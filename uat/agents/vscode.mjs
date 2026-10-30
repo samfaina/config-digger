@@ -33,7 +33,7 @@ import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { fresh, gitInit, json, probe, root, run, same, skill, write } from "./lib.mjs";
+import { fresh, json, probe, root, run, same, skill, write } from "./lib.mjs";
 
 // `node:sqlite` warns that it is experimental on every run.
 process.removeAllListeners("warning");
@@ -48,6 +48,11 @@ const commit = fs.readdirSync(path.dirname(bin)).find((f) => fs.existsSync(path.
 // and the built-in extensions.
 const app = path.join(path.dirname(bin), commit, "resources", "app");
 const version = json(path.join(app, "product.json")).version;
+// Whether the version is 1.`minor` or later.
+const fromMinor = (minor) => {
+  const [major, own] = version.split(".").map(Number);
+  return major > 1 || own >= minor;
+};
 // The CLI of config-digger that the `nonce` launch asks, `--cli`, or else
 // the debug build of this checkout, which `cargo build -p
 // config-digger-cli` makes.
@@ -518,8 +523,7 @@ if (runs("install")) {
     `[user]\n\tname = cd-throwaway\n\temail = cd-throwaway@cd-throwaway.invalid\n[url "${pathToFileURL(repo).href}"]\n\tinsteadOf = ${marketUrl}\n`,
   );
   const gitEnv = { GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" };
-  await gitInit(repo);
-  for (const args of [["add", "-A"], ["commit", "-q", "-m", "cd-throwaway"]]) {
+  for (const args of [["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "cd-throwaway"]]) {
     const done = await run("git", args, { cwd: repo, env: gitEnv });
     if (done.code !== 0) throw new Error(`git ${args[0]} failed: ${done.stderr}`);
   }
@@ -535,8 +539,7 @@ if (runs("install")) {
   const folder = path.join(clone, "plugins", "installed");
   // 1.143.1 adds the folder's path below `agent-plugins`, which 1.141.0
   // does not write.
-  const [major, minor] = version.split(".").map(Number);
-  const relativePath = major > 1 || minor >= 143 ? { relativePath: path.relative(d.plugins, folder).replaceAll("\\", "/") } : {};
+  const relativePath = fromMinor(143) ? { relativePath: path.relative(d.plugins, folder).replaceAll("\\", "/") } : {};
 
   await p.check("plugins[agent-plugins]", "VS Code clones a marketplace it installs a plugin from into `agent-plugins\\<host>\\<owner>\\<repo>`, and lists the plugin in `installed.json` as `{\"version\": 1, \"installed\": [{\"pluginUri\", \"marketplace\", \"name\"}]}`, its `pluginUri` the `file:` URI of the plugin's folder in the clone, from 1.143.1 with a `relativePath` too", async () =>
     same(
@@ -597,8 +600,7 @@ if (runs("files")) {
   );
   await p.check("locations[claude-desktop-mcp]", "the user's `chat.mcp.discovery.enabled` turns Claude Desktop's config on", async () => same(seen.tags.includes("desktop"), true));
   // `external` is there from 1.135.0 on, and not in 1.129.1.
-  const [major, minor] = version.split(".").map(Number);
-  const hasExternal = major > 1 || minor >= 135;
+  const hasExternal = fromMinor(135);
   await p.check("locations[extension-mcp]", "the cache spells a launch's `env` as an object, its `headers` as `[name, value]` pairs, its `args` as an array, and its `uri` as a URI object whose `authority`, `query` and `fragment` hold the userinfo, the query and the fragment, and, from 1.135.0, whose `external` holds the whole URL with `=` and `&` encoded", async () => {
     const servers = seen.cache?.["cd-throwaway.probe/cd-throwaway-provider"]?.servers ?? [];
     const launchOf = (label) => servers.find((s) => s.label === label)?.launch;
