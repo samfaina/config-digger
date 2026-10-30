@@ -238,12 +238,11 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # on its default options, and looks at none of the errors it finds [code].
 # So it reads comments, and a trailing comma after the last server or
 # after the last field of a server, as if they were not there [test]. And
-# it starts the servers that parser keeps around an error: those on both
-# sides of `,,` or of a missing comma, those after a key with no value,
-# which drops that key, those of an object left open at the end of the
-# file, and with a string left open in a server, which takes the next
-# server into it, that server and those before it [test]. config-digger
-# reads the file the same way, through its port of that parser.
+# it starts the servers that parser keeps around `,,`, a missing comma, a
+# key with no value, which drops that key, an object left open at the end
+# of the file, and a string left open in a server, which takes the next
+# server into it [test]. config-digger reads the file the same way,
+# through its port of that parser.
 [[locations]]
 id = "cursor-plugin-mcp"
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".mcp.json", "mcp.json"] }

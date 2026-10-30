@@ -2549,21 +2549,34 @@ fn read_failure<'i>(inventory: &'i Inventory, path: &Path) -> &'i ReadFailure {
         .unwrap_or_else(|| panic!("{} is no Read failure", path.display()))
 }
 
-#[test]
-fn a_plugin_s_servers_file_with_an_error_lists_the_servers_around_it_with_no_caveat() {
-    let broken = r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#;
-    let kit_mcp = local_plugin("kit").join("mcp.json");
-    let docs_mcp = plugin_cache(r"market\docs\1.0.0\.mcp.json");
+/// A local plugin's `mcp.json` and a Claude Code plugin's `.mcp.json`.
+fn servers_files() -> [(&'static str, PathBuf); 2] {
+    [
+        ("kit", local_plugin("kit").join("mcp.json")),
+        ("docs", plugin_cache(r"market\docs\1.0.0\.mcp.json")),
+    ]
+}
+
+/// The inventory with both of `servers_files` holding `text`, the Claude
+/// Code plugin installed and Cursor's gate importing it on.
+fn servers_files_holding(text: &str) -> Inventory {
     let fs = with_installed(
         cursor(),
         json!({ "docs@market": user_install("docs") }),
         json!({ "docs@market": true }),
     );
-    let fs = with_gates(fs, &[("enable_cc_plugin_import", true)])
-        .with_file(&kit_mcp, broken)
-        .with_file(&docs_mcp, broken);
+    let fs = with_gates(fs, &[("enable_cc_plugin_import", true)]);
+    let fs = servers_files()
+        .iter()
+        .fold(fs, |fs, (_, file)| fs.with_file(file, text));
+    inventory(&fs)
+}
 
-    let inventory = inventory(&fs);
+#[test]
+fn a_plugin_s_servers_file_with_an_error_lists_the_servers_around_it_with_no_caveat() {
+    let inventory = servers_files_holding(
+        r#"{ "mcpServers": { "a": { "command": "a" },, "b": { "command": "b" } } }"#,
+    );
 
     for name in [
         "plugin-kit-a",
@@ -2575,8 +2588,8 @@ fn a_plugin_s_servers_file_with_an_error_lists_the_servers_around_it_with_no_cav
         assert_eq!(code(item.state), "effective", "{name}");
         assert!(item.caveats.is_empty(), "{name}: {:?}", item.caveats);
     }
-    for file in [&kit_mcp, &docs_mcp] {
-        let failure = read_failure(&inventory, file);
+    for (_, file) in servers_files() {
+        let failure = read_failure(&inventory, &file);
         assert_eq!(code(failure.kind), "parse", "{}", file.display());
         assert_eq!(code(failure.reaction), "reads_around_error");
         let position = failure.position.as_ref().unwrap();
@@ -2589,46 +2602,62 @@ fn a_plugin_s_servers_file_with_an_error_lists_the_servers_around_it_with_no_cav
 }
 
 // Comments, trailing commas and four errors besides `,,`, in the texts
-// `cursor.mjs` gives the real Cursor, each case asserting what it started
-// (#438).
+// `cursor.mjs` gives the real Cursor, its servers named apart, each case
+// asserting what it started (#438).
 
-/// What config-digger reads of a servers file holding `text`, in a local
-/// plugin's `mcp.json` and then in a Claude Code plugin's `.mcp.json`: the
-/// servers it lists, and whether the file is a Read failure.
-fn servers_read(text: &str) -> [(Vec<String>, bool); 2] {
-    let kit_mcp = local_plugin("kit").join("mcp.json");
-    let docs_mcp = plugin_cache(r"market\docs\1.0.0\.mcp.json");
-    let fs = with_installed(
-        cursor(),
-        json!({ "docs@market": user_install("docs") }),
-        json!({ "docs@market": true }),
-    );
-    let fs = fs.with_file(&kit_mcp, text).with_file(&docs_mcp, text);
-    let inventory = inventory(&fs);
-    [("kit", &kit_mcp), ("docs", &docs_mcp)].map(|(plugin, file)| {
+/// What config-digger reads of one plugin's servers file.
+#[derive(Debug, PartialEq)]
+struct ServersRead {
+    /// The servers it lists, by their names in the file.
+    servers: Vec<String>,
+    /// Whether the file is a Read failure, read around its error.
+    around_error: bool,
+}
+
+/// What config-digger reads of `servers_files` holding `text`, each server
+/// checked to be an Effective Item with no caveat.
+fn servers_read(text: &str) -> [ServersRead; 2] {
+    let inventory = servers_files_holding(text);
+    servers_files().map(|(plugin, file)| {
         let prefix = format!("plugin-{plugin}-");
-        let mut names: Vec<String> = cursor_items(&inventory)
-            .filter_map(|item| item.name.strip_prefix(&prefix))
-            .map(str::to_owned)
-            .collect();
-        names.sort();
-        let failed = inventory
+        let mut servers: Vec<String> = Vec::new();
+        for item in cursor_items(&inventory) {
+            let Some(name) = item.name.strip_prefix(&prefix) else {
+                continue;
+            };
+            assert_eq!(code(item.state), "effective", "{}", item.name);
+            assert!(item.caveats.is_empty(), "{}: {:?}", item.name, item.caveats);
+            servers.push(name.to_owned());
+        }
+        servers.sort();
+        let failure = inventory
             .read_failures
             .iter()
-            .any(|failure| failure.agent == "cursor" && &failure.path == file);
-        (names, failed)
+            .find(|failure| failure.agent == "cursor" && failure.path == file);
+        if let Some(failure) = failure {
+            assert_eq!(code(failure.reaction), "reads_around_error");
+        }
+        ServersRead {
+            servers,
+            around_error: failure.is_some(),
+        }
     })
 }
 
-/// `servers`, listed from a file that parses, in both kinds of plugin.
-fn parsed(servers: &[&str]) -> [(Vec<String>, bool); 2] {
-    let names: Vec<String> = servers.iter().map(|&name| name.to_owned()).collect();
-    [(names.clone(), false), (names, false)]
+/// `servers`, listed from a file read with no error, in both plugins.
+fn parsed(servers: &[&str]) -> [ServersRead; 2] {
+    [(); 2].map(|()| ServersRead {
+        servers: servers.iter().map(|&name| name.to_owned()).collect(),
+        around_error: false,
+    })
 }
 
-/// `servers`, listed around the file's error, in both kinds of plugin.
-fn around_error(servers: &[&str]) -> [(Vec<String>, bool); 2] {
-    parsed(servers).map(|(names, _)| (names, true))
+/// `servers`, listed around the file's error, in both plugins.
+fn around_error(servers: &[&str]) -> [ServersRead; 2] {
+    parsed(servers).map(|read| ServersRead {
+        around_error: true,
+        ..read
+    })
 }
 
 #[test]
