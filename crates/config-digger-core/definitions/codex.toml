@@ -491,8 +491,8 @@ on_read_failure = "ignores_file"
 # `skills`, a path or a list of them, or else in its `skills` folder
 # [source]. Codex names them `<plugin>:<skill>` [source]. It finds every
 # `SKILL.md` below each folder, the folder's own included, up to 6 folders
-# down [source, test]; a declared folder holding one is read here as that
-# one skill alone.
+# down [source], as in the `skills` folder of an installed plugin [test]; a
+# declared folder holding one is read here as that one skill alone.
 [[locations]]
 id = "plugin-skills"
 anchor = { block = "plugin", plugins = "installed", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
@@ -521,8 +521,8 @@ on_read_failure = "ignores_file"
 # skills with one name are both used [source, docs]. Trust keeps out no
 # skill. It finds skill folders up to 6 folders below a root [test], and
 # below a plugin's skills folder by the same loader [source], an installed
-# plugin's [test]. It skips a `SKILL.md` that is not UTF-8 or cannot be
-# opened [test]. A frontmatter that is not YAML it reads again with each
+# plugin's `skills` folder too [test]. It skips a `SKILL.md` that is not
+# UTF-8 or cannot be opened [test]. A frontmatter that is not YAML it reads again with each
 # plain value that holds `: ` quoted, as `quote-values` says:
 # `description: Use when: x` loads, and `name: [unclosed` names a skill
 # `[unclosed` [source, test]. A stray line, an indented `name`, two `name`
