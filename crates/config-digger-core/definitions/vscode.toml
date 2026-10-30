@@ -238,11 +238,13 @@ on_read_failure = "ignores_file"
 
 # A `.code-workspace` file's `settings.mcp` [docs]. VS Code skips these
 # servers when the file does not parse, but still opens the file's folders
-# and applies its other settings, read around the error [test].
+# and applies its other settings, read around the error [test]: it keeps
+# what `node-jsonc-parser`'s code keeps around `,,`, a missing comma, a key
+# with no value, `settings` left open at the end of the file, and a string
+# left open in a folder, which swallows the folder after it [test].
 # config-digger reads the file's folders and settings around the error too.
 [[locations]]
 id = "workspace-mcp"
-unverified = "Of a `.code-workspace` file that does not parse, VS Code is taken to keep the folders and settings `node-jsonc-parser`'s code keeps around an error other than `,,`, the one the probe tests; a probe workspace file holding other errors would test it (#437)."
 anchor = { block = "project-file" }
 format = { block = "json", dialect = "jsonc" }
 root = ["settings", "mcp", "servers"]
@@ -319,10 +321,13 @@ risks = ["agent_may_drop_entries"]
 # An agent plugin's servers are in the `.mcp.json` at its root, whatever
 # its manifest [test], and in the file a manifest's `mcpServers` names,
 # which `plugin-manifest-mcp` reads. VS Code reads a `.mcp.json` it cannot
-# parse around the error, and starts the servers it finds there [test].
+# parse around the error, and starts the servers it finds there [test]: it
+# keeps what `node-jsonc-parser`'s code keeps around `,,`, a missing comma,
+# a key with no value, which drops that key, an object left open at the
+# end of the file, and a string left open in a server, which takes the
+# next server into it [test].
 [[locations]]
 id = "plugin-mcp"
-unverified = "Of a plugin `.mcp.json` that does not parse, VS Code is taken to keep what `node-jsonc-parser`'s code keeps around an error other than `,,`, the one the probe tests; a probe plugin whose `.mcp.json` holds other errors would test it (#437)."
 anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]

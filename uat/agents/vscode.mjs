@@ -529,6 +529,74 @@ if (runs("broken-workspace")) {
   );
 }
 
+// Four errors besides `,,`, each in a plugin's `.mcp.json` and in a
+// `.code-workspace` file, one member per line (#437). `tests/vscode.rs`
+// reads the same texts, its servers and folders named apart.
+const member = (key, value) => `"${key}": ${JSON.stringify(value)}`;
+// `items` in code spans, as "`a`, `b` and `c`".
+const spans = (items) => items.map((i) => `\`${i}\``).join(", ").replace(/, ([^,]*)$/, " and $1");
+const pluginServer = (t) => member(`cd-throwaway-plugin-${t}`, server(`plugin-${t}`));
+// The server `plugin-b` with a member whose string is left open: it runs
+// to the end of the line, swallowing the `}` and `,` after it.
+const openServer = `"cd-throwaway-plugin-b": ${JSON.stringify(server("plugin-b")).slice(0, -1)}, "note": "open },`;
+const pluginErrors = [
+  ["comma", "a missing comma between two servers", `{ "mcpServers": {\n  ${pluginServer("a")}\n  ${pluginServer("b")},\n  ${pluginServer("c")}\n} }`],
+  ["value", "a key with no value", `{ "mcpServers": {\n  "cd-throwaway-plugin-a": ,\n  ${pluginServer("b")},\n  ${pluginServer("c")}\n} }`],
+  ["open-object", "an object left open at the end of the file", `{ "mcpServers": {\n  ${pluginServer("a")},\n  ${pluginServer("b")}\n`],
+  ["open-string", "a string left open inside a server", `{ "mcpServers": {\n  ${pluginServer("a")},\n  ${openServer}\n  ${pluginServer("c")}\n} }`],
+];
+const workspaceSettings = {
+  "chat.mcp.discovery.enabled": { "claude-desktop": true },
+  mcp: { servers: { "cd-throwaway-workspace": server("workspace") } },
+};
+const workspaceFolders = member("folders", [{ path: "proj" }, { path: "other" }]);
+const workspaceErrors = [
+  ["comma", "a missing comma between `folders` and `settings`", `{\n  ${workspaceFolders}\n  ${member("settings", workspaceSettings)}\n}`],
+  ["value", "a key with no value between `folders` and `settings`", `{\n  ${workspaceFolders},\n  "cd-throwaway-a": ,\n  ${member("settings", workspaceSettings)}\n}`],
+  [
+    "open-object",
+    "`settings` left open at the end of the file",
+    `{\n  ${workspaceFolders},\n  "settings": {\n    ${Object.entries(workspaceSettings).map(([k, v]) => member(k, v)).join(",\n    ")}\n`,
+  ],
+  [
+    "open-string",
+    "a string left open inside the first folder",
+    `{\n  "folders": [\n    { "path": "proj", "name": "open },\n    { "path": "other" }\n  ],\n  ${member("settings", workspaceSettings)}\n}`,
+  ],
+];
+// What VS Code keeps of each, as `node-jsonc-parser`'s code reads it.
+const pluginKept = { comma: ["a", "b", "c"], value: ["b", "c"], "open-object": ["a", "b"], "open-string": ["a", "b"] };
+const workspaceKept = { comma: ["other", "proj"], value: ["other", "proj"], "open-object": ["other", "proj"], "open-string": ["proj"] };
+
+if (runs("broken-plugin")) {
+  for (const [name, error, text] of pluginErrors) {
+    const seen = await brokenLaunch(`plugin-${name}`, ({ d }) => {
+      const plugin = marketplace(d.plugins, [["plugin-p", { "plugin.json": manifest("plugin-p"), ".mcp.json": text }]]);
+      return { file: path.join(plugin["plugin-p"], ".mcp.json") };
+    });
+    await p.check("locations[plugin-mcp]", `VS Code reads an agent plugin's \`.mcp.json\` around ${error}: of \`plugin-a\`, \`plugin-b\` and \`plugin-c\`, ${spans(pluginKept[name].map((t) => `plugin-${t}`))} start`, async () =>
+      same(seen.tags, ["folder-ok", ...pluginKept[name].map((t) => `plugin-${t}`), "user-ok"].sort()),
+    );
+  }
+}
+if (runs("broken-workspace")) {
+  for (const [name, error, text] of workspaceErrors) {
+    const seen = await brokenLaunch(`workspace-${name}`, ({ dir, d }) => {
+      const file = path.join(dir, "cd-throwaway.code-workspace");
+      fs.mkdirSync(path.join(dir, "other"), { recursive: true });
+      write(file, text);
+      claudeDesktop(d);
+      return { file, open: file };
+    });
+    await p.check("locations[workspace-mcp]", `VS Code reads a \`.code-workspace\` file around ${error}: it opens ${spans(workspaceKept[name])}, applies \`chat.mcp.discovery.enabled\` and starts none of the file's servers`, async () =>
+      same(
+        { folders: seen.done.folders?.map((f) => path.basename(f)).sort(), discovery: seen.tags.includes("desktop"), servers: seen.tags.includes("workspace") },
+        { folders: workspaceKept[name], discovery: true, servers: false },
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------- which settings turn discovery on
 
 // Whether VS Code reads Claude Desktop's config, with

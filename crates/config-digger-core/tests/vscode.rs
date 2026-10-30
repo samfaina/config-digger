@@ -2025,6 +2025,133 @@ fn a_plugin_mcp_json_with_an_error_lists_the_servers_around_it_with_no_caveat() 
     );
 }
 
+// Four errors besides `,,`, in the texts `vscode.mjs` gives the real VS
+// Code, each case asserting what it started or opened (#437).
+
+/// The servers config-digger lists from the fixture plugin's `.mcp.json`
+/// holding `text`, in the default profile.
+fn plugin_servers(text: &str) -> Vec<String> {
+    let fs = with_home(vscode()).with_file(review_kit().join(".mcp.json"), text);
+    let inventory = inventory(&fs);
+    let mut names: Vec<String> = inventory
+        .items
+        .iter()
+        .filter(|item| {
+            item.agent == "vscode"
+                && item.home == "default"
+                && item
+                    .entries
+                    .iter()
+                    .any(|entry| entry.path == review_kit().join(".mcp.json"))
+        })
+        .map(|item| item.name.clone())
+        .collect();
+    names.sort();
+    names
+}
+
+#[test]
+fn a_plugin_mcp_json_missing_a_comma_between_servers_lists_them_all() {
+    let text = "{ \"mcpServers\": {\n  \"cd-throwaway-plugin-a\": {\"command\":\"a\"}\n  \"cd-throwaway-plugin-b\": {\"command\":\"b\"},\n  \"cd-throwaway-plugin-c\": {\"command\":\"c\"}\n} }";
+
+    assert_eq!(
+        plugin_servers(text),
+        [
+            "cd-throwaway-plugin-a",
+            "cd-throwaway-plugin-b",
+            "cd-throwaway-plugin-c"
+        ]
+    );
+}
+
+#[test]
+fn a_plugin_mcp_json_key_with_no_value_lists_the_servers_after_it() {
+    let text = "{ \"mcpServers\": {\n  \"cd-throwaway-plugin-a\": ,\n  \"cd-throwaway-plugin-b\": {\"command\":\"b\"},\n  \"cd-throwaway-plugin-c\": {\"command\":\"c\"}\n} }";
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-b", "cd-throwaway-plugin-c"]
+    );
+}
+
+#[test]
+fn a_plugin_mcp_json_left_open_at_its_end_lists_its_servers() {
+    let text = "{ \"mcpServers\": {\n  \"cd-throwaway-plugin-a\": {\"command\":\"a\"},\n  \"cd-throwaway-plugin-b\": {\"command\":\"b\"}\n";
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-a", "cd-throwaway-plugin-b"]
+    );
+}
+
+#[test]
+fn a_string_left_open_in_a_plugin_s_server_takes_the_next_server_into_it() {
+    // The string runs to the end of its line, swallowing the `}` and `,`,
+    // so the next server is read as a member of `plugin-b`.
+    let text = "{ \"mcpServers\": {\n  \"cd-throwaway-plugin-a\": {\"command\":\"a\"},\n  \"cd-throwaway-plugin-b\": {\"command\":\"b\", \"note\": \"open },\n  \"cd-throwaway-plugin-c\": {\"command\":\"c\"}\n} }";
+
+    assert_eq!(
+        plugin_servers(text),
+        ["cd-throwaway-plugin-a", "cd-throwaway-plugin-b"]
+    );
+}
+
+/// What config-digger reads of the fixture workspace file holding `text`:
+/// the member folders whose servers it lists, whether
+/// `chat.mcp.discovery.enabled` turns on Claude Desktop's servers, and
+/// whether it lists the file's own server.
+fn workspace_read(text: &str) -> (Vec<&'static str>, bool, bool) {
+    let fs = with_claude_desktop(with_project(vscode(), "multi")).with_file(workspace(), text);
+    let inventory = inventory_at(&fs, &workspace());
+    let members = [("api", "api-only"), ("web", "web-only")]
+        .into_iter()
+        .filter(|(_, server)| inventory.items.iter().any(|item| item.name == *server))
+        .map(|(folder, _)| folder)
+        .collect();
+    let discovery = discovered(&inventory) == ("blocked".to_owned(), "not_approved".to_owned());
+    let servers = inventory.items.iter().any(|item| item.name == "docs");
+    assert_eq!(reaction(&inventory, &workspace()), "ignores_file");
+    (members, discovery, servers)
+}
+
+const WORKSPACE_FOLDERS: &str = r#""folders": [{"path":"api"},{"path":"web"}]"#;
+const WORKSPACE_SETTINGS: &str = r#""settings": {"chat.mcp.discovery.enabled":{"claude-desktop":true},"mcp":{"servers":{"docs":{"url":"https://docs.example.com/mcp"}}}}"#;
+
+#[test]
+fn a_workspace_file_missing_a_comma_between_folders_and_settings_keeps_both() {
+    let text = format!("{{\n  {WORKSPACE_FOLDERS}\n  {WORKSPACE_SETTINGS}\n}}");
+
+    assert_eq!(workspace_read(&text), (vec!["api", "web"], true, false));
+}
+
+#[test]
+fn a_workspace_file_key_with_no_value_between_folders_and_settings_keeps_both() {
+    let text =
+        format!("{{\n  {WORKSPACE_FOLDERS},\n  \"cd-throwaway-a\": ,\n  {WORKSPACE_SETTINGS}\n}}");
+
+    assert_eq!(workspace_read(&text), (vec!["api", "web"], true, false));
+}
+
+#[test]
+fn a_workspace_file_whose_settings_are_left_open_at_its_end_keeps_both() {
+    let text = format!(
+        "{{\n  {WORKSPACE_FOLDERS},\n  \"settings\": {{\n    \"chat.mcp.discovery.enabled\": {{\"claude-desktop\":true}},\n    \"mcp\": {{\"servers\":{{\"docs\":{{\"url\":\"https://docs.example.com/mcp\"}}}}}}\n"
+    );
+
+    assert_eq!(workspace_read(&text), (vec!["api", "web"], true, false));
+}
+
+#[test]
+fn a_string_left_open_in_a_workspace_folder_drops_the_folder_after_it() {
+    // The string swallows the rest of its line, so the object of the next
+    // folder is skipped as a missing property name.
+    let text = format!(
+        "{{\n  \"folders\": [\n    {{ \"path\": \"api\", \"name\": \"open }},\n    {{ \"path\": \"web\" }}\n  ],\n  {WORKSPACE_SETTINGS}\n}}"
+    );
+
+    assert_eq!(workspace_read(&text), (vec!["api"], true, false));
+}
+
 #[test]
 fn vs_code_skips_the_servers_of_a_workspace_file_it_cannot_parse() {
     let file = workspace();
