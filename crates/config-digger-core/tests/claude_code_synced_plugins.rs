@@ -96,6 +96,39 @@ fn a_synced_plugins_skill_is_a_read_only_cloud_mirror_named_by_its_manifest() {
 }
 
 #[test]
+fn a_synced_plugins_skills_are_named_as_claude_code_rewrites_them() {
+    let declared = "---\nname: \"  demo:Report v2  \"\ndescription: d\n---\n\nDo it.\n";
+    let fs = synced_home()
+        .with_file(
+            in_account(r"demo~g3\.claude-plugin\plugin.json"),
+            json!({ "name": "demo", "version": "1.2.0", "skills": ["./report/"] }).to_string(),
+        )
+        .with_file(in_account(r"demo~g3\skills\ x.dot\SKILL.md"), skill_md("x"))
+        .with_file(in_account(r"demo~g3\report\SKILL.md"), declared)
+        .with_file(
+            in_account(&format!(r"demo~g3\skills\{}\SKILL.md", "x".repeat(252))),
+            skill_md("long"),
+        );
+
+    let inventory = inventory(&fs);
+
+    let entry = entry_json(&item(&inventory, "demo:-x-dot").entries[0]);
+    assert_eq!(entry["state"], "effective");
+    assert_eq!(
+        entry["path"],
+        in_account(r"demo~g3\skills\ x.dot").display().to_string()
+    );
+    let entry = entry_json(&item(&inventory, "demo:Report-v2").entries[0]);
+    assert_eq!(entry["state"], "effective");
+    assert_eq!(
+        entry["path"],
+        in_account(r"demo~g3\report").display().to_string()
+    );
+    let long = entry_json(&item(&inventory, &format!("demo:{}", "x".repeat(252))).entries[0]);
+    assert_eq!(long["state"], "invalid");
+}
+
+#[test]
 fn a_synced_plugins_servers_are_read_only_cloud_mirrors_too() {
     let fs = synced_home().with_file(
         in_account(r"demo~g3\.claude-plugin\plugin.json"),

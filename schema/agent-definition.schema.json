@@ -2729,6 +2729,15 @@
                 }
               ]
             },
+            "name_rule_on": {
+              "description": "Which name of a skill `name_rule` judges: its folder's name and its\n`name` by default.",
+              "$ref": "#/$defs/NameRuleOn"
+            },
+            "trims_name": {
+              "description": "Whether the Agent trims a frontmatter `name`, and drops from it what\nthe location's `name_template` puts before a name, such as\n`<plugin>:`, before it rewrites it. A `name` left empty is none.",
+              "type": "boolean",
+              "default": false
+            },
             "reserved": {
               "description": "Folder names the Agent never loads a skill from, compared\ncase-insensitively, such as a name it keeps for itself.",
               "type": "array",
@@ -2958,6 +2967,11 @@
           "description": "Each character a Windows file name cannot hold, `: \\ / < > * ? \" |`,\nreplaced by `-`, as Gemini CLI names a skill.",
           "type": "string",
           "const": "path-chars"
+        },
+        {
+          "description": "Each UTF-16 code unit other than `A`-`Z`, `a`-`z`, `0`-`9`, `_` and\n`-` replaced by one `-`, so that a character outside the BMP is\n`--`, with runs kept and nothing trimmed, as Claude Code names a\nplugin's skill.",
+          "type": "string",
+          "const": "hyphen-per-unit"
         }
       ]
     },
@@ -2968,6 +2982,21 @@
           "description": "Names without hidden, direction-changing or blank-like characters,\nas Claude Code names a skill since 2.1.299. A folder name keeps it\nwith no space at either end or next to a `:`, no `:` at either end,\nno two spaces in a row, no `<` or `>`, and at most 256 UTF-16 code\nunits. A frontmatter `name` keeps it with letters, marks, digits,\n`_`, `:`, `.` and `-` alone, no character the folder name may not\nhold, and at most 256 UTF-16 code units.",
           "type": "string",
           "const": "visible-chars"
+        }
+      ]
+    },
+    "NameRuleOn": {
+      "description": "Which name of a skill its location's name rule judges.",
+      "oneOf": [
+        {
+          "description": "Its folder's name, and its frontmatter `name`, each as written.",
+          "type": "string",
+          "const": "parts"
+        },
+        {
+          "description": "The name the Agent gives the skill, rewritten as `sanitize` says\nand filled in its location's `name_template`, held to the rule of a\nfolder name: a skill whose name breaks it is skipped. Its folder's\nname and its frontmatter `name` are not judged on their own.",
+          "type": "string",
+          "const": "entry-name"
         }
       ]
     },
@@ -3066,6 +3095,15 @@
               "type": "null"
             }
           ]
+        },
+        "name_rule_on": {
+          "description": "Which name of a skill `name_rule` judges: its folder's name and its\n`name` by default.",
+          "$ref": "#/$defs/NameRuleOn"
+        },
+        "trims_name": {
+          "description": "Whether the Agent trims a frontmatter `name`, and drops from it what\nthe location's `name_template` puts before a name, such as\n`<plugin>:`, before it rewrites it. A `name` left empty is none.",
+          "type": "boolean",
+          "default": false
         },
         "reserved": {
           "description": "Folder names the Agent never loads a skill from, compared\ncase-insensitively, such as a name it keeps for itself.",
