@@ -10,7 +10,7 @@ use crate::api::{
     RollbackLocation, RollbackOutcome, Verify, WarningClass,
 };
 use crate::definitions::{AgentDefinition, Definitions};
-use crate::edit::EditableFile;
+use crate::edit::{self, EditableFile};
 use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::mask::Side;
@@ -18,7 +18,7 @@ use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::{FileSystem, Ports};
 use crate::store;
 use crate::{explain, resolve, running, scan};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -633,7 +633,7 @@ fn verify(
 }
 
 /// Verify of one file: it reads back, and every key an edit changed holds the
-/// value the edit gave it. When the file holds other bytes than those
+/// value the edits gave it. When the file holds other bytes than those
 /// written, something rewrote it since, and only a rewrite that took an edit
 /// away fails the Operation.
 fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result<(), Failure> {
@@ -658,7 +658,7 @@ fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result
 enum Landed {
     /// The file no longer decodes or parses.
     ReadFailure(String),
-    /// A key does not hold what its last edit gave it.
+    /// A key does not hold what the edits gave it.
     Mismatch(String),
 }
 
@@ -667,8 +667,8 @@ struct TouchedKey<'w> {
     key_path: &'w [String],
     /// Its value before the Operation.
     before: &'w Option<Value>,
-    /// The value its last edit gave it.
-    after: &'w Option<Value>,
+    /// Its value once every edit of the file is applied.
+    after: Option<Value>,
 }
 
 /// Each key the edits of a file changed, once, in the order first changed.
@@ -676,23 +676,56 @@ fn touched_keys<'w>(write: &'w PendingWrite) -> Vec<TouchedKey<'w>> {
     let mut keys: Vec<TouchedKey> = Vec::new();
     let dependencies = write.file.edited.edits.iter();
     for dependency in dependencies.flat_map(|applied| &applied.depends_on) {
-        match keys
-            .iter_mut()
-            .find(|key| key.key_path == dependency.key_path.as_slice())
+        if !keys
+            .iter()
+            .any(|key| key.key_path == dependency.key_path.as_slice())
         {
-            Some(key) => key.after = &dependency.after,
-            None => keys.push(TouchedKey {
+            keys.push(TouchedKey {
                 key_path: &dependency.key_path,
                 before: &dependency.before,
-                after: &dependency.after,
-            }),
+                after: None,
+            });
+        }
+        // An edit also changes what the keys above and below it hold.
+        for key in &mut keys {
+            if let Some(below) = dependency.key_path.strip_prefix(key.key_path) {
+                set_at(&mut key.after, below, &dependency.after);
+            } else if let Some(above) = key.key_path.strip_prefix(dependency.key_path.as_slice()) {
+                key.after = dependency
+                    .after
+                    .as_ref()
+                    .and_then(|value| edit::lookup(value, above))
+                    .cloned();
+            }
         }
     }
     keys
 }
 
+/// Gives `key_path` below `value` the value `to`, `None` taking it out.
+fn set_at(value: &mut Option<Value>, key_path: &[String], to: &Option<Value>) {
+    let Some((name, below)) = key_path.split_first() else {
+        value.clone_from(to);
+        return;
+    };
+    if !matches!(value, Some(Value::Object(_))) {
+        if to.is_none() {
+            return;
+        }
+        *value = Some(Value::Object(Map::new()));
+    }
+    let Some(Value::Object(object)) = value else {
+        unreachable!("an object by now");
+    };
+    let mut child = object.remove(name);
+    set_at(&mut child, below, to);
+    if let Some(child) = child {
+        object.insert(name.clone(), child);
+    }
+}
+
 /// Whether every key the edits of a file changed holds, in `bytes`, the
-/// value its last edit gave it.
+/// value the edits gave it.
 fn edits_hold(bytes: &[u8], write: &PendingWrite) -> Result<(), Landed> {
     let path = &write.file.path;
     let file = EditableFile::decode(bytes, write.file.syntax).map_err(|reason| {
@@ -702,7 +735,7 @@ fn edits_hold(bytes: &[u8], write: &PendingWrite) -> Result<(), Landed> {
         let value = file.value_at(key.key_path).map_err(|error| {
             Landed::ReadFailure(format!("{} no longer parses: {error}", path.display()))
         })?;
-        if value != *key.after {
+        if value != key.after {
             return Err(Landed::Mismatch(format!(
                 "`{}` in {} does not hold what was written",
                 key.key_path.join("."),

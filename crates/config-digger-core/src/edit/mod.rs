@@ -369,7 +369,8 @@ fn split_key_path(key_path: &[String]) -> Result<(&[String], &str), EditError> {
     }
 }
 
-fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {
+/// The value at `key_path` below `value`.
+pub(crate) fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {
     key_path
         .iter()
         .try_fold(value, |value, key| value.as_object()?.get(key))
