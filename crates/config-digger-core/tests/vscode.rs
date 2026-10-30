@@ -1541,6 +1541,169 @@ fn a_built_in_extension_s_skill_cannot_be_removed() {
     assert_eq!(remove["how_to_remove"], Value::Null);
 }
 
+/// `fs` with an extension in `folder` whose `package.json` holds `manifest`
+/// and lists one `chatSkills` skill, `skill`.
+fn with_extension(
+    fs: FakeFileSystem,
+    folder: &Path,
+    mut manifest: Value,
+    skill: &str,
+) -> FakeFileSystem {
+    manifest["contributes"] =
+        serde_json::json!({ "chatSkills": [{ "path": format!("./skills/{skill}/SKILL.md") }] });
+    fs.with_file(folder.join("package.json"), manifest.to_string())
+        .with_file(
+            folder.join(format!(r"skills\{skill}\SKILL.md")),
+            format!("---\nname: {skill}\ndescription: Comes from {skill}.\n---\n"),
+        )
+}
+
+/// The folder of a fixture built-in extension, `twin`.
+fn built_in_twin() -> PathBuf {
+    installation().join(r"8a7abeba6e\resources\app\extensions\twin")
+}
+
+/// The folder of a fixture installed extension, `acme.twin-<version>`.
+fn installed_twin(version: &str) -> PathBuf {
+    Path::new(HOME).join(format!(r".vscode\extensions\acme.twin-{version}"))
+}
+
+/// The fixture Installation and home, with a built-in extension whose
+/// `package.json` holds `builtin` and whose skill is `twin-builtin`, and an
+/// installed one whose `package.json` holds `installed` and whose skill is
+/// `twin-installed`.
+fn with_twins(builtin: Value, installed: Value) -> FakeFileSystem {
+    let fs = with_extension(
+        with_installation(with_home(vscode())),
+        &built_in_twin(),
+        builtin,
+        "twin-builtin",
+    );
+    let version = installed["version"].as_str().unwrap_or("1.0.0").to_owned();
+    with_extension(fs, &installed_twin(&version), installed, "twin-installed")
+}
+
+/// The manifest of the extension `acme.twin` at `version`.
+fn twin(version: &str) -> Value {
+    serde_json::json!({ "publisher": "acme", "name": "twin", "version": version })
+}
+
+/// The names of the VS Code skills `twin-builtin` and `twin-installed`
+/// that are listed, in that order.
+fn twin_skills(fs: &FakeFileSystem) -> Vec<&'static str> {
+    let inventory = inventory(fs);
+    ["twin-builtin", "twin-installed"]
+        .into_iter()
+        .filter(|name| {
+            inventory
+                .items
+                .iter()
+                .any(|item| item.agent == "vscode" && item.name == *name)
+        })
+        .collect()
+}
+
+#[test]
+fn an_installed_extension_with_a_built_in_one_s_id_takes_its_place_at_a_higher_version() {
+    let fs = with_twins(twin("1.0.0"), twin("2.0.0"));
+
+    assert_eq!(twin_skills(&fs), ["twin-installed"]);
+}
+
+#[test]
+fn an_installed_extension_with_a_built_in_one_s_id_is_skipped_at_the_same_or_a_lower_version() {
+    for installed in ["1.0.0", "0.9.0"] {
+        let fs = with_twins(twin("1.0.0"), twin(installed));
+
+        assert_eq!(
+            twin_skills(&fs),
+            ["twin-builtin"],
+            "installed at {installed}"
+        );
+    }
+}
+
+#[test]
+fn extension_ids_that_differ_only_in_case_are_one_id() {
+    let builtin = serde_json::json!({ "publisher": "Acme", "name": "Twin", "version": "1.0.0" });
+    let fs = with_twins(builtin, twin("2.0.0"));
+
+    assert_eq!(twin_skills(&fs), ["twin-installed"]);
+}
+
+#[test]
+fn an_installed_extension_with_a_built_in_one_s_id_and_no_version_it_can_compare_is_skipped() {
+    for installed in [
+        serde_json::json!({ "publisher": "acme", "name": "twin" }),
+        twin("next"),
+    ] {
+        let fs = with_twins(twin("1.0.0"), installed.clone());
+
+        assert_eq!(twin_skills(&fs), ["twin-builtin"], "installed {installed}");
+    }
+    let builtin = serde_json::json!({ "publisher": "acme", "name": "twin" });
+    let fs = with_twins(builtin, twin("2.0.0"));
+    assert_eq!(
+        twin_skills(&fs),
+        ["twin-builtin"],
+        "built in with no version"
+    );
+}
+
+#[test]
+fn extensions_whose_ids_differ_are_both_read() {
+    let installed = serde_json::json!({ "publisher": "acme", "name": "other", "version": "2.0.0" });
+    let fs = with_twins(twin("1.0.0"), installed);
+
+    assert_eq!(twin_skills(&fs), ["twin-builtin", "twin-installed"]);
+}
+
+#[test]
+fn an_extension_whose_manifest_gives_no_publisher_or_no_name_has_no_id_to_compare() {
+    for (builtin, installed) in [
+        (
+            serde_json::json!({ "name": "twin", "version": "1.0.0" }),
+            twin("0.9.0"),
+        ),
+        (
+            serde_json::json!({ "publisher": "", "name": "twin", "version": "1.0.0" }),
+            twin("0.9.0"),
+        ),
+        (
+            twin("1.0.0"),
+            serde_json::json!({ "publisher": "acme", "version": "0.9.0" }),
+        ),
+    ] {
+        let fs = with_twins(builtin.clone(), installed.clone());
+
+        assert_eq!(
+            twin_skills(&fs),
+            ["twin-builtin", "twin-installed"],
+            "{builtin} and {installed}"
+        );
+    }
+}
+
+#[test]
+fn an_installed_extension_takes_the_place_of_each_built_in_one_of_its_id_it_is_higher_than() {
+    let fs = with_twins(twin("1.0.0"), twin("2.0.0"));
+    // A commit folder left over from an update, with the same extension.
+    let leftover = installation().join(r"0ld0c0mm1t\resources\app\extensions\twin");
+    let fs = with_extension(fs, &leftover, twin("1.0.0"), "twin-builtin");
+
+    assert_eq!(twin_skills(&fs), ["twin-installed"]);
+}
+
+#[test]
+fn an_extension_version_marked_obsolete_takes_no_built_in_one_s_place() {
+    let fs = with_twins(twin("1.0.0"), twin("2.0.0")).with_file(
+        Path::new(HOME).join(r".vscode\extensions\.obsolete"),
+        r#"{"acme.twin-2.0.0":true}"#,
+    );
+
+    assert_eq!(twin_skills(&fs), ["twin-builtin"]);
+}
+
 /// Claude Desktop's config file, which VS Code can discover.
 const CLAUDE_DESKTOP: &str = r"C:\Users\fixture\AppData\Roaming\Claude\claude_desktop_config.json";
 

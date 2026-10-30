@@ -765,6 +765,12 @@ pub(crate) struct PluginsDefinition {
     /// and competes with no other. The name is the one the list reads.
     #[serde(default)]
     pub loses_to: Vec<String>,
+    /// Another list whose plugins this list's plugins take the place of,
+    /// one id loading once, as VS Code loads an installed extension with a
+    /// built-in one's id in its place only when its version is higher. Of
+    /// a plugin of this list and one of the other with the same id, the
+    /// one that loses is never read: it has no Entries.
+    pub replaces: Option<Replaces>,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -807,6 +813,44 @@ pub(crate) struct PluginName {
     pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
 }
 
+/// The plugins of another list that a list's plugins take the place of.
+/// Each plugin's id and version are read from a JSON file of its folder.
+/// A plugin of the list wins over one of the other with its id when both
+/// versions parse, as config-digger compares versions, and its own is
+/// higher; otherwise the other wins. A plugin whose file gives no id is
+/// compared with none.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct Replaces {
+    /// The id of the other list, such as `built-in-extensions`.
+    pub plugins: String,
+    /// A `/`-separated path relative to a plugin's folder, such as
+    /// `package.json`.
+    pub file: String,
+    /// The key paths of the strings joined into a plugin's id, in order,
+    /// such as `publisher` and `name`: a plugin with any of them missing or
+    /// empty has no id. Ids are compared without regard to case.
+    pub id: Vec<Vec<String>>,
+    /// The text between the strings of an id, such as `.`.
+    pub joined_by: String,
+    /// The key path of a plugin's version.
+    pub version: Vec<String>,
+}
+
+impl Replaces {
+    fn validate(&self) -> Result<(), String> {
+        non_empty("replaces plugins", &self.plugins)?;
+        blocks::validate_relative(&self.file)?;
+        if self.id.is_empty() {
+            return Err("replaces id needs key paths".into());
+        }
+        for key_path in &self.id {
+            blocks::validate_key_path(key_path)?;
+        }
+        blocks::validate_key_path(&self.version)
+    }
+}
+
 /// The `uninstall` segment that stands for a plugin's id.
 pub(crate) const PLUGIN_ID: &str = "{id}";
 /// The `uninstall` segment that stands for the Scope a plugin is installed at.
@@ -842,6 +886,9 @@ impl PluginsDefinition {
             return Err(format!(
                 "id_template must name the plugin with `{PLUGIN_NAME}`"
             ));
+        }
+        if let Some(replaces) = &self.replaces {
+            replaces.validate()?;
         }
         if self.unique_names && self.same_names_invalid {
             return Err("plugins that share a name are renamed or invalid, not both".into());
@@ -1744,16 +1791,28 @@ impl AgentDefinition {
         for (index, plugins) in self.plugins.iter().enumerate() {
             let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
             plugins.validate().map_err(context)?;
+            // The index of the other list `id`, which the field `field` names.
+            let other_list = |field: &str, id: &str| match self
+                .plugins
+                .iter()
+                .position(|other| other.id == id)
+            {
+                None => Err(context(format!("{field} `{id}` is no plugins list"))),
+                Some(at) if at == index => Err(context(format!("{field} `{id}` is its own list"))),
+                Some(at) => Ok(at),
+            };
             for id in &plugins.loses_to {
-                match self.plugins.iter().position(|other| other.id == *id) {
-                    None => return Err(context(format!("loses_to `{id}` is no plugins list"))),
-                    Some(at) if at == index => {
-                        return Err(context(format!("loses_to `{id}` is its own list")));
-                    }
-                    Some(at) if at > index => {
-                        return Err(context(format!("loses_to `{id}` comes after it")));
-                    }
-                    Some(_) => {}
+                if other_list("loses_to", id)? > index {
+                    return Err(context(format!("loses_to `{id}` comes after it")));
+                }
+            }
+            if let Some(replaces) = &plugins.replaces {
+                let id = &replaces.plugins;
+                let at = other_list("replaces", id)?;
+                if plugins.registry.in_project() || self.plugins[at].registry.in_project() {
+                    return Err(context(format!(
+                        "replaces `{id}` needs both lists outside Projects"
+                    )));
                 }
             }
             for anchor in plugins.registry.anchors() {
@@ -5033,6 +5092,65 @@ loses_to = {synced_loses_to}
                 error(&text)
             );
         }
+    }
+
+    /// `with_plugins` plus the list `local` after `installed`, whose
+    /// plugins take the place of those of the list `replaced`, the list
+    /// `installed` being read through `registry`.
+    fn with_replacing_list(replaced: &str, registry: &str) -> String {
+        with_plugins(&format!(
+            r#"
+[[plugins]]
+id = "local"
+registry = {{ block = "plugin-folders", anchor = {{ block = "home", root = "plugins", path = "local" }}, depth = 1 }}
+replaces = {{ plugins = "{replaced}", file = "package.json", id = [["publisher"], ["name"]], joined_by = ".", version = ["version"] }}
+"#
+        ))
+        .replace(
+            r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+            registry,
+        )
+    }
+
+    #[test]
+    fn a_plugin_list_replaces_another_list_outside_projects() {
+        let records = r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#;
+        let text = with_replacing_list("installed", records);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let keys = format!(
+            r#"registry = {{ block = "project-plugin-keys", anchor = {IN_PROJECT}, root = ["plugins"], scope = "project", cache = {{ block = "machine", path = "~/.agent/cache" }}, marker = ".complete" }}"#
+        );
+        for (replaced, registry, refusal) in [
+            (
+                "market",
+                records,
+                "plugins `local`: replaces `market` is no plugins list",
+            ),
+            (
+                "local",
+                records,
+                "plugins `local`: replaces `local` is its own list",
+            ),
+            (
+                "installed",
+                keys.as_str(),
+                "plugins `local`: replaces `installed` needs both lists outside Projects",
+            ),
+        ] {
+            let text = with_replacing_list(replaced, registry);
+            assert!(
+                error(&text).contains(refusal),
+                "{replaced}: {}",
+                error(&text)
+            );
+        }
+        let text = with_replacing_list("installed", records)
+            .replace(r#"id = [["publisher"], ["name"]]"#, "id = []");
+        assert!(
+            error(&text).contains("replaces id needs key paths"),
+            "{}",
+            error(&text)
+        );
     }
 
     /// `with_plugins`, its plugin servers competing by endpoint and ranked

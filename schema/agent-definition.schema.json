@@ -1887,6 +1887,17 @@
           },
           "default": []
         },
+        "replaces": {
+          "description": "Another list whose plugins this list's plugins take the place of,\none id loading once, as VS Code loads an installed extension with a\nbuilt-in one's id in its place only when its version is higher. Of\na plugin of this list and one of the other with the same id, the\none that loses is never read: it has no Entries.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Replaces"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "uninstall": {
           "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out. Without it,\nthe Agent uninstalls a plugin only through its own interface.",
           "type": [
@@ -2434,6 +2445,52 @@
       "required": [
         "file",
         "key_path"
+      ]
+    },
+    "Replaces": {
+      "description": "The plugins of another list that a list's plugins take the place of.\nEach plugin's id and version are read from a JSON file of its folder.\nA plugin of the list wins over one of the other with its id when both\nversions parse, as config-digger compares versions, and its own is\nhigher; otherwise the other wins. A plugin whose file gives no id is\ncompared with none.",
+      "type": "object",
+      "properties": {
+        "plugins": {
+          "description": "The id of the other list, such as `built-in-extensions`.",
+          "type": "string"
+        },
+        "file": {
+          "description": "A `/`-separated path relative to a plugin's folder, such as\n`package.json`.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The key paths of the strings joined into a plugin's id, in order,\nsuch as `publisher` and `name`: a plugin with any of them missing or\nempty has no id. Ids are compared without regard to case.",
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "joined_by": {
+          "description": "The text between the strings of an id, such as `.`.",
+          "type": "string"
+        },
+        "version": {
+          "description": "The key path of a plugin's version.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "plugins",
+        "file",
+        "id",
+        "joined_by",
+        "version"
       ]
     },
     "LocationDefinition": {
