@@ -2110,7 +2110,7 @@
         {
           "id": "28.1",
           "title": "Skills en una carpeta .claude\\skills más honda del Project",
-          "goal": "Claude Code carga las skills de las carpetas .claude\\skills de más abajo del Project en cuanto trabaja con un archivo de su carpeta, y config-digger las enseña como Entries Effective de ese Project, con un aviso que nombra la carpeta; la que tiene el nombre de otra skill lleva la carpeta delante.",
+          "goal": "En un Project que es un repo git, Claude Code carga las skills de las carpetas .claude\\skills de más abajo en cuanto trabaja con un archivo de su carpeta, y config-digger las enseña como Entries Effective de ese Project, con un aviso que nombra la carpeta; la que tiene el nombre de otra skill lleva la carpeta delante.",
           "instructions": [
             "Abre config-digger.",
             "Ve al Inventario.",
@@ -2119,7 +2119,7 @@
             "Busca cd-throwaway-nested-skill en la lista Items.",
             "Abre el Item cd-throwaway-nested-skill y lee los avisos de su Entry.",
             "Busca cd-throwaway-project-skill en la lista Items.",
-            "En el campo Project de la cabecera, quita el Project.",
+            "En el campo Project de la cabecera, elige No Project.",
             "Busca cd-throwaway-nested-skill en la lista Items otra vez."
           ],
           "commands": [],
@@ -2128,7 +2128,7 @@
             "Bajo su nombre sale «project · E:\\cd-throwaway\\project\\apps\\web\\.claude\\skills\\cd-throwaway-nested-skill».",
             "Su Entry tiene el aviso «Claude Code loads it only once it reads or edits a file under `apps\\web` in the Project.».",
             "La lista Items tiene «cd-throwaway-project-skill» y «apps/web:cd-throwaway-project-skill», los dos «Effective».",
-            "Sin Project elegido, «cd-throwaway-nested-skill» no sale en la lista Items."
+            "Con No Project elegido, «cd-throwaway-nested-skill» no sale en la lista Items."
           ],
           "setup": {
             "label": "Crear los datos de prueba con skills anidados",

@@ -356,7 +356,8 @@ description: Throwaway skill for testing config-digger. Does nothing.
 
 # With -NestedSkills, skills in a .claude\skills deeper in the Project, which
 # Claude Code loads once it works on a file under apps\web: one of its own
-# name, and one with the name of the Project's own skill.
+# name, and one with the name of the Project's own skill. config-digger reads
+# them only in a git repo, so the Project becomes one.
 if ($NestedSkills) {
     foreach ($name in "cd-throwaway-nested-skill", "cd-throwaway-project-skill") {
         Write-TestFile "$Root\project\apps\web\.claude\skills\$name\SKILL.md" @"
@@ -365,6 +366,10 @@ name: $name
 description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
+    }
+    git init -q "$Root\project"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot run git init in $Root\project: install Git for Windows."
     }
 }
 

@@ -673,11 +673,11 @@ impl DownWalk {
 
 impl Validate for DownWalk {
     fn validate(&self) -> Result<(), String> {
-        let one_name = |name: &&String| name.is_empty() || name.contains(['/', '\\']);
-        if let Some(name) = self.skip.iter().find(one_name) {
+        let not_one_name = |name: &&String| name.is_empty() || name.contains(['/', '\\']);
+        if let Some(name) = self.skip.iter().find(not_one_name) {
             return Err(format!("skipped folder `{name}` must be one folder name"));
         }
-        if let Some(name) = self.ignore_files.iter().find(one_name) {
+        if let Some(name) = self.ignore_files.iter().find(not_one_name) {
             return Err(format!("ignore file `{name}` must be one file name"));
         }
         Ok(())
@@ -4267,6 +4267,10 @@ impl Validate for Apart {
                 "apart: on_clash must hold `{}` once",
                 super::ENTRY_NAME
             ));
+        }
+        // Without it, the renamed Entries would clash again.
+        if !self.on_clash.contains(SUBFOLDER) {
+            return Err(format!("apart: on_clash must hold `{SUBFOLDER}`"));
         }
         Ok(())
     }

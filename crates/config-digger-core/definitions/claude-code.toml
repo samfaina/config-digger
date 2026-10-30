@@ -817,11 +817,14 @@ on_read_failure = "ignores_file"
 # folder loads them sooner [docs]. A folder no such file is under is never
 # read [test]. Each skill is Effective, with a note naming its folder.
 # Claude Code skips a skills folder whose holding folder git ignores, as
-# `git check-ignore` says, in a repo or not [test]: a `.gitignore` leaving
-# out a folder on the way skips the skills below it, and one leaving out
-# the `.claude` folder alone skips none [test]. config-digger reads only
-# the `.gitignore` files, not `.git\info\exclude` nor git's global excludes.
-# Claude Code also skips its own claude.ai sync folders, and on Windows a
+# `git check-ignore` says [test]: a `.gitignore` leaving out a folder on the
+# way skips the skills below it, and one leaving out the `.claude` folder
+# alone skips none [test]. config-digger reads only the `.gitignore` files,
+# not `.git\info\exclude` nor git's global excludes, and those above the
+# repo root too, which git does not read. Outside a git repo, where the
+# check fails, Claude Code loads nested skills too [test]; config-digger
+# reads them only in a git work tree, so as not to walk every folder below
+# a Project that is a home folder or a drive. Claude Code also skips its own claude.ai sync folders, and on Windows a
 # path holding an 8.3 short name (`~1`), which a walk never meets [code]. It
 # runs no discovery at all while the `projectSettings` source is off or a
 # policy allows only plugin customization ("Dynamic skill discovery
@@ -833,7 +836,7 @@ unverified = [
   "The reserved folder names, the name rule and the frontmatter handling of `project-skills` are taken to apply to a nested skill, as the binary loads it as a Project skill.",
   "A nested skills folder reached through a link or a junction is taken to load as any other, as the binary walks up the path of the file as Claude Code reads it.",
 ]
-anchor = { block = "project", path = ".claude/skills", walk = { down = { needs_git = false, skip = [], ignore_files = [".gitignore"], ignores_path = false, follow_links = true } } }
+anchor = { block = "project", path = ".claude/skills", walk = { down = { needs_git = true, skip = [], ignore_files = [".gitignore"], ignores_path = false, follow_links = true } } }
 format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
 name_rule_when = { gate = "tengu_slate_wicket" }
 loaded_on_file_under_folder = true
@@ -954,6 +957,8 @@ on_read_failure = "ignores_file"
 [items.skill]
 unverified = [
   "A nested skill is taken to be named `<subfolder>:<name>` against a managed skill of its name too, as the binary says.",
+  "Of two nested skills of one name, Claude Code lists the one it loads first under its bare name until the other loads, as the binary says; config-digger names both `<subfolder>:<name>`, and `skillOverrides[\"<subfolder>:<name>\"]`, which Disable writes, is taken to turn the first off while it goes by its bare name too.",
+  "A nested skill is taken to keep its name against a built-in command or bundled skill of that name, which config-digger does not read, though the binary counts them as a clash.",
   "A plugin that is off, or forced off by the managed settings, and whose manifest fails is taken to have its skills Disabled or Blocked rather than Invalid, since Claude Code does not load an off plugin.",
   "Every character the name rule refuses is taken from the 2.1.302 binary, with config-digger's Unicode tables, but for those the probe tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E and U+00A0 in a frontmatter `name`, and the length of an ASCII `name`. Among the rest, a frontmatter `name` holding any character but letters, marks, digits, `_`, `:`, `.` and `-`, such as `+` or `@`, is taken to be refused.",
   "`<` and `>` in a folder name, which a Windows folder name cannot hold, are taken to break the name rule, as the binary says.",

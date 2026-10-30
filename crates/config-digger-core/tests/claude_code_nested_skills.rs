@@ -256,3 +256,18 @@ fn skill_overrides_turn_a_nested_skill_off_by_its_name_and_a_prefixed_one_by_its
         )
     );
 }
+
+#[test]
+fn outside_a_git_repo_no_nested_skill_is_read() {
+    // Claude Code loads them there too, but reading them would walk every
+    // folder below a Project that may be a home folder or a drive.
+    let fs = FakeFileSystem::new()
+        .with_file(PathBuf::from(HOME).join(".claude.json"), "{}")
+        .with_folder(PROJECT);
+    let fs = with_skill(fs, ".", "own");
+    let fs = with_skill(fs, r"apps\web", "web");
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(names(&inventory), ["own"]);
+}

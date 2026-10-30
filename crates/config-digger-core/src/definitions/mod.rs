@@ -3947,6 +3947,54 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
+    fn a_location_kept_apart_is_read_by_a_walk_down_and_named_by_its_subfolder_on_a_clash() {
+        // The skills' competition, which comes after the servers'.
+        let apart = |anchor: &str, apart: &str| {
+            let mut text = with_skills(anchor, SKILL_FORMAT, CHECKS);
+            let competition = r#"competition = { block = "exact-name" }"#;
+            let at = text.rfind(competition).unwrap();
+            text.replace_range(
+                at..at + competition.len(),
+                &format!(r#"competition = {{ block = "exact-name", apart = {apart} }}"#),
+            );
+            text
+        };
+        let down = format!(r#"{{ block = "project", path = ".test/skills", walk = {DOWN} }}"#);
+        let up = r#"{ block = "project", path = ".test/skills", walk = "up-to-repo-root" }"#;
+        let named = r#"{ locations = ["user-skills"], on_clash = "{subfolder}:{name}" }"#;
+        assert!(
+            parse("test.toml", &apart(&down, named)).is_ok(),
+            "{}",
+            error(&apart(&down, named))
+        );
+        for (anchor, block, message) in [
+            (
+                up,
+                named,
+                "keeps `user-skills` apart, which no walk down reads",
+            ),
+            (
+                &down,
+                r#"{ locations = ["other"], on_clash = "{subfolder}:{name}" }"#,
+                "names `other`, which is not a location of this kind",
+            ),
+            (
+                &down,
+                r#"{ locations = ["user-skills"], on_clash = "{name}" }"#,
+                "on_clash must hold `{subfolder}`",
+            ),
+            (
+                &down,
+                r#"{ locations = ["user-skills"], on_clash = "{subfolder}" }"#,
+                "on_clash must hold `{name}` once",
+            ),
+        ] {
+            let text = apart(anchor, block);
+            assert!(error(&text).contains(message), "{block}: {}", error(&text));
+        }
+    }
+
+    #[test]
     fn a_machine_path_starts_from_the_home_folder_a_variable_or_a_drive_without_wildcards() {
         for (path, message) in [
             ("skills", "must start with"),
