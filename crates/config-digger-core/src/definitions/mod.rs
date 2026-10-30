@@ -1791,34 +1791,28 @@ impl AgentDefinition {
         for (index, plugins) in self.plugins.iter().enumerate() {
             let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
             plugins.validate().map_err(context)?;
+            // The index of the other list `id`, which the field `field` names.
+            let other_list = |field: &str, id: &str| match self
+                .plugins
+                .iter()
+                .position(|other| other.id == id)
+            {
+                None => Err(context(format!("{field} `{id}` is no plugins list"))),
+                Some(at) if at == index => Err(context(format!("{field} `{id}` is its own list"))),
+                Some(at) => Ok(at),
+            };
             for id in &plugins.loses_to {
-                match self.plugins.iter().position(|other| other.id == *id) {
-                    None => return Err(context(format!("loses_to `{id}` is no plugins list"))),
-                    Some(at) if at == index => {
-                        return Err(context(format!("loses_to `{id}` is its own list")));
-                    }
-                    Some(at) if at > index => {
-                        return Err(context(format!("loses_to `{id}` comes after it")));
-                    }
-                    Some(_) => {}
+                if other_list("loses_to", id)? > index {
+                    return Err(context(format!("loses_to `{id}` comes after it")));
                 }
             }
             if let Some(replaces) = &plugins.replaces {
                 let id = &replaces.plugins;
-                match self.plugins.iter().position(|other| other.id == *id) {
-                    None => return Err(context(format!("replaces `{id}` is no plugins list"))),
-                    Some(at) if at == index => {
-                        return Err(context(format!("replaces `{id}` is its own list")));
-                    }
-                    Some(at)
-                        if plugins.registry.in_project()
-                            || self.plugins[at].registry.in_project() =>
-                    {
-                        return Err(context(format!(
-                            "replaces `{id}` needs both lists outside Projects"
-                        )));
-                    }
-                    Some(_) => {}
+                let at = other_list("replaces", id)?;
+                if plugins.registry.in_project() || self.plugins[at].registry.in_project() {
+                    return Err(context(format!(
+                        "replaces `{id}` needs both lists outside Projects"
+                    )));
                 }
             }
             for anchor in plugins.registry.anchors() {

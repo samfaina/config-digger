@@ -126,13 +126,14 @@ name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/
 # skills of one name, a built-in one's wins over an installed one's whose
 # folder sorts first, and within each group the one whose folder sorts
 # first [test]. VS Code loads one extension of an id, its manifest's
-# `publisher` and `name` joined by `.`, compared without regard to case: an
-# installed extension with a built-in one's id takes its place when its
-# version is higher, and is skipped when it is the same or lower [test], so
-# config-digger reads only the one VS Code loads. Its CLI refuses to install
-# a built-in extension's id while none of that id is installed [test], so
-# such an extension is left when VS Code starts to ship one the user had
-# installed. GitHub Copilot Chat, which `product.json`'s
+# `publisher` and `name` joined by `.`, compared without regard to case
+# [binary]: an installed extension with a built-in one's id takes its place
+# when its version is higher, and is skipped when it is the same or lower
+# [test]. config-digger reads only the one VS Code loads, and keeps the
+# built-in one when either version does not parse (#432). Its CLI refuses
+# to install a built-in extension's id while none of that id is installed
+# [test], so such an extension is left when VS Code starts to ship one the
+# user had installed. GitHub Copilot Chat, which `product.json`'s
 # `builtInExtensionsEnabledWithAutoUpdates` lets the user update, follows
 # rules of its own in VS Code's scanner [binary], which #432 leaves
 # untested. An Installation's folder holds one commit folder [disk]: one
