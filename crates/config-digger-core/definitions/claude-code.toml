@@ -873,13 +873,13 @@ on_read_failure = "ignores_file"
 # other than `A`-`Z`, `a`-`z`, `0`-`9`, `_` and `-`, a declared skill's
 # `name` trimmed and rid of a leading `<plugin>:` first, and holds the
 # whole `<plugin>:<name>` to the folder name rule, so that only one over
-# 256 characters is skipped [test]. config-digger applies the rule of local
-# skills instead (#429). In a folder of skill folders, a frontmatter `name`
-# the rule refuses is no alias [test].
+# 256 characters is skipped [test]. In a folder of skill folders, a
+# frontmatter `name` the rule refuses is no alias [test].
 [[locations]]
 id = "plugin-skills"
+unverified = "Claude Code is taken to rewrite a plugin's skill names while `tengu_slate_wicket` is off too, as the probe ran with the gate at its default."
 anchor = { block = "plugin", plugins = "installed", path = ".claude-plugin/plugin.json" }
-format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", sanitize = "hyphen-per-unit", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars", name_rule_on = "entry-name" }, one_skill = { name_from = "frontmatter", trims_name = true, sanitize = "hyphen-per-unit", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars", name_rule_on = "entry-name" } }
 name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
 kind = "skill"
@@ -893,12 +893,12 @@ on_read_failure = "fails_plugin"
 [[locations]]
 id = "synced-plugin-skills"
 unverified = [
-  "A synced plugin's skills are taken to be named as an installed plugin's are (#429).",
+  "A synced plugin's skills are taken to be named as an installed plugin's are.",
   "A synced plugin's skills are taken to fail with the plugin when its manifest does not parse, or its `mcpServers` has a shape the manifest's schema refuses, as an installed plugin's do.",
 ]
 anchor = { block = "plugin", plugins = "synced", path = ".claude-plugin/plugin.json" }
 when = [{ block = "feature-gate", gate = "tengu_claudeai_plugins_sync_enabled" }, { block = "signed-in-account" }]
-format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }, one_skill = { name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" } }
+format = { block = "manifest-skills", field = ["skills"], default = "skills", adds_to_default = true, path_may_name_one = true, skills = { name_from = "folder", sanitize = "hyphen-per-unit", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars", name_rule_on = "entry-name" }, one_skill = { name_from = "frontmatter", trims_name = true, sanitize = "hyphen-per-unit", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars", name_rule_on = "entry-name" } }
 name_rule_when = { gate = "tengu_slate_wicket" }
 name_template = "{plugin}:{name}"
 kind = "skill"
@@ -939,9 +939,11 @@ on_read_failure = "ignores_file"
 # `/<folder>` goes to the local skill, a synced skill answering to it while
 # no local skill takes it [test]. Claude Code skips a skill it cannot
 # load before they compete. Names are used as written, capitals and `_`
-# included [test]. Since 2.1.299 a name rule applies, behind the gate
-# `tengu_slate_wicket`, on by default [docs, binary]: `visible-chars`, on
-# every skill location. It skips a skill whose folder name starts or ends
+# included [test], but for a plugin's skills, which Claude Code rewrites as
+# `plugin-skills` says [test]. Since 2.1.299 a name rule applies, behind
+# the gate `tengu_slate_wicket`, on by default [docs, binary]:
+# `visible-chars`, on every skill location, a plugin's skill held to it by
+# its whole name alone [test]. It skips a skill whose folder name starts or ends
 # with a space, or holds a hidden, direction-changing or blank-like
 # character, but takes a space inside it, `.`, capitals and letters outside
 # ASCII [test]. It refuses a frontmatter `name` as an alias when it holds

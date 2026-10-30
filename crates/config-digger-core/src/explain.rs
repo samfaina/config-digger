@@ -2385,6 +2385,10 @@ pub(crate) fn unseen_servers(agent_name: &str, unseen: &[UnseenServers]) -> Stri
     )
 }
 
+/// What the `visible-chars` rule of a folder name refuses, as the end of a
+/// sentence.
+const FOLDER_NAME_RULE: &str = "which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters";
+
 /// What is wrong with a skill's `SKILL.md` or folder for `agent_name`, as
 /// the end of a sentence.
 fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
@@ -2398,8 +2402,11 @@ fn skill_defect(agent_name: &str, defect: SkillDefect) -> String {
         SkillDefect::NoName => "its SKILL.md frontmatter has no `name`".to_owned(),
         SkillDefect::NoDescription => "its SKILL.md frontmatter has no `description`".to_owned(),
         SkillDefect::Reserved => format!("{agent_name} keeps its folder's name for itself"),
-        SkillDefect::FolderName(NameRule::VisibleChars) => format!(
-            "its folder's name breaks {agent_name}'s name rule, which refuses a space at either end or two in a row, hidden, direction-changing or blank-like characters, `<`, `>` and names over 256 characters"
+        SkillDefect::FolderName(NameRule::VisibleChars) => {
+            format!("its folder's name breaks {agent_name}'s name rule, {FOLDER_NAME_RULE}")
+        }
+        SkillDefect::EntryName(NameRule::VisibleChars) => format!(
+            "the name {agent_name} gives it breaks {agent_name}'s name rule, {FOLDER_NAME_RULE}"
         ),
         SkillDefect::RefusedName(NameRule::VisibleChars) => format!(
             "its SKILL.md frontmatter `name` breaks {agent_name}'s name rule, which refuses blanks, `/`, `<`, `>`, hidden and direction-changing characters and names over 256 characters"

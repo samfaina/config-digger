@@ -1285,6 +1285,14 @@ impl LocationDefinition {
             .replace(FOLDER_NAME, folder)
             .replace(ENTRY_NAME, name)
     }
+
+    /// What `name_template` puts before an Entry's own name, filled in
+    /// with the plugin and folder `parts` name, such as `<plugin>:`.
+    pub fn name_prefix(&self, parts: &NameParts) -> String {
+        let named = self.entry_name(ENTRY_NAME, parts);
+        let prefix = named.split(ENTRY_NAME).next().unwrap_or_default();
+        prefix.to_owned()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
@@ -4132,6 +4140,33 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
         assert!(
             flat.contains("only a recursive skill folder can set a max_depth"),
             "{flat}"
+        );
+    }
+
+    #[test]
+    fn a_name_rule_judges_the_entry_name_only_when_there_is_one_and_a_name_trims_only_from_the_frontmatter()
+     {
+        let anchor = r#"{ block = "home", root = "state", path = "skills" }"#;
+        let with = |format: &str, fields: &str| {
+            let format = format.replace(" }", &format!(", {fields} }}"));
+            with_skills(anchor, &format, CHECKS)
+        };
+        let text = with(
+            SKILL_FORMAT,
+            r#"trims_name = true, sanitize = "hyphen-per-unit", name_rule = "visible-chars", name_rule_on = "entry-name""#,
+        );
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let unruled = error(&with(SKILL_FORMAT, r#"name_rule_on = "entry-name""#));
+        assert!(
+            unruled.contains("only a skill folder with a name_rule can set name_rule_on"),
+            "{unruled}"
+        );
+        let by_folder =
+            SKILL_FORMAT.replace(r#"name_from = "frontmatter""#, r#"name_from = "folder""#);
+        let trimmed = error(&with(&by_folder, "trims_name = true"));
+        assert!(
+            trimmed.contains("only a skill folder named by its frontmatter can trim its name"),
+            "{trimmed}"
         );
     }
 

@@ -7,10 +7,11 @@ use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
-    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NonceHash,
-    PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord, PluginRegistry,
-    ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource,
-    SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, Unlisted, is_entry_key,
+    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
+    NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
+    PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
+    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, Unlisted,
+    is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -1480,6 +1481,7 @@ fn read_as_if(
         opened_in: Vec::new(),
         walk_below: None,
         project_folder: None,
+        plugin_name: None,
         name_clashes: Vec::new(),
     };
     scanner.reader.not_admin_owned = find_not_admin_owned(definitions, &found, ports, &as_if);
@@ -3566,6 +3568,9 @@ struct Scanner<'p> {
     /// The folder of a Project the location being read is in, if it is in
     /// one: for a workspace file, the member folder.
     project_folder: Option<PathBuf>,
+    /// The name of the plugin whose skills are being read, if they are a
+    /// plugin's: their location's `name_template` names them by it.
+    plugin_name: Option<String>,
     name_clashes: Vec<ScannedNameClash>,
 }
 
@@ -4789,6 +4794,7 @@ impl Scanner<'_> {
         };
         let base = &plugin.folder;
         let mut read_folders = Vec::new();
+        self.plugin_name = Some(plugin.name.clone());
         for declared in block.paths(text.as_deref()) {
             let folder = paths::lexical(&base.join(&declared.path));
             if read_folders.contains(&folder) {
@@ -4816,6 +4822,7 @@ impl Scanner<'_> {
             self.add_reader(home, location, &folder);
             self.read_skills(home, location, &block.skills, &folder, project.clone(), 0);
         }
+        self.plugin_name = None;
     }
 
     /// Adds the Entries at the root of the file `path` of `plugin`: an
@@ -5296,7 +5303,11 @@ impl Scanner<'_> {
         let Some(text) = self.reader.text(home, &skill_md, project.as_deref()) else {
             return;
         };
-        let read = read_skill(format, skill.name, text);
+        let parts = NameParts {
+            plugin: self.plugin_name.as_deref(),
+            folder: None,
+        };
+        let read = read_skill(format, location, &parts, skill.name, text);
         tracing::debug!(location = %location.id, skill = %read.name, "read skill");
         // A link at the skill's own location is an Entry apart from its target.
         let link = ScannedLink::at(fs, skill.folder, || {
@@ -5536,8 +5547,14 @@ pub(crate) struct SkillReading {
 
 /// The skill in the folder named `folder`, whose `SKILL.md` holds `text`,
 /// as an Agent that reads skill folders as `format` says reads it, under
-/// its name rule.
-fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
+/// its name rule, in `location`, whose `name_template` fills in `parts`.
+fn read_skill(
+    format: &SkillFolder,
+    location: &LocationDefinition,
+    parts: &NameParts,
+    folder: &str,
+    text: &str,
+) -> ReadSkill {
     let mut config = serde_json::Map::new();
     let mut found = None;
     let mut named = None;
@@ -5551,13 +5568,19 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
                     config.insert(key.to_owned(), value.clone().into());
                 }
             }
-            named = keys.get("name").filter(|name| !name.is_empty()).cloned();
+            let prefix = location.name_prefix(parts);
+            named = keys
+                .get("name")
+                .map(|name| format.frontmatter_name(name, &prefix))
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned);
         }
         Err(defect) => found = Some(defect),
     }
     // `refused` is the defect of a `name` the rule refuses, which then
-    // counts as none, and `folder_breaks` that of a folder name it refuses.
-    let read = |named: Option<&String>, refused: Option<SkillDefect>, folder_breaks| {
+    // counts as none, and `breaks` that of a folder name or a name it
+    // refuses.
+    let read = |named: Option<&String>, refused: Option<SkillDefect>, breaks| {
         let mut defect = found;
         let name = match (format.name_from, named) {
             (NameFrom::Frontmatter, Some(name)) => name.clone(),
@@ -5569,7 +5592,7 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
         };
         if format.is_reserved(folder) {
             defect = Some(SkillDefect::Reserved);
-        } else if let Some(breaks) = folder_breaks {
+        } else if let Some(breaks) = breaks {
             defect = Some(breaks);
         }
         SkillReading {
@@ -5588,10 +5611,28 @@ fn read_skill(format: &SkillFolder, folder: &str, text: &str) -> ReadSkill {
             unruled: None,
         };
     };
-    let kept = named.as_ref().filter(|name| rule.takes_name(name));
-    let refused = (named.is_some() && kept.is_none()).then_some(SkillDefect::RefusedName(rule));
-    let folder_breaks = (!rule.takes_folder(folder)).then_some(SkillDefect::FolderName(rule));
-    let ruled = read(kept, refused, folder_breaks);
+    let (kept, refused, breaks) = match format.name_rule_on {
+        NameRuleOn::Parts => {
+            let kept = named.as_ref().filter(|name| rule.takes_name(name));
+            let refused =
+                (named.is_some() && kept.is_none()).then_some(SkillDefect::RefusedName(rule));
+            let breaks = !rule.takes_folder(folder);
+            (
+                kept,
+                refused,
+                breaks.then_some(SkillDefect::FolderName(rule)),
+            )
+        }
+        NameRuleOn::EntryName => {
+            let breaks = !rule.takes_folder(&location.entry_name(&unruled.name, parts));
+            (
+                named.as_ref(),
+                None,
+                breaks.then_some(SkillDefect::EntryName(rule)),
+            )
+        }
+    };
+    let ruled = read(kept, refused, breaks);
     let unruled = (ruled != unruled).then(|| Box::new(unruled));
     ReadSkill {
         name: ruled.name,

@@ -3314,6 +3314,15 @@ pub(crate) struct SkillFolder {
     /// and a `name` that breaks it counts as no `name`. The location's
     /// `name_rule_when` says when the Agent applies it.
     pub name_rule: Option<NameRule>,
+    /// Which name of a skill `name_rule` judges: its folder's name and its
+    /// `name` by default.
+    #[serde(default)]
+    pub name_rule_on: NameRuleOn,
+    /// Whether the Agent trims a frontmatter `name`, and drops from it what
+    /// the location's `name_template` puts before a name, such as
+    /// `<plugin>:`, before it rewrites it. A `name` left empty is none.
+    #[serde(default)]
+    pub trims_name: bool,
     /// Folder names the Agent never loads a skill from, compared
     /// case-insensitively, such as a name it keeps for itself.
     #[serde(default)]
@@ -3387,6 +3396,25 @@ pub(crate) enum Sanitize {
     /// Each character a Windows file name cannot hold, `: \ / < > * ? " |`,
     /// replaced by `-`, as Gemini CLI names a skill.
     PathChars,
+    /// Each UTF-16 code unit other than `A`-`Z`, `a`-`z`, `0`-`9`, `_` and
+    /// `-` replaced by one `-`, so that a character outside the BMP is
+    /// `--`, with runs kept and nothing trimmed, as Claude Code names a
+    /// plugin's skill.
+    HyphenPerUnit,
+}
+
+/// Which name of a skill its location's name rule judges.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum NameRuleOn {
+    /// Its folder's name, and its frontmatter `name`, each as written.
+    #[default]
+    Parts,
+    /// The name the Agent gives the skill, rewritten as `sanitize` says
+    /// and filled in its location's `name_template`, held to the rule of a
+    /// folder name: a skill whose name breaks it is skipped. Its folder's
+    /// name and its frontmatter `name` are not judged on their own.
+    EntryName,
 }
 
 /// A rule an Agent's skill names must keep.
@@ -3490,6 +3518,9 @@ pub(crate) enum SkillDefect {
     Reserved,
     /// Its folder's name breaks the Agent's name rule.
     FolderName(NameRule),
+    /// The name the Agent gives it breaks the Agent's name rule, for a
+    /// location whose rule judges that name.
+    EntryName(NameRule),
     /// Its frontmatter's `name` breaks the Agent's name rule, so that the
     /// Agent reads it as a frontmatter without a `name`.
     RefusedName(NameRule),
@@ -3516,6 +3547,12 @@ impl Validate for SkillFolder {
                 return Err("only a recursive skill folder can set a max_depth".into());
             }
             _ => {}
+        }
+        if self.name_rule.is_none() && self.name_rule_on != NameRuleOn::Parts {
+            return Err("only a skill folder with a name_rule can set name_rule_on".into());
+        }
+        if self.trims_name && self.name_from != NameFrom::Frontmatter {
+            return Err("only a skill folder named by its frontmatter can trim its name".into());
         }
         if self.no_frontmatter.reads_again() || self.no_name.reads_again() {
             return Err(
@@ -3545,9 +3582,10 @@ impl SkillFolder {
             }
             SkillDefect::MalformedFrontmatter => self.malformed_frontmatter,
             SkillDefect::NoName => self.no_name,
-            SkillDefect::NoDescription | SkillDefect::Reserved | SkillDefect::FolderName(_) => {
-                SkillFallback::Skip
-            }
+            SkillDefect::NoDescription
+            | SkillDefect::Reserved
+            | SkillDefect::FolderName(_)
+            | SkillDefect::EntryName(_) => SkillFallback::Skip,
             SkillDefect::RefusedName(_) => self.no_name,
         }
     }
@@ -3557,6 +3595,18 @@ impl SkillFolder {
         self.reserved
             .iter()
             .any(|name| name.eq_ignore_ascii_case(folder))
+    }
+
+    /// A skill's frontmatter `name` as the Agent takes it, when its
+    /// location's `name_template` puts `prefix` before a name. It trims as
+    /// JavaScript's `trim` does: U+FEFF too, and not U+0085.
+    pub fn frontmatter_name<'n>(&self, name: &'n str, prefix: &str) -> &'n str {
+        if !self.trims_name {
+            return name;
+        }
+        let blank = |c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{FEFF}';
+        let name = name.trim_matches(blank);
+        name.strip_prefix(prefix).unwrap_or(name)
     }
 
     /// The name `name` as the Agent uses it.
@@ -3576,6 +3626,17 @@ impl SkillFolder {
             }
             Some(Sanitize::PathChars) => {
                 name.replace([':', '\\', '/', '<', '>', '*', '?', '"', '|'], "-")
+            }
+            Some(Sanitize::HyphenPerUnit) => {
+                let mut sanitized = String::new();
+                for c in name.chars() {
+                    if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                        sanitized.push(c);
+                    } else {
+                        sanitized.extend(std::iter::repeat_n('-', c.len_utf16()));
+                    }
+                }
+                sanitized
             }
         }
     }
