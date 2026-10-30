@@ -5614,9 +5614,9 @@ fn read_skill(
     let (kept, refused, breaks) = match format.name_rule_on {
         NameRuleOn::Parts => {
             let kept = named.as_ref().filter(|name| rule.takes_name(name));
-            let refused = named.is_some() && kept.is_none();
+            let refused =
+                (named.is_some() && kept.is_none()).then_some(SkillDefect::RefusedName(rule));
             let breaks = !rule.takes_folder(folder);
-            let refused = refused.then_some(SkillDefect::RefusedName(rule));
             (
                 kept,
                 refused,

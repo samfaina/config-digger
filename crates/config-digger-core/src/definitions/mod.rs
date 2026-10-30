@@ -1286,8 +1286,8 @@ impl LocationDefinition {
             .replace(ENTRY_NAME, name)
     }
 
-    /// What the name the Agent gives an Entry of the plugin and folder
-    /// `parts` name puts before the Entry's own name, such as `<plugin>:`.
+    /// What `name_template` puts before an Entry's own name, filled in
+    /// with the plugin and folder `parts` name, such as `<plugin>:`.
     pub fn name_prefix(&self, parts: &NameParts) -> String {
         let named = self.entry_name(ENTRY_NAME, parts);
         let prefix = named.split(ENTRY_NAME).next().unwrap_or_default();

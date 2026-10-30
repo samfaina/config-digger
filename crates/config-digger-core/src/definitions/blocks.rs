@@ -3597,13 +3597,15 @@ impl SkillFolder {
             .any(|name| name.eq_ignore_ascii_case(folder))
     }
 
-    /// The frontmatter `name` `name` as the Agent takes it, when its
-    /// location's `name_template` puts `prefix` before a name.
+    /// A skill's frontmatter `name` as the Agent takes it, when its
+    /// location's `name_template` puts `prefix` before a name. It trims as
+    /// JavaScript's `trim` does: U+FEFF too, and not U+0085.
     pub fn frontmatter_name<'n>(&self, name: &'n str, prefix: &str) -> &'n str {
         if !self.trims_name {
             return name;
         }
-        let name = name.trim();
+        let blank = |c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{FEFF}';
+        let name = name.trim_matches(blank);
         name.strip_prefix(prefix).unwrap_or(name)
     }
 

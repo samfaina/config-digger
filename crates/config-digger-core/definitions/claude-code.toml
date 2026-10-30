@@ -939,11 +939,11 @@ on_read_failure = "ignores_file"
 # `/<folder>` goes to the local skill, a synced skill answering to it while
 # no local skill takes it [test]. Claude Code skips a skill it cannot
 # load before they compete. Names are used as written, capitals and `_`
-# included [test], but a plugin's, which `plugin-skills` says how Claude
-# Code rewrites. Since 2.1.299 a name rule applies, behind the gate
-# `tengu_slate_wicket`, on by default [docs, binary]: `visible-chars`, on
-# every skill location, a plugin's skill held to it by its whole name
-# alone. It skips a skill whose folder name starts or ends
+# included [test], but for a plugin's skills, which Claude Code rewrites as
+# `plugin-skills` says [test]. Since 2.1.299 a name rule applies, behind
+# the gate `tengu_slate_wicket`, on by default [docs, binary]:
+# `visible-chars`, on every skill location, a plugin's skill held to it by
+# its whole name alone [test]. It skips a skill whose folder name starts or ends
 # with a space, or holds a hidden, direction-changing or blank-like
 # character, but takes a space inside it, `.`, capitals and letters outside
 # ASCII [test]. It refuses a frontmatter `name` as an alias when it holds

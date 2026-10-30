@@ -303,6 +303,8 @@ fn a_declared_plugin_skill_is_named_by_its_frontmatter_name_trimmed_unprefixed_a
         ("cd-throwaway\u{200B}zwsp", "cd-throwaway-zwsp"),
         (r#""  padded  ""#, "padded"),
         ("cd-throwaway-pk:pref", "pref"),
+        ("\"\u{FEFF}bom\u{FEFF}\"", "bom"),
+        ("\"\u{85}nel\"", "-nel"),
     ];
     let names: Vec<String> = named.iter().map(|(name, _)| (*name).to_owned()).collect();
     let fs = with_plugin_skills(json!({}), &names);
@@ -436,7 +438,8 @@ fn a_frontmatter_name_the_rule_refuses_leaves_a_skill_of_a_plugins_skills_folder
  {
     let manifest = json!({ "name": "cd-throwaway-pk", "version": "1.0.0" });
     let mut fs = with_plugin(json!({}), &manifest);
-    for (index, name) in refused_names().iter().enumerate() {
+    let refused = refused_names();
+    for (index, name) in refused.iter().enumerate() {
         let text = format!("---\nname: {name}\ndescription: d{index}\n---\n\nDo it.\n");
         let folder = Path::new(PLUGIN).join(format!(r"skills\n{index}"));
         fs = with_skill(fs, folder, &text);
@@ -444,23 +447,22 @@ fn a_frontmatter_name_the_rule_refuses_leaves_a_skill_of_a_plugins_skills_folder
 
     let inventory = inventory(&fs);
 
-    for index in 0..refused_names().len() {
+    for index in 0..refused.len() {
         let item = skill(&inventory, &format!("cd-throwaway-pk:n{index}"));
         assert_eq!(code(item.state), "effective", "n{index}");
         let entry = serde_json::to_value(&item.entries[0]).unwrap();
         assert_eq!(entry["notes"], json!([]), "n{index}");
     }
-    let names: Vec<&str> = inventory
+    let mut names: Vec<&str> = inventory
         .items
         .iter()
-        .map(|item| item.name.as_str())
+        .filter_map(|item| item.name.strip_prefix("cd-throwaway-pk:"))
         .collect();
-    assert!(
-        !names
-            .iter()
-            .any(|name| name.contains("cd-throwaway-spaced")),
-        "{names:?}"
-    );
+    names.sort();
+    let folders: Vec<String> = (0..refused.len())
+        .map(|index| format!("n{index}"))
+        .collect();
+    assert_eq!(names, folders);
 }
 
 #[test]
@@ -554,16 +556,38 @@ fn a_plugin_skill_whose_whole_name_is_over_256_characters_breaks_the_name_rule()
 }
 
 #[test]
+fn a_declared_plugin_skill_whose_whole_name_is_over_256_characters_breaks_the_name_rule() {
+    let [kept, refused] = long_plugin_skill_folders();
+    let names = [
+        format!(r#""  {kept}  ""#),
+        format!("cd-throwaway-pk:{refused}"),
+    ];
+    let fs = with_plugin_skills(json!({}), &names);
+
+    let inventory = inventory(&fs);
+
+    let (state_of_kept, _) = state(&inventory, &format!("cd-throwaway-pk:{kept}"));
+    assert_eq!(state_of_kept, "effective");
+    let (state, reason) = state(&inventory, &format!("cd-throwaway-pk:{refused}"));
+    assert_eq!(state, "invalid");
+    assert_eq!(reason, NAME_BREAKS_RULE);
+}
+
+#[test]
 fn with_the_gate_cached_off_no_name_rule_applies() {
     let folders = long_plugin_skill_folders();
     let fs = with_user_skill(
-        with_plugin_skill_folders(gate_cached(false), &folders),
+        with_plugin_skill_folders(
+            gate_cached(false),
+            &[&folders[..], &[" x".to_owned()]].concat(),
+        ),
         " cd-throwaway-lead",
     );
 
     let inventory = inventory(&fs);
 
     assert_eq!(state(&inventory, " cd-throwaway-lead").0, "effective");
+    assert_eq!(state(&inventory, "cd-throwaway-pk:-x").0, "effective");
     for folder in &folders {
         let item = skill(&inventory, &format!("cd-throwaway-pk:{folder}"));
         assert_eq!(code(item.state), "effective", "{folder}");
