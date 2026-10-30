@@ -78,7 +78,8 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 # `oauthAccount` and no tokens it is signed out and reads no synced skill
 # or plugin; with tokens and no `oauthAccount` it reads none offline, and
 # online it fetches the account at start, writes `oauthAccount` back and
-# reads them [test]. config-digger reads `oauthAccount` alone (#491).
+# reads the synced skills [test]. config-digger reads `oauthAccount` alone
+# (#491).
 [account]
 name = "claude.ai"
 anchor = { block = "home", root = "state_file" }
@@ -100,8 +101,9 @@ folder = "{organization}_{account}"
 #
 # A third-party provider leaves Claude Code on the account: with
 # `CLAUDE_CODE_USE_BEDROCK` it reads the synced skills, and keeps out the
-# synced plugins only because it holds the plugin sync gate off [test]; the
-# other providers alike [binary]. `ANTHROPIC_API_KEY` leaves it on under
+# synced plugins only because it holds the plugin sync gate off [test]. The
+# other providers leave it on alike [binary], and hold the gate off as its
+# bypass says. `ANTHROPIC_API_KEY` leaves it on under
 # `-p` [test], and `primaryApiKey` in `~/.claude.json` leaves it on [test].
 [account.off]
 unverified = "`ANTHROPIC_API_KEY` is taken to leave an interactive session on the account too, whether the user approved the key or not, as the binary says (#492)."
@@ -240,7 +242,8 @@ source = "source"
 # only a plugin the account's `manifest.json` lists, and a sync round
 # deletes one claude.ai does not list [test]; config-digger reads every
 # folder (#494). A synced plugin is named by its manifest's `name`, not by
-# its folder [disk], and its switches know it as `<name>@synced` [docs]. Its Entries are read-only, being a copy of the
+# its folder [disk], and its switches know it as `<name>@synced` [docs].
+# Its Entries are read-only, being a copy of the
 # account's configuration. Like `synced-skills`, its servers and skills
 # are read only in the Signed-in account's folder, and while Claude Code
 # runs on that account [test]; unlike them, only while the plugin sync gate
@@ -1186,9 +1189,9 @@ env_maps = [
 # This gate turns the claude.ai plugin sync on, as the one above does for
 # skills: on a Max account it is on and `plugins/synced` holds the
 # account's plugins [disk]. Unlike the skill sync gate, it also closes the
-# synced plugins: Claude Code reads none while the gate is off, by its
-# cached value, and while `DISABLE_GROWTHBOOK` or a third-party provider
-# holds it off [test]. Without a value it is off [binary].
+# synced plugins: Claude Code reads none while the gate is cached off or
+# not cached at all, and while `DISABLE_GROWTHBOOK` or a third-party
+# provider holds it off [test].
 [[feature_gates]]
 name = "tengu_claudeai_plugins_sync_enabled"
 assumed = false

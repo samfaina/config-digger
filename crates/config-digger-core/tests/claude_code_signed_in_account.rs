@@ -339,7 +339,8 @@ fn an_empty_auth_token_leaves_claude_code_on_the_account() {
 }
 
 /// A third-party provider and an API key, which leave Claude Code on the
-/// account wherever they are set.
+/// account wherever they are set; `ANTHROPIC_API_KEY` in an interactive
+/// session is marked `unverified`.
 const ON_VARIABLES: [(&str, &str); 7] = [
     ("ANTHROPIC_API_KEY", "not-a-real-secret"),
     ("CLAUDE_CODE_USE_BEDROCK", "1"),

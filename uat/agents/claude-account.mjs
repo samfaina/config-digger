@@ -13,8 +13,8 @@
 // ones, changes the gates' cached values, the user settings and two keys
 // of `.claude.json`, and puts them back at the end. Sign the home out
 // with `claude auth logout` on the same `CLAUDE_CONFIG_DIR` when done,
-// never on a copy. `CD_PROBE_ACCOUNT_HOME` names another signed-in home, a folder
-// named `claude-account-home*` in the probe root.
+// never on a copy. `CD_PROBE_ACCOUNT_HOME` names another signed-in home, a
+// folder named `claude-account-home*` in the probe root.
 import fs from "node:fs";
 import path from "node:path";
 import { fresh, json, modelServer, probe, root, run, same, skill, syncedPlugin, write } from "./lib.mjs";
@@ -92,7 +92,7 @@ function cacheGate(value, gate = "tengu_claudeai_skills_sync_enabled") {
   s.cachedGrowthBookFeatures = { ...s.cachedGrowthBookFeatures, [gate]: value };
   write(state, s);
 }
-const cachedGate = () => json(state).cachedGrowthBookFeatures?.tengu_claudeai_skills_sync_enabled;
+const cachedGate = (gate = "tengu_claudeai_skills_sync_enabled") => json(state).cachedGrowthBookFeatures?.[gate];
 
 const planted = (name) => /throwaway|^fold-/.test(name);
 // The skill folders Claude Code downloaded into the account's folder.
@@ -224,7 +224,9 @@ try {
   // `manifest.json` lists; a sync round deletes one claude.ai does not
   // list. These sessions run with no way out of the machine but to the
   // model stand-in: the gates hold their cached values and no round runs.
-  const offline = { HTTPS_PROXY: "http://127.0.0.1:9", HTTP_PROXY: "http://127.0.0.1:9", NO_PROXY: "127.0.0.1" };
+  const closedPort = "http://127.0.0.1:9";
+  const offline = { HTTPS_PROXY: closedPort, HTTP_PROXY: closedPort, NO_PROXY: "127.0.0.1" };
+  const keptPluginsGate = cachedGate(pluginsGate);
   cacheGate(true, pluginsGate);
   // The folder `<name>~g<n>` from 2.1.310, `<name>` before, as the
   // account's own synced plugins have it.
@@ -237,6 +239,7 @@ try {
   const reads = (s) => ({ skills: syncedListed(s).length > 0, plugin: s.plugins.includes("cd-throwaway-synced") });
   const both = { skills: true, plugin: true };
   const none = { skills: false, plugin: false };
+  const skillsOnly = { skills: true, plugin: false };
   const onAccount = "claude.ai/firstParty";
 
   await p.check("plugins[synced]", "a synced plugin is read, with its skills, only in the signed-in account's folder, `plugins/synced/<org>_<account>`, and not in another account's folder", async () => {
@@ -244,14 +247,19 @@ try {
     return same({ plugins: s.plugins.filter((n) => n.startsWith("cd-throwaway")), skill: s.skills.includes("cd-throwaway-synced:cd-throwaway-pskill"), auth: await auth() }, { plugins: ["cd-throwaway-synced"], skill: true, auth: onAccount });
   });
 
-  await p.check("plugins[synced]", "a synced plugin is read only while the gate `tengu_claudeai_plugins_sync_enabled` is on, and only one the account's `manifest.json` lists", async () => {
+  await p.check("plugins[synced]", "a synced plugin is read only while the gate `tengu_claudeai_plugins_sync_enabled` is on: not while it is held off, cached off or not cached at all, and only one the account's `manifest.json` lists", async () => {
     const unlisted = path.join(pluginBucket, generation === undefined ? "cd-throwaway-unlisted" : "cd-throwaway-unlisted~g1");
     write(path.join(unlisted, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-unlisted", version: "1.0.0" });
     const loaded = async (env) => (await session({ env })).plugins.filter((n) => n.startsWith("cd-throwaway"));
-    const gateOff = await loaded({ ...offline, ...noFetch });
-    const gateOn = await loaded(offline);
+    const heldOff = await loaded({ ...offline, ...noFetch });
+    cacheGate(false, pluginsGate);
+    const cachedOff = await loaded(offline);
+    cacheGate(undefined, pluginsGate);
+    const uncached = await loaded(offline);
+    cacheGate(true, pluginsGate);
+    const on = await loaded(offline);
     fs.rmSync(unlisted, { recursive: true });
-    return same({ gateOff, gateOn }, { gateOff: [], gateOn: ["cd-throwaway-synced"] });
+    return same({ heldOff, cachedOff, uncached, on }, { heldOff: [], cachedOff: [], uncached: [], on: ["cd-throwaway-synced"] });
   });
 
   // Signed out, on copies of the signed-in home. Never `claude auth logout`
@@ -282,24 +290,24 @@ try {
   // and the session stops before it gives up: the init event comes before
   // any request.
   const projectSettings = path.join(proj, ".claude", "settings.json");
-  const bedrock = (value) => ({ env: { CLAUDE_CODE_USE_BEDROCK: value, ANTHROPIC_BEDROCK_BASE_URL: "http://127.0.0.1:9", CLAUDE_CODE_SKIP_BEDROCK_AUTH: "1", AWS_REGION: "us-east-1" } });
+  const bedrock = (value) => ({ env: { CLAUDE_CODE_USE_BEDROCK: value, ANTHROPIC_BEDROCK_BASE_URL: closedPort, CLAUDE_CODE_SKIP_BEDROCK_AUTH: "1", AWS_REGION: "us-east-1" } });
   // Each case: what the file holds, what `claude auth status` says, which
   // of the account's synced skills and plugins Claude Code reads, and what
   // that shows.
-  const off = "takes Claude Code off the account: it reads no synced skill or plugin";
-  const on = "leaves Claude Code on the account: it reads the synced skills and plugins";
-  const gateOff = "leaves Claude Code on the account but holds the plugin sync gate off: it reads the synced skills, and no synced plugin";
+  const takesOff = "takes Claude Code off the account: it reads no synced skill or plugin";
+  const leavesOn = "leaves Claude Code on the account: it reads the synced skills and plugins";
+  const holdsGateOff = "leaves Claude Code on the account but holds the plugin sync gate off: it reads the synced skills, and no synced plugin";
   const settingsCases = [
-    ["`apiKeyHelper` in the user settings", userSettings, { apiKeyHelper: "echo not-a-real-secret" }, "api_key_helper/firstParty", none, off],
-    ["`apiKeyHelper` in the Project's `.claude/settings.json`", projectSettings, { apiKeyHelper: "echo not-a-real-secret" }, "api_key_helper/firstParty", none, off],
-    ["`env.ANTHROPIC_AUTH_TOKEN` in the user settings", userSettings, { env: { ANTHROPIC_AUTH_TOKEN: "not-a-real-secret" } }, "oauth_token/firstParty", none, off],
-    ["`env.ANTHROPIC_AUTH_TOKEN` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "not-a-real-secret" } }, onAccount, none, off],
-    ["`env.ANTHROPIC_AUTH_TOKEN` set to `\"\"` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "" } }, onAccount, both, on],
-    ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the user settings", userSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, "oauth_token/firstParty", none, off],
+    ["`apiKeyHelper` in the user settings", userSettings, { apiKeyHelper: "echo not-a-real-secret" }, "api_key_helper/firstParty", none, takesOff],
+    ["`apiKeyHelper` in the Project's `.claude/settings.json`", projectSettings, { apiKeyHelper: "echo not-a-real-secret" }, "api_key_helper/firstParty", none, takesOff],
+    ["`env.ANTHROPIC_AUTH_TOKEN` in the user settings", userSettings, { env: { ANTHROPIC_AUTH_TOKEN: "not-a-real-secret" } }, "oauth_token/firstParty", none, takesOff],
+    ["`env.ANTHROPIC_AUTH_TOKEN` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "not-a-real-secret" } }, onAccount, none, takesOff],
+    ["`env.ANTHROPIC_AUTH_TOKEN` set to `\"\"` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "" } }, onAccount, both, leavesOn],
+    ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the user settings", userSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, "oauth_token/firstParty", none, takesOff],
     ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the Project's settings", projectSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, onAccount, { skills: false, plugin: true }, "takes Claude Code's synced skills off the account, not its synced plugins"],
-    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the Project's settings", projectSettings, bedrock("1"), "third_party/bedrock", { skills: true, plugin: false }, gateOff],
-    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the user settings", userSettings, bedrock("1"), "third_party/bedrock", { skills: true, plugin: false }, gateOff],
-    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"0\"` in the user settings", userSettings, bedrock("0"), onAccount, both, on],
+    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the Project's settings", projectSettings, bedrock("1"), "third_party/bedrock", skillsOnly, holdsGateOff],
+    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the user settings", userSettings, bedrock("1"), "third_party/bedrock", skillsOnly, holdsGateOff],
+    ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"0\"` in the user settings", userSettings, bedrock("0"), onAccount, both, leavesOn],
   ];
   for (const [what, file, settings, expected, expectedReads, shows] of settingsCases) {
     await p.check("account.off", `${what} ${shows}`, async () => {
@@ -350,6 +358,7 @@ try {
   });
 
   unplantPlugins();
+  cacheGate(keptPluginsGate, pluginsGate);
 
   // ---------------------------------------------------------------- the gate
 
