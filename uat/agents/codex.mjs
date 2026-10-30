@@ -125,7 +125,13 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     write(path.join(market, name, ".mcp.json"), { mcpServers: { [`${name}-srv`]: { command: "cmd", args: ["/c", name] } } });
     skill(path.join(market, name, "skills", `${name}-skill`), [`name: ${name}-skill`, `description: d-${name}-skill`]);
   }
-  write(path.join(market, ".agents", "plugins", "marketplace.json"), { name: "cd-throwaway-market", plugins: names.map((name) => ({ name, source: { source: "local", path: `./${name}` } })) });
+  // p3 holds only a skill 6 and one 7 folders below its skills folder, and
+  // is installed by the depth check alone.
+  const deep = path.join(market, "cd-throwaway-p3", "skills", "a", "b", "c", "d", "e");
+  write(path.join(market, "cd-throwaway-p3", ".codex-plugin", "plugin.json"), { name: "cd-throwaway-p3", version: "1.0.0", description: "probe plugin" });
+  skill(path.join(deep, "cd-throwaway-plugin-depth6"), ["name: cd-throwaway-plugin-depth6", "description: d-cd-throwaway-plugin-depth6"]);
+  skill(path.join(deep, "f", "cd-throwaway-plugin-depth7"), ["name: cd-throwaway-plugin-depth7", "description: d-cd-throwaway-plugin-depth7"]);
+  write(path.join(market, ".agents", "plugins", "marketplace.json"), { name: "cd-throwaway-market", plugins: [...names, "cd-throwaway-p3"].map((name) => ({ name, source: { source: "local", path: `./${name}` } })) });
   await codex(home, proj, "plugin", "marketplace", "add", market);
   for (const name of names) await codex(home, proj, "plugin", "add", `${name}@cd-throwaway-market`);
   const config = path.join(home, "config.toml");
@@ -152,6 +158,13 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     const folder = fs.existsSync(path.join(home, "plugins", "cache", "cd-throwaway-market", "cd-throwaway-p2"));
     const table = fs.readFileSync(config, "utf8").includes('"cd-throwaway-p2@cd-throwaway-market"');
     return same({ folder, table }, { folder: false, table: false });
+  });
+  await p.check("locations[plugin-skills]", "an installed plugin's skill folders are found up to 6 folders below its skills folder, not 7, though its copy in the cache holds both", async () => {
+    await codex(home, proj, "plugin", "add", "cd-throwaway-p3@cd-throwaway-market");
+    const copy = path.join(home, "plugins", "cache", "cd-throwaway-market", "cd-throwaway-p3", "1.0.0", "skills", "a", "b", "c", "d", "e");
+    const copied = ["cd-throwaway-plugin-depth6", path.join("f", "cd-throwaway-plugin-depth7")].every((folder) => fs.existsSync(path.join(copy, folder, "SKILL.md")));
+    const listed = (await skills(home, proj)).filter((n) => n.includes("depth"));
+    return same({ copied, listed }, { copied: true, listed: ["cd-throwaway-plugin-depth6"] });
   });
 }
 

@@ -491,11 +491,10 @@ on_read_failure = "ignores_file"
 # `skills`, a path or a list of them, or else in its `skills` folder
 # [source]. Codex names them `<plugin>:<skill>` [source]. It finds every
 # `SKILL.md` below each folder, the folder's own included, up to 6 folders
-# down [source]; a declared folder holding one is read here as that one
-# skill alone.
+# down [source, test]; a declared folder holding one is read here as that
+# one skill alone.
 [[locations]]
 id = "plugin-skills"
-unverified = "That Codex caps a plugin's skill folders at 6 folders deep too is not tested."
 anchor = { block = "plugin", plugins = "installed", path = [".codex-plugin/plugin.json", ".claude-plugin/plugin.json", ".cursor-plugin/plugin.json"] }
 format = { block = "manifest-skills", field = ["skills"], default = "skills", dot_slash = true, path_may_name_one = true, skills = { recursive = true, max_depth = 6, name_from = "frontmatter", no_frontmatter = "skip", malformed_frontmatter = "quote-values", no_name = "skip" } }
 name_template = "{plugin}:{name}"
@@ -521,18 +520,19 @@ on_read_failure = "ignores_file"
 # Codex lists every skill it finds, by the path of its `SKILL.md`, so two
 # skills with one name are both used [source, docs]. Trust keeps out no
 # skill. It finds skill folders up to 6 folders below a root [test], and
-# below a plugin's skills folder by the same loader [source]. It skips a
-# `SKILL.md` that is not UTF-8 or cannot be opened [test]. A frontmatter
-# that is not YAML it reads again with each plain value that holds `: `
-# quoted, as `quote-values` says: `description: Use when: x` loads, and
-# `name: [unclosed` names a skill `[unclosed` [source, test]. A stray line,
-# an indented `name`, two `name` lines, a quote that never closes, such a
-# value going on over indented lines and a value ending in `:` without
-# holding `: ` still skip the skill, and a frontmatter that never closes is
-# none [source, test]. A frontmatter without a `name`, or with an empty one,
-# names the skill after its folder [source, test], which `no_name = "skip"`
-# does not say, and one without a `description` skips it [source], which
-# config-digger does not: a ticket, not filed yet.
+# below a plugin's skills folder by the same loader [source], an installed
+# plugin's [test]. It skips a `SKILL.md` that is not UTF-8 or cannot be
+# opened [test]. A frontmatter that is not YAML it reads again with each
+# plain value that holds `: ` quoted, as `quote-values` says:
+# `description: Use when: x` loads, and `name: [unclosed` names a skill
+# `[unclosed` [source, test]. A stray line, an indented `name`, two `name`
+# lines, a quote that never closes, such a value going on over indented
+# lines and a value ending in `:` without holding `: ` still skip the
+# skill, and a frontmatter that never closes is none [source, test]. A
+# frontmatter without a `name`, or with an empty one, names the skill after
+# its folder [source, test], which `no_name = "skip"` does not say, and one
+# without a `description` skips it [source], which config-digger does not:
+# a ticket, not filed yet.
 [items.skill]
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
