@@ -3,7 +3,8 @@
 //! fake ports: a location whose `name_template` names its Entries
 //! `synced:<name>`, beside a local one, and a switch that holds each Entry
 //! by its name or by its own name before the template, as Claude Code's
-//! `skillOverrides` holds a synced skill.
+//! `skillOverrides` holds a synced skill, a partial value under its own
+//! name limiting it.
 
 use config_digger_core::api::{Action, Context, Core, Inventory, Plan, ScanOptions, Targets};
 use config_digger_core::api::{Entry, WarningClass};
@@ -73,6 +74,7 @@ context = "project"
 enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
+partial_values = ["name-only"]
 "#;
 
 fn home_file() -> PathBuf {
@@ -238,4 +240,20 @@ fn disable_of_the_entry_named_as_another_s_own_name_warns_of_that_one_too() {
     let after = inventory(&core);
     assert_eq!(code(entry(&after, "pdf").state), "disabled");
     assert_eq!(code(entry(&after, "synced:pdf").state), "disabled");
+}
+
+#[test]
+fn a_partial_value_under_the_own_name_key_limits_the_entry() {
+    let fs = fixture(false, json!({ "pdf": "name-only" }));
+    let core = core(&fs);
+
+    let pdf = entry(&inventory(&core), "synced:pdf");
+
+    assert_eq!(code(pdf.state), "effective");
+    assert_eq!(pdf.notes.len(), 1);
+    assert_eq!(code(pdf.notes[0].code), "partial_switch");
+    assert_eq!(
+        pdf.notes[0].switch,
+        Some(format!("{}#overrides.pdf", settings().display()))
+    );
 }

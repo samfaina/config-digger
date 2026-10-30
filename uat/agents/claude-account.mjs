@@ -217,6 +217,49 @@ try {
     return same(off, { "anthropic-skills:fold-s": true, "fold-s": true, "anthropic-skills:cd-throwaway-sname": false, "cd-throwaway-sname": false });
   });
 
+  // Each of the three switches, one settings file at a time: what the
+  // listing shows of the synced skill, whether the session reads it, and
+  // whether `/anthropic-skills:fold-s` runs it, under each partial value by
+  // either key, and with the two keys disagreeing.
+  const overridden = async (file, skillOverrides) => {
+    write(file, { ...(file === userSettings && keptSettings ? JSON.parse(keptSettings) : {}), skillOverrides });
+    try {
+      const s = await session({ env: noFetch });
+      const { sent } = await session({ prompt: "/anthropic-skills:fold-s", env: noFetch });
+      return { listed: s.listed.filter((l) => l.includes("fold-s")), read: s.skills.includes("anthropic-skills:fold-s"), runs: sent.includes("body-of-synced-fold-s") };
+    } finally {
+      if (file === userSettings) putBackSettings();
+      else fs.rmSync(path.join(proj, ".claude"), { recursive: true, force: true });
+    }
+  };
+  const nameOnly = { listed: ["- anthropic-skills:fold-s"], read: true, runs: true };
+  const userInvocableOnly = { listed: [], read: true, runs: true };
+  const off = { listed: [], read: false, runs: false };
+  const on = { listed: ["- anthropic-skills:fold-s (anthropic-skills:cd-throwaway-sname): planted in the bucket"], read: true, runs: true };
+  for (const [table, where, file] of [
+    ["items.skill.disable[0]", "the Project's `.claude/settings.local.json`", path.join(proj, ".claude", "settings.local.json")],
+    ["items.skill.disable[1]", "the Project's `.claude/settings.json`", path.join(proj, ".claude", "settings.json")],
+    ["items.skill.disable[2]", "the user settings", userSettings],
+  ]) {
+    for (const [key, which] of [["anthropic-skills:fold-s", "`anthropic-skills:<folder>`"], ["fold-s", "the bare `<folder>`"]]) {
+      await p.check(table, `in ${where}, \`name-only\` under ${which} lists a synced skill by its name alone and \`user-invocable-only\` lists it not at all, and both leave \`/anthropic-skills:<folder>\` running it`, async () => {
+        return same({ "name-only": await overridden(file, { [key]: "name-only" }), "user-invocable-only": await overridden(file, { [key]: "user-invocable-only" }) }, { "name-only": nameOnly, "user-invocable-only": userInvocableOnly });
+      });
+    }
+    // Each pair of disagreeing keys, in both orders.
+    await p.check(table, `in ${where}, of a synced skill's two keys that disagree, \`anthropic-skills:<folder>\` decides, whichever the file holds first: \`"on"\` there keeps it read beside \`"<folder>": "off"\`, and \`"off"\` there turns it off beside \`"<folder>": "on"\``, async () => {
+      return same(
+        {
+          "bare off, prefixed first": await overridden(file, { "anthropic-skills:fold-s": "on", "fold-s": "off" }),
+          "bare off, bare first": await overridden(file, { "fold-s": "off", "anthropic-skills:fold-s": "on" }),
+          "prefixed off, prefixed first": await overridden(file, { "anthropic-skills:fold-s": "off", "fold-s": "on" }),
+          "prefixed off, bare first": await overridden(file, { "fold-s": "on", "anthropic-skills:fold-s": "off" }),
+        },
+        { "bare off, prefixed first": on, "bare off, bare first": on, "prefixed off, prefixed first": off, "prefixed off, bare first": off },
+      );
+    });
+  }
+
   // ---------------------------------------------------------------- the account
 
   // Claude Code reads a synced plugin only while the gate
