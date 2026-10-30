@@ -15,7 +15,7 @@ mod jsonc;
 mod toml;
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use similar::{Algorithm, DiffTag, TextDiff};
 use std::borrow::Cow;
 use std::ops::Range;
@@ -369,10 +369,35 @@ fn split_key_path(key_path: &[String]) -> Result<(&[String], &str), EditError> {
     }
 }
 
-fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {
+/// The value at `key_path` below `value`.
+pub(crate) fn lookup<'v>(value: &'v Value, key_path: &[String]) -> Option<&'v Value> {
     key_path
         .iter()
         .try_fold(value, |value, key| value.as_object()?.get(key))
+}
+
+/// Gives `key_path` below `value` the value `to`, `None` taking it out. The
+/// keys above it become objects when they are not.
+pub(crate) fn set_at(value: &mut Option<Value>, key_path: &[String], to: &Option<Value>) {
+    let Some((name, below)) = key_path.split_first() else {
+        value.clone_from(to);
+        return;
+    };
+    let mut object = match value.take() {
+        Some(Value::Object(object)) => object,
+        // Nothing to take out.
+        other if to.is_none() => {
+            *value = other;
+            return;
+        }
+        _ => Map::new(),
+    };
+    let mut child = object.remove(name);
+    set_at(&mut child, below, to);
+    if let Some(child) = child {
+        object.insert(name.clone(), child);
+    }
+    *value = Some(Value::Object(object));
 }
 
 /// The whole file's value once `edit` is applied to `value`.

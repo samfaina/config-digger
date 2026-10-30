@@ -10,7 +10,7 @@ use crate::api::{
     RollbackLocation, RollbackOutcome, Verify, WarningClass,
 };
 use crate::definitions::{AgentDefinition, Definitions};
-use crate::edit::EditableFile;
+use crate::edit::{self, EditableFile};
 use crate::folders::{self, FolderOp, PlannedFolder};
 use crate::history::{self, EditRecord, FolderRecord, LocationRecord, Manifest, VerifyRecord};
 use crate::mask::Side;
@@ -633,7 +633,7 @@ fn verify(
 }
 
 /// Verify of one file: it reads back, and every key an edit changed holds the
-/// value the edit gave it. When the file holds other bytes than those
+/// value the edits gave it. When the file holds other bytes than those
 /// written, something rewrote it since, and only a rewrite that took an edit
 /// away fails the Operation.
 fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result<(), Failure> {
@@ -658,7 +658,7 @@ fn verify_file(ports: &Ports, planned: &Planned, write: &PendingWrite) -> Result
 enum Landed {
     /// The file no longer decodes or parses.
     ReadFailure(String),
-    /// A key does not hold what its last edit gave it.
+    /// A key does not hold what the edits gave it.
     Mismatch(String),
 }
 
@@ -667,8 +667,8 @@ struct TouchedKey<'w> {
     key_path: &'w [String],
     /// Its value before the Operation.
     before: &'w Option<Value>,
-    /// The value its last edit gave it.
-    after: &'w Option<Value>,
+    /// Its value once every edit of the file is applied.
+    after: Option<Value>,
 }
 
 /// Each key the edits of a file changed, once, in the order first changed.
@@ -676,23 +676,34 @@ fn touched_keys<'w>(write: &'w PendingWrite) -> Vec<TouchedKey<'w>> {
     let mut keys: Vec<TouchedKey> = Vec::new();
     let dependencies = write.file.edited.edits.iter();
     for dependency in dependencies.flat_map(|applied| &applied.depends_on) {
-        match keys
-            .iter_mut()
-            .find(|key| key.key_path == dependency.key_path.as_slice())
+        if !keys
+            .iter()
+            .any(|key| key.key_path == dependency.key_path.as_slice())
         {
-            Some(key) => key.after = &dependency.after,
-            None => keys.push(TouchedKey {
+            keys.push(TouchedKey {
                 key_path: &dependency.key_path,
                 before: &dependency.before,
-                after: &dependency.after,
-            }),
+                after: None,
+            });
+        }
+        // An edit also changes what the keys above and below it hold.
+        for key in &mut keys {
+            if let Some(below) = dependency.key_path.strip_prefix(key.key_path) {
+                edit::set_at(&mut key.after, below, &dependency.after);
+            } else if let Some(above) = key.key_path.strip_prefix(dependency.key_path.as_slice()) {
+                key.after = dependency
+                    .after
+                    .as_ref()
+                    .and_then(|value| edit::lookup(value, above))
+                    .cloned();
+            }
         }
     }
     keys
 }
 
 /// Whether every key the edits of a file changed holds, in `bytes`, the
-/// value its last edit gave it.
+/// value the edits gave it.
 fn edits_hold(bytes: &[u8], write: &PendingWrite) -> Result<(), Landed> {
     let path = &write.file.path;
     let file = EditableFile::decode(bytes, write.file.syntax).map_err(|reason| {
@@ -702,7 +713,7 @@ fn edits_hold(bytes: &[u8], write: &PendingWrite) -> Result<(), Landed> {
         let value = file.value_at(key.key_path).map_err(|error| {
             Landed::ReadFailure(format!("{} no longer parses: {error}", path.display()))
         })?;
-        if value != *key.after {
+        if value != key.after {
             return Err(Landed::Mismatch(format!(
                 "`{}` in {} does not hold what was written",
                 key.key_path.join("."),
@@ -910,11 +921,17 @@ fn fail(
 
 #[cfg(test)]
 mod tests {
+    use super::{Landed, PendingWrite, edits_hold};
     use crate::api::{
         Action, Context, Core, ErrorCode, Plan, RollbackOutcome, ScanOptions, Targets, Warning,
         WarningClass,
     };
+    use crate::edit::{Edit, EditableFile, Syntax};
+    use crate::plan::{AppliedEdit, EditedFile, PlannedFile};
     use crate::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+    use crate::store::Medium;
+    use serde_json::json;
+    use std::path::PathBuf;
 
     const CLAUDE_JSON: &str = r"C:\Users\fixture\.claude.json";
     const SERVERS: &str = r#"{"mcpServers": {"linear": {"url": "https://u"}}}"#;
@@ -1086,6 +1103,107 @@ checks = ["disable", "precedence"]
         );
 
         assert!(outcome.is_ok(), "{outcome:?}");
+    }
+
+    fn set(key_path: &[&str], value: serde_json::Value) -> Edit {
+        Edit::Set {
+            key_path: key_path.iter().map(|key| (*key).to_owned()).collect(),
+            value,
+        }
+    }
+
+    /// A JSON file the plan creates with `edits`, each applied to the file
+    /// the edits before it left.
+    fn created_with(edits: &[Edit]) -> PlannedFile {
+        let read = b"{}".to_vec();
+        let mut bytes = read.clone();
+        let mut applied_edits = Vec::new();
+        for edit in edits {
+            let applied = EditableFile::decode(&bytes, Syntax::Jsonc)
+                .unwrap()
+                .apply(edit)
+                .unwrap();
+            bytes = applied.bytes;
+            applied_edits.push(AppliedEdit {
+                edit: edit.clone(),
+                inverse: applied.inverse,
+                depends_on: applied.depends_on,
+            });
+        }
+        PlannedFile {
+            path: PathBuf::from(r"C:\Users\fixture\created.json"),
+            syntax: Syntax::Jsonc,
+            read,
+            created: true,
+            edited: EditedFile {
+                bytes,
+                edits: applied_edits,
+            },
+            readers: Vec::new(),
+            switches: Vec::new(),
+            git_versioned: false,
+            parking: false,
+            parked_store: false,
+            parked_readers: Vec::new(),
+            medium: Medium::File,
+        }
+    }
+
+    /// Whether the edits of `file` hold in `bytes`.
+    fn hold_in(file: &PlannedFile, bytes: &[u8]) -> Result<(), Landed> {
+        let write = PendingWrite {
+            file,
+            current: None,
+            bytes: file.edited.bytes.clone(),
+        };
+        edits_hold(bytes, &write)
+    }
+
+    #[test]
+    fn edits_under_a_key_an_earlier_edit_created_hold_whatever_their_order() {
+        let review = json!({ "agent": "cursor" });
+        let lint = json!({ "agent": "codex" });
+        let orders = [
+            vec![
+                set(&["entries"], json!({ "review": review })),
+                set(&["entries", "lint"], lint.clone()),
+            ],
+            vec![
+                set(&["entries"], json!({ "review": review })),
+                set(&["entries", "lint"], lint.clone()),
+                set(&["entries"], json!({ "lint": lint })),
+            ],
+            vec![
+                set(&["entries"], json!({ "review": review, "lint": lint })),
+                Edit::Remove {
+                    key_path: vec!["entries".to_owned(), "lint".to_owned()],
+                },
+            ],
+        ];
+        for edits in orders {
+            let file = created_with(&edits);
+
+            let held = hold_in(&file, &file.edited.bytes);
+
+            assert!(held.is_ok(), "{edits:?}");
+        }
+    }
+
+    #[test]
+    fn a_rewrite_that_takes_either_edit_away_does_not_hold() {
+        let file = created_with(&[
+            set(&["entries"], json!({ "review": 1 })),
+            set(&["entries", "lint"], json!(2)),
+        ]);
+
+        for rewritten in [
+            r#"{"entries": {"review": 1}}"#,
+            r#"{"entries": {"lint": 2}}"#,
+        ] {
+            let held = hold_in(&file, rewritten.as_bytes());
+
+            assert!(matches!(held, Err(Landed::Mismatch(_))), "{rewritten}");
+        }
     }
 
     #[test]

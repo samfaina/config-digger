@@ -418,19 +418,18 @@ fn parked_cursor_skills(env: &FakeEnvironment) -> (FakeFileSystem, Vec<String>) 
         },
     );
     let core = Core::new(fake::ports(fs.clone(), env.clone())).unwrap();
-    for name in ["review", "lint"] {
-        let snapshot = core.scan(&ScanOptions { projects: vec![] }).unwrap();
-        let selector = cursor_skill(name).display().to_string();
-        let park = core
-            .plan(
-                &snapshot,
-                &Context { project: None },
-                Action::Disable,
-                &targets(&[&selector]),
-            )
-            .unwrap();
-        core.execute(park, &[WarningClass::WideReach]).unwrap();
-    }
+    let snapshot = core.scan(&ScanOptions { projects: vec![] }).unwrap();
+    let review = cursor_skill("review").display().to_string();
+    let lint = cursor_skill("lint").display().to_string();
+    let park = core
+        .plan(
+            &snapshot,
+            &Context { project: None },
+            Action::Disable,
+            &targets(&[&review, &lint]),
+        )
+        .unwrap();
+    core.execute(park, &[WarningClass::WideReach]).unwrap();
     let store = PathBuf::from(LOCAL_APP_DATA).join(r"config-digger\parked\manifest.json");
     let locators = ["review", "lint"]
         .iter()
@@ -488,7 +487,7 @@ fn an_enable_asks_the_git_index_once_per_repository_of_the_folders_it_brings_bac
 
 #[test]
 fn counting_the_operations_asks_the_git_index_nothing() {
-    // History holds the Disables that moved both skills out of a dotfiles
+    // History holds the Disable that moved both skills out of a dotfiles
     // repo at the home folder.
     let env = FakeEnvironment::with_home(HOME)
         .with_var("APPDATA", APP_DATA)
@@ -501,7 +500,7 @@ fn counting_the_operations_asks_the_git_index_nothing() {
 
     let count = core.operation_count().unwrap();
 
-    assert_eq!(count, 2);
+    assert_eq!(count, 1);
     assert_eq!(git.asked(), Vec::<PathBuf>::new());
     core.history().unwrap();
     assert!(
