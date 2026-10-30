@@ -80,7 +80,7 @@ The account checks add the `init` event's plugins and `claude auth status --json
 
 | Agent | Versions every check passes on | `verified` |
 |---|---|---|
-| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too; `claude-code.mjs` with #410's and #352's checks on these and 2.1.312, which stays outside `verified` until the other probes run on it; both probes with #458's checks on these and 2.1.314, which stays outside `verified` as `claude-account.mjs` has not run on it, and with `CLAUDE_CODE_PLUGIN_DIRS`, which Orca's terminals set, left out of the environment; `claude-account.mjs` on 2.1.299, 2.1.302, 2.1.309 and 2.1.310, with a Max account, and with #400's checks on 2.1.299, 2.1.302 and 2.1.309 | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
+| Claude Code | 2.1.299, 2.1.300, 2.1.302, 2.1.304, 2.1.308, 2.1.309, with `claude-code-machine.mjs` too; `claude-code.mjs` with #410's and #352's checks on these and 2.1.312, which stays outside `verified` until the other probes run on it; both probes with #458's checks on these and 2.1.314, which stays outside `verified` as `claude-account.mjs` has not run on it; `claude-account.mjs` on 2.1.299, 2.1.302, 2.1.309 and 2.1.310, with a Max account, and with #400's checks on 2.1.299, 2.1.302 and 2.1.309 | 2.1.299 to 2.1.309 (was 2.1.286 to 2.1.302) |
 | Codex | 0.159.3, with `codex-machine.mjs` too | unchanged |
 | Gemini CLI | 0.62.0 | unchanged |
 | VS Code | 1.129.1, 1.135.0, 1.141.0, `vscode.mjs`, its `policy` check signed in to the owner's GitHub account, with #412's checks too; 1.143.1 every check but the `.mcp.json` references one, which stays outside `verified` | 1.129.1 to 1.141.0 (was 1.129.1) |

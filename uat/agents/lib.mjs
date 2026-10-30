@@ -16,6 +16,10 @@ if (!path.basename(root).startsWith("cd-throwaway")) {
   throw new Error(`CD_PROBE_ROOT must be a folder named cd-throwaway*, not ${root}`);
 }
 
+// Orca's terminals set `CLAUDE_CODE_PLUGIN_DIRS`, which would load Orca's
+// own plugin into every Claude Code launch.
+delete process.env.CLAUDE_CODE_PLUGIN_DIRS;
+
 // A new empty folder under `base`, which defaults to the probe root.
 export function fresh(name, base = root) {
   const dir = path.join(base, name);

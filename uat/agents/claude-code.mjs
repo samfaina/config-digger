@@ -170,11 +170,11 @@ function verbatimSkill(dir, folder) {
 
   // The forward-slash key spelled in another case: its drive letter, its
   // last folder's name, and the whole key.
-  const swap = (s) => (s === s.toLowerCase() ? s.toUpperCase() : s.toLowerCase());
+  const swapCase = (s) => (s === s.toLowerCase() ? s.toUpperCase() : s.toLowerCase());
   const spellings = {
-    drive: swap(key[0]) + key.slice(1),
-    folder: key.slice(0, key.lastIndexOf("/") + 1) + swap(path.basename(proj)),
-    whole: swap(key),
+    drive: swapCase(key[0]) + key.slice(1),
+    folder: key.slice(0, key.lastIndexOf("/") + 1) + swapCase(path.basename(proj)),
+    whole: key.toUpperCase(),
   };
 
   await p.check("items.mcp.gates[0]", "the Project's state under its forward-slash key in another case is not found: neither its trust nor its approvals count, and the Project's settings do not approve", async () => {
@@ -193,8 +193,8 @@ function verbatimSkill(dir, folder) {
   await p.check("items.mcp.gates[0]", "started in the Project spelled in another case, Claude Code finds the state under that spelling, and not under the Project's own", async () => {
     const seen = {};
     for (const [label, spelled] of Object.entries({ drive: spellings.drive, folder: spellings.folder })) {
-      for (const [under, k] of [["started", spelled], ["own", key]]) {
-        reset({ projects: { [k]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true } } });
+      for (const [under, stateKey] of [["started", spelled], ["own", key]]) {
+        reset({ projects: { [stateKey]: { hasTrustDialogAccepted: true, enableAllProjectMcpServers: true } } });
         seen[`${label}, under ${under}`] = await approved(spelled.replaceAll("/", "\\"));
       }
     }

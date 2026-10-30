@@ -150,9 +150,11 @@ await p.check("locations[managed-settings-mcp]", "an HKCU value that does not pa
     projects: { [key(projects["state untrusted"])]: { allowedTools: [] }, [key(projects.trusted)]: { hasTrustDialogAccepted: true } },
   });
   // Each server's approval in `claude mcp list` run in `dir`: a server it
-  // lists is approved unless its line says it waits for approval.
+  // lists is approved unless its line says it waits for approval. In the
+  // Sandbox the status marks before the words are not those
+  // `claude-code.mjs` matches.
   const approved = async (dir) => {
-    const { stdout } = await run(bin, ["mcp", "list"], { cwd: dir, env: { CLAUDE_CONFIG_DIR: approvalsHome, ANTHROPIC_API_KEY: "not-a-real-secret" } });
+    const { stdout } = await run(bin, ["mcp", "list"], { cwd: dir, env: { ...env, CLAUDE_CONFIG_DIR: approvalsHome } });
     const lines = stdout.split("\n").map((l) => l.trim());
     return ["cd-throwaway-a", "cd-throwaway-b"].map((n) => {
       const line = lines.find((l) => l.startsWith(`${n}:`));
