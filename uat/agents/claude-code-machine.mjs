@@ -135,5 +135,49 @@ await p.check("locations[managed-settings-mcp]", "an HKCU value that does not pa
   return same(seen, { names: ["cd-throwaway-user"], starts: "starts" });
 });
 
+// ---------------------------------------------------------------- managed approvals
+
+// Three Projects with the same two `.mcp.json` servers, in a home of their
+// own: one with no state in `.claude.json`, one whose state does not hold
+// `hasTrustDialogAccepted`, and one trusted, the control.
+{
+  const approvalsHome = path.join(base, "approvals-home");
+  const projects = { "no state": path.join(base, "no-state"), "state untrusted": path.join(base, "state-untrusted"), trusted: path.join(base, "trusted") };
+  for (const dir of Object.values(projects)) write(path.join(dir, ".mcp.json"), { mcpServers: { "cd-throwaway-a": stdio("a"), "cd-throwaway-b": stdio("b") } });
+  // Claude Code keys a Project by its path with forward slashes.
+  const key = (dir) => dir.replaceAll("\\", "/");
+  write(path.join(approvalsHome, ".claude.json"), {
+    projects: { [key(projects["state untrusted"])]: { allowedTools: [] }, [key(projects.trusted)]: { hasTrustDialogAccepted: true } },
+  });
+  // Each server's approval in `claude mcp list` run in `dir`: a server it
+  // lists is approved unless its line says it waits for approval. In the
+  // Sandbox the status marks before the words are not those
+  // `claude-code.mjs` matches.
+  const approved = async (dir) => {
+    const { stdout } = await run(bin, ["mcp", "list"], { cwd: dir, env: { ...env, CLAUDE_CONFIG_DIR: approvalsHome } });
+    const lines = stdout.split("\n").map((l) => l.trim());
+    return ["cd-throwaway-a", "cd-throwaway-b"].map((n) => {
+      const line = lines.find((l) => l.startsWith(`${n}:`));
+      return line === undefined ? "absent" : line.includes("Pending approval") ? "pending" : "approved";
+    });
+  };
+
+  await p.check("items.mcp.gates[0]", "`enabledMcpjsonServers` and `enableAllProjectMcpServers` in `managed-settings.json` approve a Project's `.mcp.json` servers whether the Project is trusted or not", async () => {
+    const seen = {};
+    for (const [label, settings] of [["none", null], ["one named", { enabledMcpjsonServers: ["cd-throwaway-a"] }], ["all", { enableAllProjectMcpServers: true }]]) {
+      await deploy(settings ? { file: JSON.stringify(settings) } : {});
+      for (const [where, dir] of Object.entries(projects)) seen[`${label}, ${where}`] = await approved(dir);
+    }
+    const none = ["pending", "pending"];
+    const one = ["approved", "pending"];
+    const all = ["approved", "approved"];
+    return same(seen, {
+      "none, no state": none, "none, state untrusted": none, "none, trusted": none,
+      "one named, no state": one, "one named, state untrusted": one, "one named, trusted": one,
+      "all, no state": all, "all, state untrusted": all, "all, trusted": all,
+    });
+  });
+}
+
 await clear();
 p.finish();
