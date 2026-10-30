@@ -9,8 +9,8 @@
 //   node uat/agents/cursor.mjs [--bin <Cursor.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=plugins,broken-user` runs those launches only: `plugins`,
-// `wrong-shape`, `broken-<user|project>`, `project-plugins`, `sign-in`,
-// `gates`, `skills` and `nested-skills`.
+// `plugin-errors`, `wrong-shape`, `broken-<user|project>`,
+// `project-plugins`, `sign-in`, `gates`, `skills` and `nested-skills`.
 //
 // Cursor takes a Statsig gate from the account's cache, or signed out from
 // its code's default, unless an override in the profile's
@@ -432,6 +432,70 @@ if (runs("plugins")) {
   await p.check("locations[claude-plugin-mcp]", "Cursor reads a Claude Code plugin's `.mcp.json` it cannot parse around the error: both servers start", async () =>
     same(of("cc-bad-mcp-a", "cc-bad-mcp-b"), ["cc-bad-mcp-a", "cc-bad-mcp-b"]),
   );
+}
+
+// ---------------------------------------------------------------- servers files read around their errors
+
+// Comments, trailing commas and four errors besides `,,`, each in the
+// servers file of its own plugin: a local plugin's `mcp.json` and a Claude
+// Code plugin's `.mcp.json`, one member per line (#438). `tests/cursor.rs`
+// reads the same texts.
+const member = (key, value) => `"${key}": ${JSON.stringify(value)}`;
+// `items` in code spans, as "`a`, `b` and `c`".
+const spans = (items) => items.map((i) => `\`${i}\``).join(", ").replace(/, ([^,]*)$/, " and $1");
+// Each case, its error, and its text with the servers `a`, `b` and `c`
+// named `cd-throwaway-<prefix>-<a|b|c>`.
+const serverErrors = (prefix) => {
+  const one = (t) => member(`cd-throwaway-${prefix}-${t}`, server(`${prefix}-${t}`));
+  // `b` with `rest` after its last field and before its `}`.
+  const b = (rest) => `"cd-throwaway-${prefix}-b": ${JSON.stringify(server(`${prefix}-b`)).slice(0, -1)}${rest}`;
+  return [
+    ["line-comment", "with a `//` comment between two servers", `{ "mcpServers": {\n  ${one("a")},\n  // cd-throwaway\n  ${one("b")}\n} }`],
+    ["block-comment", "with a `/* */` comment between two servers", `{ "mcpServers": {\n  ${one("a")},\n  /* cd-throwaway */\n  ${one("b")}\n} }`],
+    ["trailing-server", "with a trailing comma after the last server", `{ "mcpServers": {\n  ${one("a")},\n  ${one("b")},\n} }`],
+    ["trailing-field", "with a trailing comma after the last field of a server", `{ "mcpServers": {\n  ${one("a")},\n  ${b(",}")}\n} }`],
+    ["comma", "around a missing comma between two servers", `{ "mcpServers": {\n  ${one("a")}\n  ${one("b")},\n  ${one("c")}\n} }`],
+    ["value", "around a key with no value", `{ "mcpServers": {\n  "cd-throwaway-${prefix}-a": ,\n  ${one("b")},\n  ${one("c")}\n} }`],
+    ["open-object", "around an object left open at the end of the file", `{ "mcpServers": {\n  ${one("a")},\n  ${one("b")}\n`],
+    // The string runs to the end of its line, swallowing the `}` and `,`.
+    ["open-string", "around a string left open inside a server", `{ "mcpServers": {\n  ${one("a")},\n  ${b(`, "note": "open },`)}\n  ${one("c")}\n} }`],
+  ];
+};
+// What Cursor starts of each, as `node-jsonc-parser`'s code reads it.
+const serverKept = {
+  "line-comment": ["a", "b"],
+  "block-comment": ["a", "b"],
+  "trailing-server": ["a", "b"],
+  "trailing-field": ["a", "b"],
+  comma: ["a", "b", "c"],
+  value: ["b", "c"],
+  "open-object": ["a", "b"],
+  "open-string": ["a", "b"],
+};
+
+// One launch, a plugin per case and kind: the local plugin
+// `cd-throwaway-cp-<case>` and the Claude Code plugin
+// `cd-throwaway-cc-<case>`, whose servers are `<cp|cc>-<case>-<a|b|c>`.
+if (runs("plugin-errors")) {
+  const dir = fresh("plugin-errors", base);
+  const d = folders(dir);
+  const kinds = [
+    ["cursor-plugin-mcp", "cp", "a plugin's `mcp.json`"],
+    ["claude-plugin-mcp", "cc", "a Claude Code plugin's `.mcp.json`"],
+  ];
+  const cases = Object.keys(serverKept);
+  const text = (prefix, name) => serverErrors(`${prefix}-${name}`).find(([n]) => n === name)[2];
+  localPlugins(d.cursor, cases.map((name) => [`cd-throwaway-cp-${name}`, { "mcp.json": text("cp", name) }]));
+  claudePlugins(d.claude, cases.map((name) => [`cd-throwaway-cc-${name}`, { ".claude-plugin/plugin.json": { name: `cd-throwaway-cc-${name}` }, ".mcp.json": text("cc", name) }]));
+  const tags = await launch(dir);
+  for (const [location, prefix, file] of kinds) {
+    for (const [name, error, text] of serverErrors(prefix)) {
+      const held = ["a", "b", "c"].filter((t) => text.includes(`-${t}"`));
+      await p.check(`locations[${location}]`, `Cursor reads ${file} ${error}: of ${spans(held)}, ${spans(serverKept[name])} start`, async () =>
+        same(held.filter((t) => tags.includes(`${prefix}-${name}-${t}`)), serverKept[name]),
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------- a manifest's servers of the wrong shape

@@ -215,10 +215,8 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # objects, Cursor rejects whole, as one it cannot parse; `"./servers.json"`
 # or `["./servers.json", {}]` leaves the manifest read [test]. config-digger
 # shows a rejected manifest as one Read failure and reads the next one, as
-# for one that does not parse. It reads a plugin's `mcp.json` it cannot
-# parse around the error, starting the servers on both sides of it [test],
-# which config-digger does not yet (#438): `unknown` stays there, so the
-# Items it reaches keep a caveat.
+# for one that does not parse. It reads a plugin's `.mcp.json` or
+# `mcp.json` it cannot parse around the error, as `cursor-plugin-mcp` says.
 [[locations]]
 id = "cursor-plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
@@ -236,11 +234,21 @@ on_read_failure = "reads_next_path"
 rejected_unless_path_object_or_list = [["mcpServers"]]
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
+# Cursor reads a plugin's servers file with `node-jsonc-parser`'s `parse`,
+# on its default options, and looks at none of the errors it finds [code].
+# So it reads comments, and a trailing comma after the last server or
+# after the last field of a server, as if they were not there [test]. And
+# it starts the servers that parser keeps around an error: those on both
+# sides of `,,` or of a missing comma, those after a key with no value,
+# which drops that key, those of an object left open at the end of the
+# file, and with a string left open in a server, which takes the next
+# server into it, that server and those before it [test]. config-digger
+# reads the file the same way, through its port of that parser.
 [[locations]]
 id = "cursor-plugin-mcp"
 anchor = { block = "plugin", plugins = ["project", "local"], path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
-format = { block = "json", dialect = "strict" }
+format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
 scope = "plugin"
@@ -248,7 +256,7 @@ provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "unknown"
+on_read_failure = "reads_around_error"
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 
 # The servers of a Claude Code plugin, read only while Cursor's gate
@@ -264,7 +272,7 @@ shape = { block = "fields", one_of = ["command", "url"], types = { command = "st
 # one it rejects for its `mcpServers`, still reading the plugin's
 # `.mcp.json`, and reads the next manifest instead [test], as
 # `reads_next_path` does. It reads a `.mcp.json` it cannot parse around the
-# error [test] (#438), for which `unknown` stays.
+# error, as `claude-plugin-mcp` says.
 [[locations]]
 id = "claude-plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "claude-code", path = [".cursor-plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
@@ -283,11 +291,15 @@ rejected_unless_path_object_or_list = [["mcpServers"]]
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
 
+# Cursor reads a Claude Code plugin's servers file with the same code as
+# one of its own plugins' [code], and the probe finds the same: comments
+# and trailing commas read as if they were not there, and the same servers
+# kept around each error `cursor-plugin-mcp` names [test].
 [[locations]]
 id = "claude-plugin-mcp"
 anchor = { block = "plugin", plugins = "claude-code", path = [".mcp.json", "mcp.json"] }
 name_template = "plugin-{plugin}-{name}"
-format = { block = "json", dialect = "strict" }
+format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"
 scope = "plugin"
@@ -295,7 +307,7 @@ provenance = "plugin"
 store_class = "plain"
 interpolation = { block = "braces", namespaces = ["env"], names = ["userHome", "workspaceFolder", "workspaceFolderBasename", "pathSeparator", "/", "CURSOR_PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT"] }
 secrets.fields = [["auth", "CLIENT_SECRET"]]
-on_read_failure = "unknown"
+on_read_failure = "reads_around_error"
 shape = { block = "fields", one_of = ["command", "url"], types = { command = "string", url = "string" } }
 when = [{ block = "feature-gate", gate = "enable_cc_plugin_import" }]
 
