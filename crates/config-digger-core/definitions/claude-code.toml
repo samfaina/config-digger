@@ -1014,12 +1014,17 @@ sources = [
 # or by `<folder>` alone, which a local skill of that folder answers to too
 # [test]. It turns a nested skill off by the name it is listed under, and
 # one listed as `<subfolder>:<name>` by its folder's name too, which a
-# Project or user skill of that name answers to [test]. config-digger reads
-# both keys through `also_names`, and Disable writes the first; each of the
-# three switches marks what the probe did not test.
+# Project or user skill of that name answers to [test]. In each of the
+# three files below, `name-only` and `user-invocable-only` limit a synced
+# skill under either of its keys, and leave `/anthropic-skills:<folder>`
+# running it; of two keys that disagree, `anthropic-skills:<folder>`
+# decides, whichever the file holds first [test]. config-digger reads both
+# keys through `also_names`, and Disable writes the first; it counts `off`
+# under either, so it shows Disabled a skill whose prefixed key holds `on`
+# (#510). Each of the three switches marks what the probe did not test.
 [[items.skill.disable]]
 unverified = [
-  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
   "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill.",
 ]
 block = "json-field"
@@ -1037,7 +1042,7 @@ locations = ["managed-skills", "user-skills", "project-skills", "nested-skills",
 # settings, which apply in every Project.
 [[items.skill.disable]]
 unverified = [
-  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
   "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
 ]
 block = "json-field"
@@ -1053,7 +1058,7 @@ enable_offered = false
 
 [[items.skill.disable]]
 unverified = [
-  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
   "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
 ]
 block = "json-field"
