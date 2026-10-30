@@ -11,44 +11,42 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
-/// The ignore files of one folder: its `.ignore` and its `.gitignore`.
+/// The ignore files of one folder, one for each name the walk reads, in
+/// its order.
 struct IgnoreFiles {
-    ignore: Gitignore,
-    gitignore: Gitignore,
+    files: Vec<Gitignore>,
     /// The folder above's, if it has any.
     above: Option<Rc<IgnoreFiles>>,
 }
 
 impl IgnoreFiles {
     /// Whether these files and those of the folders above leave out the
-    /// folder at `path`: the deepest file that matches it decides, an
-    /// `.ignore` over a `.gitignore`, and a `!` pattern keeps it.
+    /// folder at `path`: the deepest file of a name that matches it
+    /// decides, a name over those after it, and a `!` pattern keeps it.
     fn leave_out(files: Option<&Rc<IgnoreFiles>>, path: &Path) -> bool {
-        let mut ignore = Match::None;
-        let mut gitignore = Match::None;
+        let mut matched = vec![Match::None; files.map_or(0, |files| files.files.len())];
         let mut level = files;
         while let Some(files) = level {
-            if ignore.is_none() {
-                ignore = files.ignore.matched(path, true).map(|_| ());
-            }
-            if gitignore.is_none() {
-                gitignore = files.gitignore.matched(path, true).map(|_| ());
+            for (matched, file) in matched.iter_mut().zip(&files.files) {
+                if matched.is_none() {
+                    *matched = file.matched(path, true).map(|_| ());
+                }
             }
             level = files.above.as_ref();
         }
-        if ignore.is_none() {
-            gitignore.is_ignore()
-        } else {
-            ignore.is_ignore()
-        }
+        matched
+            .into_iter()
+            .find(|matched| !matched.is_none())
+            .is_some_and(|matched| matched.is_ignore())
     }
 }
 
-/// The ignore files of `folder`, under those of the folder above; `above`
-/// itself when it has none.
+/// The ignore files named `names` of `folder`, under those of the folder
+/// above; `above` itself when it has none.
 fn ignore_files(
     fs: &dyn FileSystem,
     folder: &Path,
+    names: &[String],
     above: Option<Rc<IgnoreFiles>>,
 ) -> Option<Rc<IgnoreFiles>> {
     let read = |name: &str| {
@@ -63,13 +61,15 @@ fn ignore_files(
         }
         builder.build().ok()
     };
-    let (ignore, gitignore) = (read(".ignore"), read(".gitignore"));
-    if ignore.is_none() && gitignore.is_none() {
+    let files: Vec<Option<Gitignore>> = names.iter().map(|name| read(name)).collect();
+    if files.iter().all(Option::is_none) {
         return above;
     }
     Some(Rc::new(IgnoreFiles {
-        ignore: ignore.unwrap_or_else(Gitignore::empty),
-        gitignore: gitignore.unwrap_or_else(Gitignore::empty),
+        files: files
+            .into_iter()
+            .map(|file| file.unwrap_or_else(Gitignore::empty))
+            .collect(),
         above,
     }))
 }
@@ -86,14 +86,13 @@ fn folders_below(fs: &dyn FileSystem, project: &Path, walk: &DownWalk) -> Vec<Pa
         return Vec::new();
     }
     // The ignore files of the folders above the Project folder apply too.
-    let above = if walk.ignore_files {
+    let names = &walk.ignore_files;
+    let above = {
         let mut parents: Vec<&Path> = project.ancestors().skip(1).collect();
         parents.reverse();
         parents
             .into_iter()
-            .fold(None, |above, parent| ignore_files(fs, parent, above))
-    } else {
-        None
+            .fold(None, |above, parent| ignore_files(fs, parent, names, above))
     };
     let mut found = Vec::new();
     // A link back to a folder already entered would never end.
@@ -109,11 +108,7 @@ fn folders_below(fs: &dyn FileSystem, project: &Path, walk: &DownWalk) -> Vec<Pa
         if folder != project {
             found.push(folder.clone());
         }
-        let files = if walk.ignore_files {
-            ignore_files(fs, &folder, above)
-        } else {
-            None
-        };
+        let files = ignore_files(fs, &folder, names, above);
         children.sort();
         // Last pushed, first entered.
         for child in children.into_iter().rev() {
@@ -150,7 +145,8 @@ impl WalksDown {
     /// `path`, by the rules `walk`, in the order the walk entered them: the
     /// folder holding each entered folder named as the path's first folder,
     /// case aside, so that the rules apply down to that folder and not
-    /// below it. A path of one name may be in any folder entered.
+    /// below it. A path of one name may be in any folder entered, and so
+    /// may any path when the rules leave the path's first folder to it.
     pub fn holders(
         &mut self,
         fs: &dyn FileSystem,
@@ -174,7 +170,7 @@ impl WalksDown {
             }
         };
         let entered = &self.0[at].entered;
-        let Some((first, _)) = path.split_once('/') else {
+        let Some((first, _)) = path.split_once('/').filter(|_| walk.ignores_path) else {
             return entered.clone();
         };
         entered

@@ -1251,6 +1251,11 @@ export type NoteCode =
  */
 "untrusted_folder_blocks" | 
 /**
+ *  The Agent loads the Entry only once it reads or edits a file under
+ *  the folder below the Project that holds it.
+ */
+"loaded_on_file_under_folder" | 
+/**
  *  The Agent's own command that lists servers shows the server built
  *  from this Entry and another as that other alone, hiding this one.
  */

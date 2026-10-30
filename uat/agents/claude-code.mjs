@@ -9,8 +9,9 @@
 // What Claude Code loads is read from `claude mcp list`, `claude mcp get`,
 // `claude plugin list`, the init event of `claude -p --output-format
 // stream-json`, and the request it sends its model: the skill listing
-// (`- <name> (<alias>): <description>`) and the body of a skill a prompt
-// runs, and what Claude Code extracts into a plugin's `.mcpb-cache`.
+// (`- <name> (<alias>): <description>`), before and after the stand-in
+// answers with a Read tool call, and the body of a skill a prompt runs, and
+// what Claude Code extracts into a plugin's `.mcpb-cache`.
 import fs from "node:fs";
 import path from "node:path";
 import { fresh, gitInit, json, modelServer, probe, run, same, skill, subst, unsubst, write } from "./lib.mjs";
@@ -24,20 +25,27 @@ const stdio = (tag) => ({ command: "cmd", args: ["/c", tag] });
 const reply = { id: "msg_x", type: "message", role: "assistant", model: "claude-x", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
 
 // One `claude -p` run: what its init event lists, and the skill lines of
-// the request its model gets.
-async function session(home, cwd, { prompt = "hi", args = [], extraEnv = {} } = {}) {
-  const model = await modelServer(reply);
+// the first request its model gets. With `read`, the model first answers
+// with a Read tool call on that file, and `listedAfter` holds the skill
+// lines of the last request, which follows the call: those listed at the
+// start, and those listed since.
+async function session(home, cwd, { prompt = "hi", args = [], extraEnv = {}, read } = {}) {
+  const readCall = { ...reply, content: [{ type: "tool_use", id: "toolu_cd", name: "Read", input: { file_path: read } }], stop_reason: "tool_use" };
+  const answer = (body) => (body.includes('"tool_result"') || !body.includes('"tools"') ? reply : readCall);
+  const model = await modelServer(read === undefined ? reply : answer);
   const env = { CLAUDE_CONFIG_DIR: home, ANTHROPIC_API_KEY: "not-a-real-secret", ANTHROPIC_BASE_URL: model.url, ...extraEnv };
   const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", ...args], { cwd, env });
   model.close();
   const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
-  const listing = model.bodies.map((b) => b.match(/The following skills are available(?:[^"\\]|\\.)*/)).find(Boolean);
-  const listed = listing ? JSON.parse(`"${listing[0]}"`).split("\n").filter((l) => l.startsWith("- ")) : [];
+  // A later request repeats the earlier listings before its own.
+  const listings = model.bodies.map((b) => [...b.matchAll(/The following skills are available(?:[^"\\]|\\.)*/g)]).filter((l) => l.length > 0);
+  const lines = (listing) => (listing ? JSON.parse(`"${listing[0]}"`).split("\n").filter((l) => l.startsWith("- ")) : []);
   return {
     servers: init.mcp_servers.map((s) => s.name),
     plugins: init.plugins.filter((x) => x.path !== "builtin").map((x) => x.name),
     skills: init.skills,
-    listed,
+    listed: lines(listings[0]?.[0]),
+    listedAfter: (listings.at(-1) ?? []).flatMap(lines),
     sent: model.bodies.join("\n"),
   };
 }
@@ -390,6 +398,88 @@ function verbatimSkill(dir, folder) {
   await p.check("locations[synced-skills]", "with an API key, the synced skills folder is not read, whatever the gate", async () => {
     const t = await session(synced, fresh("empty", dir));
     return same(t.skills.filter((n) => n.includes("cd-throwaway-sync")), []);
+  });
+}
+
+// ---------------------------------------------------------------- nested skills
+
+{
+  const dir = fresh("nested-skills", base);
+  const home = path.join(dir, "home");
+  const repo = path.join(dir, "repo");
+  await gitInit(repo);
+  const nested = (folder, name, description) => skill(path.join(repo, folder, ".claude", "skills", name), [`description: ${description}`]);
+  nested(".", "cd-throwaway-dupe", "project dupe");
+  skill(path.join(repo, ".claude", "skills", "fold-alias"), ["name: cd-throwaway-alias", "description: project alias"]);
+  skill(path.join(home, "skills", "cd-throwaway-mine"), ["description: user mine"]);
+  for (const name of ["cd-throwaway-web", "cd-throwaway-dupe", "cd-throwaway-mine", "cd-throwaway-alias", "cd-throwaway-twin"]) nested("web", name, `web ${name}`);
+  for (const name of ["cd-throwaway-deep", "cd-throwaway-twin"]) nested("web/src/deep", name, `deep ${name}`);
+  nested("sibling", "cd-throwaway-sibling", "sibling");
+  write(path.join(repo, "sibling", "file.txt"), "sibling\n");
+  // Git leaves out the folder holding `gen`'s `.claude`, and only the
+  // `.claude` folder of `deep`.
+  write(path.join(repo, ".gitignore"), "web/src/gen/\n");
+  write(path.join(repo, "web", "src", "deep", ".gitignore"), ".claude/\n");
+  nested("web/src/gen", "cd-throwaway-ignored", "ignored");
+  const deepFile = path.join(repo, "web", "src", "deep", "file.txt");
+  const genFile = path.join(repo, "web", "src", "gen", "x", "file.txt");
+  write(deepFile, "deep\n");
+  write(genFile, "gen\n");
+  // The name of each line, such as `web:cd-throwaway-dupe` for
+  // `- web:cd-throwaway-dupe: …`.
+  const names = (lines) => throwaway(lines.map((l) => l.slice(2, l.indexOf(": "))));
+  const deep = await session(home, repo, { read: deepFile });
+
+  await p.check("locations[nested-skills]", "a nested skill is not listed before a file under its folder is read, and is listed after", async () => {
+    const listed = (lines) => names(lines).includes("cd-throwaway-web");
+    return same({ before: listed(deep.listed), after: listed(deep.listedAfter) }, { before: false, after: true });
+  });
+  await p.check("locations[nested-skills]", "one read loads the skills of every folder above the file and below the Project, at depth 1 and 3", async () => {
+    return same(["cd-throwaway-web", "cd-throwaway-deep"].map((n) => names(deep.listedAfter).includes(n)), [true, true]);
+  });
+  await p.check("locations[nested-skills]", "a sibling folder no file was read under stays unlisted", async () => {
+    return same(names(deep.listedAfter).filter((n) => n.includes("sibling")), []);
+  });
+  await p.check("locations[nested-skills]", "a nested skills folder whose holding folder git leaves out is not listed, and one whose `.claude` folder alone it leaves out is", async () => {
+    const gen = await session(home, repo, { read: genFile });
+    const listed = names(gen.listedAfter);
+    return same({ ignored: listed.includes("cd-throwaway-ignored"), web: listed.includes("cd-throwaway-web"), deep: names(deep.listedAfter).includes("cd-throwaway-deep") }, { ignored: false, web: true, deep: true });
+  });
+  await p.check("items.skill", "a nested skill keeps its folder's name unless a Project, user or other nested skill has it: it is then `<folder>:<name>`, the other keeping its own, and a frontmatter alias does not count", async () => {
+    const listed = names(deep.listedAfter).filter((n) => /dupe|mine|alias|twin/.test(n)).sort();
+    return same(listed, [
+      "cd-throwaway-alias",
+      "cd-throwaway-dupe",
+      "cd-throwaway-mine",
+      "fold-alias (cd-throwaway-alias)",
+      "web/src/deep:cd-throwaway-twin",
+      "web:cd-throwaway-dupe",
+      "web:cd-throwaway-mine",
+      "web:cd-throwaway-twin",
+    ]);
+  });
+  await p.check("items.skill.disable[0]", "`skillOverrides` turns a nested skill off by the name it is listed under, and one listed as `<folder>:<name>` by its folder's name too", async () => {
+    const local = path.join(repo, ".claude", "settings.local.json");
+    const off = async (key) => {
+      write(local, { skillOverrides: { [key]: "off" } });
+      return names((await session(home, repo, { read: deepFile })).listedAfter);
+    };
+    const byName = await off("cd-throwaway-web");
+    const byPrefixed = await off("web:cd-throwaway-dupe");
+    const byFolder = await off("cd-throwaway-twin");
+    fs.rmSync(local);
+    return same(
+      { byName: byName.includes("cd-throwaway-web"), byPrefixed: ["web:cd-throwaway-dupe", "cd-throwaway-dupe"].map((n) => byPrefixed.includes(n)), byFolder: ["web:cd-throwaway-twin", "web/src/deep:cd-throwaway-twin"].map((n) => byFolder.includes(n)) },
+      { byName: false, byPrefixed: [false, true], byFolder: [false, false] },
+    );
+  });
+
+  const plain = path.join(dir, "plain");
+  skill(path.join(plain, "web", ".claude", "skills", "cd-throwaway-plain"), ["description: plain"]);
+  write(path.join(plain, "web", "file.txt"), "plain\n");
+  await p.check("locations[nested-skills]", "outside a git repo, a nested skill loads once a file under its folder is read", async () => {
+    const s = await session(home, plain, { read: path.join(plain, "web", "file.txt") });
+    return same(names(s.listedAfter).includes("cd-throwaway-plain"), true);
   });
 }
 

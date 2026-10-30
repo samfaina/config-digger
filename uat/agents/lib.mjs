@@ -103,8 +103,10 @@ export async function registry(key, name, data) {
   if (code !== 0 && data !== null) throw new Error(`reg ${args.join(" ")} failed: ${stderr}`);
 }
 
-// A local server that answers every request with `reply` and keeps each
-// request's body, so an Agent's request to its model never leaves the machine.
+// A local server that answers every request with `reply`, or with what
+// `reply` returns for the request's body when it is a function, and keeps
+// each request's body, so an Agent's request to its model never leaves the
+// machine.
 export async function modelServer(reply) {
   const bodies = [];
   const server = http.createServer((req, res) => {
@@ -112,7 +114,7 @@ export async function modelServer(reply) {
     req.on("data", (d) => (body += d)).on("end", () => {
       bodies.push(body);
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(reply));
+      res.end(JSON.stringify(typeof reply === "function" ? reply(body) : reply));
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));

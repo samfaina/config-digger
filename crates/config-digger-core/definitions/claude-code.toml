@@ -808,6 +808,41 @@ provenance = "file"
 store_class = "plain"
 on_read_failure = "ignores_file"
 
+# Nested skills: the `.claude/skills` of every folder below the Project
+# folder, at any depth, the Project folder's own left to `project-skills`
+# [docs, code]. Claude Code loads none at start. From the folder of each
+# file it reads or edits, it walks up while the folder is below the one it
+# started in, and loads the skills of each `.claude/skills` on the way the
+# first time, keeping them for the session [test]; `/add-dir` on such a
+# folder loads them sooner [docs]. A folder no such file is under is never
+# read [test]. Each skill is Effective, with a note naming its folder.
+# Claude Code skips a skills folder whose holding folder git ignores, as
+# `git check-ignore` says, in a repo or not [test]: a `.gitignore` leaving
+# out a folder on the way skips the skills below it, and one leaving out
+# the `.claude` folder alone skips none [test]. config-digger reads only
+# the `.gitignore` files, not `.git\info\exclude` nor git's global excludes.
+# Claude Code also skips its own claude.ai sync folders, and on Windows a
+# path holding an 8.3 short name (`~1`), which a walk never meets [code]. It
+# runs no discovery at all while the `projectSettings` source is off or a
+# policy allows only plugin customization ("Dynamic skill discovery
+# skipped") [code], which config-digger does not read yet. It loads these
+# skills as Project skills, as `project-skills` reads them [code].
+[[locations]]
+id = "nested-skills"
+unverified = [
+  "The reserved folder names, the name rule and the frontmatter handling of `project-skills` are taken to apply to a nested skill, as the binary loads it as a Project skill.",
+  "A nested skills folder reached through a link or a junction is taken to load as any other, as the binary walks up the path of the file as Claude Code reads it.",
+]
+anchor = { block = "project", path = ".claude/skills", walk = { down = { needs_git = false, skip = [], ignore_files = [".gitignore"], ignores_path = false, follow_links = true } } }
+format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
+name_rule_when = { gate = "tengu_slate_wicket" }
+loaded_on_file_under_folder = true
+kind = "skill"
+scope = "project"
+provenance = "file"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
 # A plugin's skills, in its `skills` folder [docs, disk], and in each folder
 # its manifest's `skills` declares besides it, a path or a list of paths:
 # each a folder of skill folders, or one skill's folder, `.` the plugin's
@@ -907,16 +942,25 @@ on_read_failure = "ignores_file"
 # digits, `_`, `:`, `.` and `-` alone, and none of those; both count at most
 # 256 UTF-16 code units, as JavaScript's `length` does [binary]. The marks
 # say which of these were tested. A plugin's skills fail with it [test],
-# after its switches, as its servers do.
+# after its switches, as its servers do. A nested skill competes with none,
+# whatever its name [docs, code, test]: Claude Code keys it by its folder
+# and its name. It keeps its folder's name, unless a Project, user or other
+# nested skill has that name: it is then `<subfolder>:<name>`, its folder
+# relative to the Project with `/`, such as `apps/web:deploy`, and the other
+# keeps its own [test]. A frontmatter alias does not count [test]. Claude
+# Code counts only the nested skills loaded so far, and a built-in command
+# or bundled skill of that name too [code]; config-digger counts every
+# nested skill, and no built-in one.
 [items.skill]
 unverified = [
+  "A nested skill is taken to be named `<subfolder>:<name>` against a managed skill of its name too, as the binary says.",
   "A plugin that is off, or forced off by the managed settings, and whose manifest fails is taken to have its skills Disabled or Blocked rather than Invalid, since Claude Code does not load an off plugin.",
   "Every character the name rule refuses is taken from the 2.1.302 binary, with config-digger's Unicode tables, but for those the probe tested: a space at either end, U+200B, U+202E, U+00A0 and U+3000 in a folder name, and a space, a tab, `/`, `<`, `>`, U+200B, U+202E and U+00A0 in a frontmatter `name`, and the length of an ASCII `name`. Among the rest, a frontmatter `name` holding any character but letters, marks, digits, `_`, `:`, `.` and `-`, such as `+` or `@`, is taken to be refused.",
   "`<` and `>` in a folder name, which a Windows folder name cannot hold, are taken to break the name rule, as the binary says.",
   "Claude Code keeps a joiner or a variation selector inside an emoji sequence on Unicode's recommended list; config-digger takes any well-formed emoji sequence for one.",
 ]
-precedence = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
-competition = { block = "exact-name" }
+precedence = ["managed-skills", "user-skills", "project-skills", "nested-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
+competition = { block = "exact-name", apart = { locations = ["nested-skills"], on_clash = "{subfolder}:{name}" } }
 checks = ["frontmatter", "disable", "plugin-load", "precedence", "rules"]
 
 # `syncClaudeAiSkills: false` stops the claude.ai skill sync [docs]: Claude
@@ -940,11 +984,16 @@ sources = [
 # menu: partial switches. `"on"` is the default. It does not apply to plugin
 # skills [docs]. It turns a synced skill off by `anthropic-skills:<folder>`,
 # or by `<folder>` alone, which a local skill of that folder answers to too
-# [test]. config-digger reads both keys through `also_names`, and Disable
-# writes the first; each of the three switches marks what the probe did not
-# test.
+# [test]. It turns a nested skill off by the name it is listed under, and
+# one listed as `<subfolder>:<name>` by its folder's name too, which a
+# Project or user skill of that name answers to [test]. config-digger reads
+# both keys through `also_names`, and Disable writes the first; each of the
+# three switches marks what the probe did not test.
 [[items.skill.disable]]
-unverified = "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309)."
+unverified = [
+  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill.",
+]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
@@ -953,13 +1002,16 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
-locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
+locations = ["managed-skills", "user-skills", "project-skills", "nested-skills", "synced-skills"]
 
 # Any settings file can hold `skillOverrides` [docs]. config-digger only
 # reads the shared Project settings, which belong to the team, and the user
 # settings, which apply in every Project.
 [[items.skill.disable]]
-unverified = "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309)."
+unverified = [
+  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
+]
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
@@ -968,11 +1020,14 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
-locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
+locations = ["managed-skills", "user-skills", "project-skills", "nested-skills", "synced-skills"]
 enable_offered = false
 
 [[items.skill.disable]]
-unverified = "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309)."
+unverified = [
+  "`name-only` and `user-invocable-only` under a synced skill's bare `<folder>` key are taken to limit it as they do under `anthropic-skills:<folder>`, and `off` under either key to turn it off whatever the other holds (#309).",
+  "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
+]
 block = "json-field"
 switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
@@ -981,7 +1036,7 @@ enable_action = "delete-key"
 reason = "disabled_by_name"
 disabled_value = "off"
 partial_values = ["name-only", "user-invocable-only"]
-locations = ["managed-skills", "user-skills", "project-skills", "synced-skills"]
+locations = ["managed-skills", "user-skills", "project-skills", "nested-skills", "synced-skills"]
 enable_offered = false
 
 # A plugin's switches, as for its servers above.
@@ -1157,7 +1212,7 @@ env_maps = [
 name = "tengu_slate_wicket"
 unverified = "While the gate is off, Claude Code applies a looser check that is not known; config-digger applies no name rule."
 assumed = true
-affects = ["managed-skills", "user-skills", "project-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
+affects = ["managed-skills", "user-skills", "project-skills", "nested-skills", "plugin-skills", "synced-plugin-skills", "synced-skills"]
 lookup = { block = "json-value", anchor = { block = "home", root = "state_file" }, key_path = ["cachedGrowthBookFeatures", "{gate}"], cached_at = ["cachedGrowthBookFeaturesAt"] }
 
 [feature_gates.bypass]

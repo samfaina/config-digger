@@ -99,7 +99,7 @@ A plugin `userConfig` value marked `sensitive` goes to OS secure storage. Non-se
 | managed ("Enterprise") | `.claude\skills\<name>\SKILL.md` inside the managed settings directory, which works out to `C:\Program Files\ClaudeCode\.claude\skills\<name>\SKILL.md` | [docs]. The full Windows path is derived by joining two doc statements. Absent here [disk] |
 | user ("Personal") | `%USERPROFILE%\.claude\skills\<name>\SKILL.md` | [disk] |
 | project | `<cwd>\.claude\skills\<name>\SKILL.md` and the same path in every parent up to the repo root. In a linked git worktree the search stops at the worktree root, falling back to the main checkout's skills when the worktree has none (v2.1.277+) | [docs] |
-| nested | `<subdir>\.claude\skills\…`, loaded lazily the first time the session touches files in `<subdir>`. Invoked as `/<subdir>:<name>` | [docs] |
+| nested | `<subdir>\.claude\skills\<name>\SKILL.md` in any folder below the start folder, loaded the first time the session reads or edits a file in `<subdir>` (see "Nested skills" below). Named `<name>`, or `<subdir>:<name>` when another skill has that name | [docs, code, test] |
 | `--add-dir` | `.claude\skills\` inside each added directory | [docs] |
 | plugin | `<installPath>\skills\<name>\SKILL.md`, plus any directories listed in the manifest's `skills` key | [disk] (supabase plugin: `skills: "./skills/"`) |
 | claude.ai synced | `%USERPROFILE%\.claude\skills\synced\` | [docs]. **[contradicts docs]** on disk the skills sit one level deeper, at `skills\synced\<uuid>_<uuid>\<name>\` (here: `docs, docx, pdf, pptx, xlsx, skill-creator, unslop, …`), next to `manifest.json`, `.last-complete-round` and `.staging\` |
@@ -112,6 +112,19 @@ More observations [disk]:
 - Some Entries in `%USERPROFILE%\.claude\skills\` are **NTFS junctions** into `%USERPROFILE%\.agents\skills\<name>`: `computer-use`, `orca-cli`, `orchestration`. That directory also holds a `.skill-lock.json`. This is the **skill manager** Provenance, and config-digger has to detect junctions/symlinks so that a Remove does not delete the target.
 - `skills\.trash\<epoch>-<pid>-<rand>\` holds skills removed by sync. The docs say "Removes synced skills from `~/.claude/skills/.trash/`" ([skills](https://code.claude.com/docs/en/skills)).
 - A folder under `skills\` that contains `.claude-plugin\plugin.json` is a plugin, `<name>@skills-dir`, not a plain skill ([plugin loading](https://code.claude.com/docs/en/plugins/loading)) [docs].
+
+### Nested skills
+
+Facts from 2.1.312: the skills docs page, its bundled code, and `uat/agents/claude-code.mjs` on throwaway folders with the local model stand-in answering with a Read tool call (#352).
+
+- Skills in a `.claude\skills` below the folder Claude Code starts in are not loaded at start. They load the first time Claude reads or edits a file in that subfolder, and stay loaded for the rest of the session. `/add-dir` on the subfolder loads them sooner [docs, test].
+- From the folder of each file it reads or edits (Read, Edit, Write), Claude Code walks up while the folder is strictly below the start folder, and checks `<folder>\.claude\skills` in each. There is no depth limit: one read loads the skills of a folder 1 and 3 levels down. A sibling folder no touched file is under is never read [code, test].
+- It skips a skills folder whose holding folder git ignores, asking `git check-ignore -- <folder>` (debug log: `Skipped gitignored skills dir`): a `.gitignore` leaving out a folder on the way hides the skills below it, and one leaving out only the `.claude` folder hides nothing. Outside a git repo the check fails and the skills load [code, test].
+- It also skips Claude Code's own claude.ai sync folders, and on Windows a path holding an 8.3 short name (`~1`). It runs no discovery at all when the `projectSettings` source is turned off or a policy allows only plugin customization (debug log: `Dynamic skill discovery skipped`) [code].
+- It loads these skills as project-settings skills, with the same parsing as `project-skills` [code].
+- Claude Code keys these skills by their folder and their name, so a nested skill never replaces another. With `deploy` at the repo root and in `apps\web\.claude\skills`, the model is told about `deploy` (the root one) and `apps/web:deploy`; a user skill or another nested skill of that name does the same, both nested ones then prefixed, and a Project skill's frontmatter alias of that name does not. A nested skill whose name is unique keeps it, and its description says which folder it applies to [docs, code, test].
+- `skillOverrides` turns a nested skill off by the name it is listed under, and one listed as `<subdir>:<name>` by its bare name too, which turns off a same-named Project skill as well [test].
+- Not tested: a nested skill against a same-named managed skill or built-in command, which the code counts as a clash [code]; a nested skills folder reached through a link; `name-only` and `user-invocable-only` on a nested skill.
 
 ## 4. Precedence and merge rules
 
