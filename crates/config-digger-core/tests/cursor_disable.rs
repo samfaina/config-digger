@@ -660,7 +660,7 @@ fn park_review_and_lint(fs: &FakeFileSystem) -> Result<Outcome, Error> {
 }
 
 #[test]
-fn disable_of_two_user_skills_in_one_operation_parks_both_in_a_store_without_entries() {
+fn disable_of_two_user_skills_in_one_operation_parks_both_in_a_new_store() {
     let fs = with_review_and_lint(cursor());
     assert!(fs.contents(parked_store()).is_none());
 
@@ -694,14 +694,29 @@ fn verify_fails_a_two_skill_park_when_the_store_is_rewritten_without_either_reco
 
         let error = park_review_and_lint(&fs).unwrap_err();
 
+        // The store holds other bytes than those written, so the Rollback
+        // leaves it for manual recovery.
+        assert_eq!(
+            error.code,
+            ErrorCode::RollbackIncomplete,
+            "without `{name}`"
+        );
         let failed = error.failed.as_ref().unwrap();
         assert_eq!(
-            failed.failure.unwrap_or(error.code),
-            ErrorCode::OverwrittenByAgent,
-            "without `{name}`: {}",
-            error.message
+            failed.failure,
+            Some(ErrorCode::OverwrittenByAgent),
+            "without `{name}`"
         );
     }
+}
+
+/// The user's skill `name` is in its folder again, and out of the store.
+fn assert_back_where_it_was(fs: &FakeFileSystem, name: &str) {
+    assert_eq!(
+        fs.contents(user_skill(name).join("SKILL.md")),
+        Some(skill_md(name).into_bytes())
+    );
+    assert!(!exists(fs, &parked_folder(name)));
 }
 
 #[test]
@@ -715,13 +730,8 @@ fn enable_of_two_parked_skills_in_one_operation_moves_both_back() {
     let plan = plan(&core, &context(None), Action::Enable, &[&review, &lint]).unwrap();
     core.execute(plan, EVERY_PROJECT).unwrap();
 
-    for name in ["review", "lint"] {
-        assert_eq!(
-            fs.contents(user_skill(name).join("SKILL.md")),
-            Some(skill_md(name).into_bytes())
-        );
-        assert!(!exists(&fs, &parked_folder(name)));
-    }
+    assert_back_where_it_was(&fs, "review");
+    assert_back_where_it_was(&fs, "lint");
     assert_eq!(read_json(&fs, &parked_store())["entries"], json!({}));
 }
 
@@ -734,13 +744,8 @@ fn an_undo_of_a_two_skill_park_puts_back_the_store_and_both_folders() {
     let undo = core.plan_undo(&operation).unwrap();
     core.execute(undo, EVERY_PROJECT).unwrap();
 
-    for name in ["review", "lint"] {
-        assert_eq!(
-            fs.contents(user_skill(name).join("SKILL.md")),
-            Some(skill_md(name).into_bytes())
-        );
-        assert!(!exists(&fs, &parked_folder(name)));
-    }
+    assert_back_where_it_was(&fs, "review");
+    assert_back_where_it_was(&fs, "lint");
     assert_eq!(read_json(&fs, &parked_store()).get("entries"), None);
     let inventory = inventory_without_project(&fs);
     assert_eq!(code(item(&inventory, "review").state), "effective");

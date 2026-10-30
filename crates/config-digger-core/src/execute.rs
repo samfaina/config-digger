@@ -18,7 +18,7 @@ use crate::plan::{self, Planned, PlannedFile};
 use crate::ports::{FileSystem, Ports};
 use crate::store;
 use crate::{explain, resolve, running, scan};
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::io;
 use std::path::{Path, PathBuf};
 
@@ -689,7 +689,7 @@ fn touched_keys<'w>(write: &'w PendingWrite) -> Vec<TouchedKey<'w>> {
         // An edit also changes what the keys above and below it hold.
         for key in &mut keys {
             if let Some(below) = dependency.key_path.strip_prefix(key.key_path) {
-                set_at(&mut key.after, below, &dependency.after);
+                edit::set_at(&mut key.after, below, &dependency.after);
             } else if let Some(above) = key.key_path.strip_prefix(dependency.key_path.as_slice()) {
                 key.after = dependency
                     .after
@@ -700,28 +700,6 @@ fn touched_keys<'w>(write: &'w PendingWrite) -> Vec<TouchedKey<'w>> {
         }
     }
     keys
-}
-
-/// Gives `key_path` below `value` the value `to`, `None` taking it out.
-fn set_at(value: &mut Option<Value>, key_path: &[String], to: &Option<Value>) {
-    let Some((name, below)) = key_path.split_first() else {
-        value.clone_from(to);
-        return;
-    };
-    if !matches!(value, Some(Value::Object(_))) {
-        if to.is_none() {
-            return;
-        }
-        *value = Some(Value::Object(Map::new()));
-    }
-    let Some(Value::Object(object)) = value else {
-        unreachable!("an object by now");
-    };
-    let mut child = object.remove(name);
-    set_at(&mut child, below, to);
-    if let Some(child) = child {
-        object.insert(name.clone(), child);
-    }
 }
 
 /// Whether every key the edits of a file changed holds, in `bytes`, the
@@ -943,11 +921,17 @@ fn fail(
 
 #[cfg(test)]
 mod tests {
+    use super::{Landed, PendingWrite, edits_hold};
     use crate::api::{
         Action, Context, Core, ErrorCode, Plan, RollbackOutcome, ScanOptions, Targets, Warning,
         WarningClass,
     };
+    use crate::edit::{Edit, EditableFile, Syntax};
+    use crate::plan::{AppliedEdit, EditedFile, PlannedFile};
     use crate::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+    use crate::store::Medium;
+    use serde_json::json;
+    use std::path::PathBuf;
 
     const CLAUDE_JSON: &str = r"C:\Users\fixture\.claude.json";
     const SERVERS: &str = r#"{"mcpServers": {"linear": {"url": "https://u"}}}"#;
@@ -1119,6 +1103,107 @@ checks = ["disable", "precedence"]
         );
 
         assert!(outcome.is_ok(), "{outcome:?}");
+    }
+
+    fn set(key_path: &[&str], value: serde_json::Value) -> Edit {
+        Edit::Set {
+            key_path: key_path.iter().map(|key| (*key).to_owned()).collect(),
+            value,
+        }
+    }
+
+    /// A JSON file the plan creates with `edits`, each applied to the file
+    /// the edits before it left.
+    fn created_with(edits: &[Edit]) -> PlannedFile {
+        let read = b"{}".to_vec();
+        let mut bytes = read.clone();
+        let mut applied_edits = Vec::new();
+        for edit in edits {
+            let applied = EditableFile::decode(&bytes, Syntax::Jsonc)
+                .unwrap()
+                .apply(edit)
+                .unwrap();
+            bytes = applied.bytes;
+            applied_edits.push(AppliedEdit {
+                edit: edit.clone(),
+                inverse: applied.inverse,
+                depends_on: applied.depends_on,
+            });
+        }
+        PlannedFile {
+            path: PathBuf::from(r"C:\Users\fixture\created.json"),
+            syntax: Syntax::Jsonc,
+            read,
+            created: true,
+            edited: EditedFile {
+                bytes,
+                edits: applied_edits,
+            },
+            readers: Vec::new(),
+            switches: Vec::new(),
+            git_versioned: false,
+            parking: false,
+            parked_store: false,
+            parked_readers: Vec::new(),
+            medium: Medium::File,
+        }
+    }
+
+    /// Whether the edits of `file` hold in `bytes`.
+    fn hold_in(file: &PlannedFile, bytes: &[u8]) -> Result<(), Landed> {
+        let write = PendingWrite {
+            file,
+            current: None,
+            bytes: file.edited.bytes.clone(),
+        };
+        edits_hold(bytes, &write)
+    }
+
+    #[test]
+    fn edits_under_a_key_an_earlier_edit_created_hold_whatever_their_order() {
+        let review = json!({ "agent": "cursor" });
+        let lint = json!({ "agent": "codex" });
+        let orders = [
+            vec![
+                set(&["entries"], json!({ "review": review })),
+                set(&["entries", "lint"], lint.clone()),
+            ],
+            vec![
+                set(&["entries"], json!({ "review": review })),
+                set(&["entries", "lint"], lint.clone()),
+                set(&["entries"], json!({ "lint": lint })),
+            ],
+            vec![
+                set(&["entries"], json!({ "review": review, "lint": lint })),
+                Edit::Remove {
+                    key_path: vec!["entries".to_owned(), "lint".to_owned()],
+                },
+            ],
+        ];
+        for edits in orders {
+            let file = created_with(&edits);
+
+            let held = hold_in(&file, &file.edited.bytes);
+
+            assert!(held.is_ok(), "{edits:?}");
+        }
+    }
+
+    #[test]
+    fn a_rewrite_that_takes_either_edit_away_does_not_hold() {
+        let file = created_with(&[
+            set(&["entries"], json!({ "review": 1 })),
+            set(&["entries", "lint"], json!(2)),
+        ]);
+
+        for rewritten in [
+            r#"{"entries": {"review": 1}}"#,
+            r#"{"entries": {"lint": 2}}"#,
+        ] {
+            let held = hold_in(&file, rewritten.as_bytes());
+
+            assert!(matches!(held, Err(Landed::Mismatch(_))), "{rewritten}");
+        }
     }
 
     #[test]
