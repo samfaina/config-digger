@@ -14,7 +14,7 @@ use crate::explain;
 use crate::locator;
 use crate::mask::MASK;
 use crate::resolve;
-use crate::scan::{ScannedEntry, ScannedSwitch, Snapshot};
+use crate::scan::{ScannedEntry, ScannedPlugin, ScannedSwitch, Snapshot};
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeSet;
@@ -298,6 +298,39 @@ fn set_for<'a>(
         }
     }
     (disabling, partial)
+}
+
+/// Whether a switch keyed by plugin turns `plugin`, of the Agent home of
+/// `entry`, off in the context of the Project with the key `project`, as it
+/// would an Entry of `plugin` of the Item kind of `entry`, whether or not
+/// the plugin has one.
+pub(crate) fn plugin_off(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &ScannedEntry,
+    plugin: &ScannedPlugin,
+    project: Option<&str>,
+) -> bool {
+    let kind = definition.location(&entry.location).kind;
+    let Some(location) = definition.locations.iter().find(|location| {
+        location.kind == kind
+            && location
+                .anchor
+                .plugin()
+                .is_some_and(|anchor| anchor.plugins.names(&plugin.plugins))
+    }) else {
+        return false;
+    };
+    // An Entry of the plugin, at a location of its list, stands for it.
+    let of_plugin = ScannedEntry {
+        location: location.id.clone(),
+        plugin: Some(plugin.clone()),
+        ..entry.clone()
+    };
+    hits(definition, snapshot, &of_plugin, project)
+        .0
+        .iter()
+        .any(|hit| hit.mechanism.target() == MechanismTarget::Plugin)
 }
 
 /// The first switch of managed policy that holds a value for `entry` in

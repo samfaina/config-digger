@@ -757,6 +757,13 @@ pub(crate) struct PluginsDefinition {
     /// manifest gives counts, never one taken from the plugin's id.
     #[serde(default)]
     pub same_names_invalid: bool,
+    /// The ids of earlier lists whose plugins this list's plugins lose to
+    /// whole, as Claude Code loads no synced plugin while an installed one
+    /// of its name loads: while a plugin of one of them that applies in the
+    /// context, and is not turned off there, has a plugin's name, every
+    /// Entry of the plugin is Shadowed, with `shadowed_by_same_named_plugin`,
+    /// and competes with no other. The name is the one the list reads.
+    pub loses_to: Option<Vec<String>>,
     /// The Agent's own command that uninstalls a plugin, shown in place of
     /// Remove. `{id}` stands for the plugin's id, and `{scope}` for the
     /// Scope it is installed at: when that is not recorded, the word
@@ -837,6 +844,9 @@ impl PluginsDefinition {
         }
         if self.unique_names && self.same_names_invalid {
             return Err("plugins that share a name are renamed or invalid, not both".into());
+        }
+        if self.loses_to.as_ref().is_some_and(Vec::is_empty) {
+            return Err("loses_to needs a plugins list".into());
         }
         if self
             .uninstall
@@ -1725,9 +1735,21 @@ impl AgentDefinition {
             "plugins",
             self.plugins.iter().map(|plugins| plugins.id.as_str()),
         )?;
-        for plugins in &self.plugins {
+        for (index, plugins) in self.plugins.iter().enumerate() {
             let context = |e: String| format!("plugins `{}`: {e}", plugins.id);
             plugins.validate().map_err(context)?;
+            for id in plugins.loses_to.iter().flatten() {
+                match self.plugins.iter().position(|other| other.id == *id) {
+                    None => return Err(context(format!("loses_to `{id}` is no plugins list"))),
+                    Some(at) if at == index => {
+                        return Err(context(format!("loses_to `{id}` is its own list")));
+                    }
+                    Some(at) if at > index => {
+                        return Err(context(format!("loses_to `{id}` comes after it")));
+                    }
+                    Some(_) => {}
+                }
+            }
             for anchor in plugins.registry.anchors() {
                 self.validate_home_root(anchor).map_err(context)?;
             }
@@ -4929,6 +4951,54 @@ locations = {locations}
     fn plugins_and_their_switch_load() {
         let text = with_plugins(&plugin_switch("plugin", "{plugin_id}", r#"["plugin-mcp"]"#));
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    /// `with_plugins` plus the list `synced` after `installed`, which loses
+    /// whole to the same-named plugins of the lists `loses_to`.
+    fn with_losing_list(loses_to: &str) -> String {
+        with_plugins(&format!(
+            r#"
+[[plugins]]
+id = "synced"
+registry = {{ block = "plugin-folders", anchor = {{ block = "home", root = "plugins", path = "synced" }}, depth = 1 }}
+loses_to = {loses_to}
+"#
+        ))
+    }
+
+    #[test]
+    fn a_plugin_list_loses_whole_only_to_earlier_lists() {
+        let text = with_losing_list(r#"["installed"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (loses_to, refusal) in [
+            (
+                r#"["market"]"#,
+                "plugins `synced`: loses_to `market` is no plugins list",
+            ),
+            (
+                r#"["synced"]"#,
+                "plugins `synced`: loses_to `synced` is its own list",
+            ),
+            (r#"[]"#, "plugins `synced`: loses_to needs a plugins list"),
+        ] {
+            let text = with_losing_list(loses_to);
+            assert!(
+                error(&text).contains(refusal),
+                "{loses_to}: {}",
+                error(&text)
+            );
+        }
+        // `installed` comes before `synced`, so it cannot lose to it.
+        let text = with_losing_list("[]").replace(
+            "uninstall = \"agent plugin uninstall {id} --scope {scope}\"",
+            "uninstall = \"agent plugin uninstall {id} --scope {scope}\"\nloses_to = [\"synced\"]",
+        );
+        let text = text.replace("loses_to = []\n", "");
+        assert!(
+            error(&text).contains("plugins `installed`: loses_to `synced` comes after it"),
+            "{}",
+            error(&text)
+        );
     }
 
     /// `with_plugins`, its plugin servers competing by endpoint and ranked

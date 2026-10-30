@@ -243,6 +243,10 @@ pub(crate) struct ScannedPlugin {
     /// name, in the Agent's load order, when the Agent refuses plugins that
     /// share a name: empty when none has it.
     pub shared_with: Vec<PathBuf>,
+    /// The plugins of the earlier lists its list loses to that have its
+    /// name, in the Agent's load order, each keeping it out whole wherever
+    /// it applies and is not turned off: empty when none has it.
+    pub loses_to: Vec<ScannedPlugin>,
 }
 
 /// A name that plugins of one list of an Agent home share, which the
@@ -1512,12 +1516,13 @@ fn read_as_if(
             .map(|installation| installation.folder.as_path())
             .collect();
         // A Project's own plugins wait for every Project.
-        let plugins: Vec<ScannedPlugin> = definition
+        let mut plugins: Vec<ScannedPlugin> = definition
             .plugins
             .iter()
             .filter(|plugins| !plugins.registry.in_project())
             .flat_map(|plugins| scanner.read_plugins(home, plugins, None, &installation_folders))
             .collect();
+        give_winners(definition, &[], &mut plugins);
         installed.insert((home.agent_index, home.home.clone()), plugins.clone());
         scanner.read_plugin_locations(home, definition, &plugins);
         for location in definition.locations.iter() {
@@ -1590,6 +1595,7 @@ fn read_as_if(
                 }
             }
         }
+        give_winners(definition, plugins_of(&installed, home), &mut plugins);
         scanner.read_plugin_locations(home, definition, &plugins);
         installed
             .entry((home.agent_index, home.home.clone()))
@@ -2625,6 +2631,33 @@ fn covered<'e>(
                 && mechanism.covers(&entry.location)
         })
         .collect()
+}
+
+/// Gives each of `plugins`, read in the order of their lists, the plugins
+/// it loses to whole: those of `earlier`, read before them, and of
+/// `plugins` before it, of the lists its list's `loses_to` names, that
+/// have its name.
+fn give_winners(
+    definition: &AgentDefinition,
+    earlier: &[ScannedPlugin],
+    plugins: &mut [ScannedPlugin],
+) {
+    for index in 0..plugins.len() {
+        let Some(lists) = definition
+            .declared_plugins(&plugins[index].plugins)
+            .ok()
+            .and_then(|list| list.loses_to.as_ref())
+        else {
+            continue;
+        };
+        let winners = earlier
+            .iter()
+            .chain(&plugins[..index])
+            .filter(|other| lists.contains(&other.plugins) && other.name == plugins[index].name)
+            .cloned()
+            .collect();
+        plugins[index].loses_to = winners;
+    }
 }
 
 /// The plugins `home` loads.
@@ -3997,6 +4030,7 @@ impl Scanner<'_> {
                 project,
                 version: record.version,
                 shared_with: Vec::new(),
+                loses_to: Vec::new(),
             });
         }
         if plugins.same_names_invalid {
@@ -6172,6 +6206,7 @@ mod tests {
                 project: None,
                 version: None,
                 shared_with: Vec::new(),
+                loses_to: Vec::new(),
             }),
             switch_id: None,
             own_name: None,

@@ -1879,6 +1879,16 @@
           "type": "boolean",
           "default": false
         },
+        "loses_to": {
+          "description": "The ids of earlier lists whose plugins this list's plugins lose to\nwhole, as Claude Code loads no synced plugin while an installed one\nof its name loads: while a plugin of one of them that applies in the\ncontext, and is not turned off there, has a plugin's name, every\nEntry of the plugin is Shadowed, with `shadowed_by_same_named_plugin`,\nand competes with no other. The name is the one the list reads.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "uninstall": {
           "description": "The Agent's own command that uninstalls a plugin, shown in place of\nRemove. `{id}` stands for the plugin's id, and `{scope}` for the\nScope it is installed at: when that is not recorded, the word\nholding it and an option just before it are left out. Without it,\nthe Agent uninstalls a plugin only through its own interface.",
           "type": [

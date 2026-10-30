@@ -1706,6 +1706,11 @@ export type ReasonCode =
 /**  A same-named Entry at a location the Agent ranks higher is Effective. */
 "shadowed_by_precedence" | 
 /**
+ *  A plugin of the same name that the Agent loads in its place keeps
+ *  the plugin the Entry is part of out whole.
+ */
+"shadowed_by_same_named_plugin" | 
+/**
  *  The Agent builds the server it uses from this Entry and other
  *  same-named ones, field by field.
  */

@@ -2140,6 +2140,39 @@
       ]
     },
     {
+      "id": "29",
+      "title": "Un plugin sincronizado bajo uno instalado de su nombre",
+      "steps": [
+        {
+          "id": "29.1",
+          "title": "El plugin sincronizado cuando hay uno instalado con su nombre",
+          "goal": "Mientras un plugin instalado tiene el nombre de un plugin sincronizado desde claude.ai, Claude Code no carga nada del sincronizado, y config-digger enseña cada skill suya Shadowed, con una razón que nombra el plugin instalado, aunque el instalado no la tenga.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "Elige la skill cd-throwaway-synced:cd-throwaway-synced-skill y lee su tarjeta.",
+            "Busca cd-throwaway-synced:cd-throwaway-installed-skill en la lista Items."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «cd-throwaway-synced:cd-throwaway-synced-skill» sale «Shadowed».",
+            "Su tarjeta tiene la etiqueta «cloud mirror».",
+            "Su tarjeta dice «Shadowed by the plugin cd-throwaway-synced@cd-throwaway in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\cache\\cd-throwaway\\cd-throwaway-synced\\1.0.0: Claude Code loads only one plugin named `cd-throwaway-synced`, and none of this one.».",
+            "El botón Disable de su tarjeta está desactivado.",
+            "El Item «cd-throwaway-synced:cd-throwaway-installed-skill» sale «Effective»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con un plugin instalado del nombre del sincronizado",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -InstalledSynced"
+          },
+          "covers": ["#354"]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

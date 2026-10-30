@@ -63,6 +63,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  # adds Codex skills whose frontmatter is not YAML
 .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  # adds a Claude Desktop package beside a classic folder in desktop-appdata
 .\uat\data\cd-throwaway-setup.ps1 -Reset -NestedSkills  # adds Claude Code skills in a .claude\skills deeper in the Project
+.\uat\data\cd-throwaway-setup.ps1 -Reset -InstalledSynced  # adds an installed plugin of the synced plugin's name to the synced home
 ```
 
 `-NameRule` adds three skills to the Claude Code home: one whose folder name starts with a space, one with a zero-width space in it, and one with a space inside it, which the rule keeps, all named `cd-throwaway-name…`. They stay out of the default data, so that no other step counts them; step 19.1 walks them.
@@ -76,6 +77,8 @@ When a change to the app makes a step wrong, change the step's text and keep its
 `-DesktopOverlay` writes Claude Desktop's folders as they would be in an `%APPDATA%` and a `%LOCALAPPDATA%` of their own, `desktop-appdata\Roaming` and `desktop-appdata\Local`: a classic `Claude` folder whose `claude_desktop_config.json` declares `cd-throwaway-overlay`, and the Store package's `LocalCache\Roaming\Claude` beside it, which holds no config of its own and so reads the classic one through its overlay (#306). Steps 25.1 and 25.2 start the app with both variables set to those folders, so config-digger's own data folder is a throwaway one there too.
 
 `-NestedSkills` adds two skills to `project\apps\web\.claude\skills`, which Claude Code loads once it works on a file under `apps\web`: `cd-throwaway-nested-skill`, and `cd-throwaway-project-skill`, which has the name of the Project's own skill and so goes by `apps/web:cd-throwaway-project-skill`. It makes `project` a git repo with `git init`, since config-digger reads nested skills only in one. They stay out of the default data, so that no other step counts them; step 28.1 walks them.
+
+`-InstalledSynced` adds to `claude-code-synced-home` the plugin `cd-throwaway-synced@cd-throwaway`, installed from a marketplace and turned on in the home's user settings, which has the name of the synced plugin `cd-throwaway-synced` and its own skill, `cd-throwaway-installed-skill`. Claude Code then loads nothing of the synced plugin, so its skill is Shadowed. It stays out of the default data, where steps 1.4 and 3.4 see the synced skill Effective; step 29.1 walks it.
 
 `-Cursor` writes Cursor's files as they would be in an `%APPDATA%` of their own, `cursor-appdata`: Cursor has run and opened `cursor-project`, a git repo, made with `git init`, whose `packages\app\.cursor\skills` holds a skill. A step that needs them starts the app with `APPDATA` set to that folder, as step 17.1 does.
 
