@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { Tooltip } from "./Tooltip";
@@ -92,5 +92,52 @@ describe("a Tooltip in a DOM", () => {
     expect(button.hasAttribute("aria-describedby")).toBe(false);
     expect(button.hasAttribute("data-tooltip")).toBe(false);
     expect([...document.body.children]).toEqual([container]);
+  });
+});
+
+describe("a keyboard focus that scrolls its control into view", () => {
+  /** Renders the Copy button in a list that scrolls, where the focus's scroll leaves it, and focuses it with Tab. */
+  async function focusInList() {
+    // Frames come only when the test says, so the scroll can come before the next one, as the browser sends it.
+    vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame"] });
+    const user = userEvent.setup();
+    render(
+      <ul data-testid="list" style={{ height: 40, overflow: "auto" }}>
+        <li>
+          <Tooltip text="Copy the path">
+            <button type="button">Copy</button>
+          </Tooltip>
+        </li>
+      </ul>,
+    );
+    const button = screen.getByRole("button", { name: "Copy" });
+    vi.spyOn(button, "getBoundingClientRect").mockReturnValue(DOMRect.fromRect({ x: 300, y: 100, width: 40, height: 20 }));
+    await user.tab();
+    expect(document.activeElement).toBe(button);
+    return { list: screen.getByTestId("list"), tip: screen.getByRole("tooltip", { hidden: true }) };
+  }
+
+  test("still shows the tooltip, placed next to the control where the scroll left it", async () => {
+    const { list, tip } = await focusInList();
+    // The browser scrolls the list as part of the focus, and sends its scroll event after.
+    fireEvent.scroll(list);
+    expect(tip.hidden).toBe(false);
+    expect([tip.style.top, tip.style.left]).toEqual(["126px", "320px"]);
+  });
+
+  test("a scroll after it, from the next frame on, hides the tooltip", async () => {
+    const { list, tip } = await focusInList();
+    fireEvent.scroll(list);
+    act(() => vi.advanceTimersToNextFrame());
+    expect(tip.hidden).toBe(false);
+    fireEvent.scroll(list);
+    expect(tip.hidden).toBe(true);
+  });
+
+  test("a resize after it, from the next frame on, hides the tooltip", async () => {
+    const { tip } = await focusInList();
+    act(() => vi.advanceTimersToNextFrame());
+    fireEvent(window, new Event("resize"));
+    expect(tip.hidden).toBe(true);
   });
 });

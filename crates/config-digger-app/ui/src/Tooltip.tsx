@@ -84,6 +84,13 @@ export function Tooltip({ text, children }: { text?: string; children: ReactElem
     return () => document.removeEventListener("keydown", onKey, true);
   }, [state]);
 
+  // A focus that scrolls its control into view sends its scroll event before the next frame's callbacks: from this one on, a scroll is another's.
+  useEffect(() => {
+    if (!state.settling) return;
+    const frame = window.requestAnimationFrame(() => send("settled"));
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.settling]);
+
   // A scroll or a resize would leave the tooltip away from its control.
   const active = state.shown || state.waiting;
   useEffect(() => {
