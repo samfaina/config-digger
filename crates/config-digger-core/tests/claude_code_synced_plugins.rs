@@ -50,14 +50,14 @@ fn synced_home() -> FakeFileSystem {
         )
 }
 
-fn inventory_with(fs: &FakeFileSystem, env: FakeEnvironment) -> Inventory {
+fn inventory_with(fs: &FakeFileSystem, env: FakeEnvironment, context: &Context) -> Inventory {
     let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
     let snapshot = core.scan(&ScanOptions::default()).unwrap();
-    core.resolve(&snapshot, &Context::default())
+    core.resolve(&snapshot, context)
 }
 
 fn inventory(fs: &FakeFileSystem) -> Inventory {
-    inventory_with(fs, FakeEnvironment::with_home(HOME))
+    inventory_with(fs, FakeEnvironment::with_home(HOME), &Context::default())
 }
 
 fn item<'i>(inventory: &'i Inventory, name: &str) -> &'i Item {
@@ -188,7 +188,7 @@ fn a_synced_plugin_without_a_manifest_is_named_by_its_folder_up_to_its_generatio
 /// the user settings turn on, carrying the skill `notes` and the server
 /// `docs` at another URL than the synced plugin's.
 fn with_installed_demo(fs: FakeFileSystem) -> FakeFileSystem {
-    let folder = in_home(r".claude\plugins\cache\acme\demo\2.0.0");
+    let folder = installed_demo_folder();
     let records = json!({
         "version": 2,
         "plugins": { "demo@acme": [{ "scope": "user", "installPath": folder, "version": "2.0.0" }] },
@@ -211,28 +211,267 @@ fn with_installed_demo(fs: FakeFileSystem) -> FakeFileSystem {
     with_user_settings(fs, &json!({ "enabledPlugins": { "demo@acme": true } }))
 }
 
+/// The folder of the installed `demo@acme` of [`with_installed_demo`].
+fn installed_demo_folder() -> PathBuf {
+    in_home(r".claude\plugins\cache\acme\demo\2.0.0")
+}
+
+/// `fs` whose synced `demo` also carries what the installed `demo` lacks:
+/// the server `search`, in its manifest, and the skill `extra`.
+fn with_more_in_synced_demo(fs: FakeFileSystem) -> FakeFileSystem {
+    fs.with_file(
+        in_account(r"demo~g3\.claude-plugin\plugin.json"),
+        json!({ "name": "demo", "mcpServers": { "search": { "command": "demo-search" } } })
+            .to_string(),
+    )
+    .with_file(
+        in_account(r"demo~g3\skills\extra\SKILL.md"),
+        skill_md("extra"),
+    )
+}
+
+/// The value at the JSON pointer `first`, the State and the reason code of
+/// each Entry of the Item `name`.
+fn rows_by(inventory: &Inventory, name: &str, first: &str) -> Vec<(String, String, String)> {
+    item(inventory, name)
+        .entries
+        .iter()
+        .map(|entry| {
+            let entry = entry_json(entry);
+            (
+                entry.pointer(first).unwrap().as_str().unwrap().to_owned(),
+                entry["state"].as_str().unwrap().to_owned(),
+                entry["reason"]["code"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+            )
+        })
+        .collect()
+}
+
+/// The provenance, State and reason code of each Entry of the Item `name`.
+fn provenances_and_states(inventory: &Inventory, name: &str) -> Vec<(String, String, String)> {
+    rows_by(inventory, name, "/provenance")
+}
+
+/// A row of [`rows_by`].
+fn row(first: &str, state: &str, code: &str) -> (String, String, String) {
+    (first.to_owned(), state.to_owned(), code.to_owned())
+}
+
 #[test]
-fn an_installed_plugin_of_the_same_name_shadows_the_synced_one() {
-    let inventory = inventory(&with_installed_demo(synced_home()));
+fn an_installed_plugin_of_the_same_name_shadows_the_synced_one_whole() {
+    let inventory = inventory(&with_more_in_synced_demo(
+        with_installed_demo(synced_home()),
+    ));
 
     for name in ["plugin:demo:docs", "demo:notes"] {
-        let provenances_and_states: Vec<(String, String)> = item(&inventory, name)
-            .entries
-            .iter()
-            .map(|entry| {
-                let entry = entry_json(entry);
-                (
-                    entry["provenance"].as_str().unwrap().to_owned(),
-                    entry["state"].as_str().unwrap().to_owned(),
-                )
-            })
-            .collect();
         assert_eq!(
-            provenances_and_states,
+            provenances_and_states(&inventory, name),
             [
-                ("plugin".to_owned(), "effective".to_owned()),
-                ("cloud_mirror".to_owned(), "shadowed".to_owned()),
+                row("plugin", "effective", ""),
+                row("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
             ],
+            "{name}"
+        );
+    }
+    // What only the synced `demo` carries is Shadowed too.
+    for name in ["plugin:demo:search", "demo:extra"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [row(
+                "cloud_mirror",
+                "shadowed",
+                "shadowed_by_same_named_plugin"
+            )],
+            "{name}"
+        );
+        let entry = entry_json(&item(&inventory, name).entries[0]);
+        assert_eq!(entry["reason"]["effective"], Value::Null, "{name}");
+        assert_eq!(
+            entry["reason"]["sentence"],
+            format!(
+                "Shadowed by the plugin demo@acme in {}: Claude Code loads only one plugin named `demo`, and none of this one.",
+                installed_demo_folder().display()
+            ),
+            "{name}"
+        );
+        assert_eq!(entry["disable"]["code"], "read_only", "{name}");
+    }
+}
+
+#[test]
+fn a_synced_plugin_kept_out_whole_shadows_no_server_of_its_endpoint() {
+    let fs = with_installed_demo(synced_home())
+        .with_file(
+            in_account(r"demo~g3\.claude-plugin\plugin.json"),
+            json!({ "name": "demo", "mcpServers": { "alpha": { "command": "shared-tool" } } })
+                .to_string(),
+        )
+        .with_file(
+            in_account(r"other~g1\.claude-plugin\plugin.json"),
+            json!({ "name": "other" }).to_string(),
+        )
+        .with_file(
+            in_account(r"other~g1\.mcp.json"),
+            json!({ "mcpServers": { "zeta": { "command": "shared-tool" } } }).to_string(),
+        );
+
+    let inventory = inventory(&fs);
+
+    // The manifest's server would rank above `.mcp.json`'s, were `demo`
+    // loaded; kept out, it stands alone.
+    assert_eq!(
+        rows_by(&inventory, "plugin:other:zeta", "/plugin/id"),
+        [row("other@synced", "effective", "")]
+    );
+    assert_eq!(
+        rows_by(&inventory, "plugin:demo:alpha", "/plugin/id"),
+        [row(
+            "demo@synced",
+            "shadowed",
+            "shadowed_by_same_named_plugin"
+        )]
+    );
+}
+
+#[test]
+fn an_installed_plugin_turned_off_keeps_the_synced_one_of_its_name_loaded() {
+    // Off by its switch, and off as no settings file names it.
+    for settings in [
+        json!({ "enabledPlugins": { "demo@acme": false } }),
+        json!({}),
+    ] {
+        let fs = with_user_settings(
+            with_more_in_synced_demo(with_installed_demo(synced_home())),
+            &settings,
+        );
+
+        let inventory = inventory(&fs);
+
+        for name in ["plugin:demo:docs", "demo:notes"] {
+            assert_eq!(
+                provenances_and_states(&inventory, name),
+                [
+                    row("plugin", "disabled", "plugin_disabled"),
+                    row("cloud_mirror", "effective", ""),
+                ],
+                "{settings}: {name}"
+            );
+        }
+        for name in ["plugin:demo:search", "demo:extra"] {
+            assert_eq!(
+                provenances_and_states(&inventory, name),
+                [row("cloud_mirror", "effective", "")],
+                "{settings}: {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_installed_plugin_the_managed_settings_force_off_keeps_the_synced_one_loaded() {
+    let program_files = r"C:\Program Files";
+    let fs = with_more_in_synced_demo(with_installed_demo(synced_home())).with_file(
+        PathBuf::from(program_files).join(r"ClaudeCode\managed-settings.json"),
+        json!({ "enabledPlugins": { "demo@acme": false } }).to_string(),
+    );
+    let env = FakeEnvironment::with_home(HOME).with_var("ProgramFiles", program_files);
+
+    let inventory = inventory_with(&fs, env, &Context::default());
+
+    for name in ["plugin:demo:docs", "demo:notes"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [
+                row("plugin", "blocked", "policy"),
+                row("cloud_mirror", "effective", ""),
+            ],
+            "{name}"
+        );
+    }
+    for name in ["plugin:demo:search", "demo:extra"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [row("cloud_mirror", "effective", "")],
+            "{name}"
+        );
+    }
+}
+
+/// The Inventory of `fs` in the context of the Project `project`, or of none.
+fn inventory_in(fs: &FakeFileSystem, project: Option<&str>) -> Inventory {
+    let context = Context {
+        project: project.map(PathBuf::from),
+    };
+    inventory_with(fs, FakeEnvironment::with_home(HOME), &context)
+}
+
+#[test]
+fn an_installed_plugin_of_one_project_keeps_the_synced_one_out_there_alone() {
+    let (app, other) = (r"E:\projects\app", r"E:\projects\other");
+    let records = json!({
+        "version": 2,
+        "plugins": { "demo@acme": [{
+            "scope": "local",
+            "projectPath": app,
+            "installPath": installed_demo_folder(),
+            "version": "2.0.0",
+        }] },
+    });
+    let fs = with_more_in_synced_demo(with_installed_demo(synced_home()))
+        .with_file(
+            in_home(r".claude\plugins\installed_plugins.json"),
+            records.to_string(),
+        )
+        .with_folder(app)
+        .with_folder(other);
+
+    for (project, state, code) in [
+        (Some(app), "shadowed", "shadowed_by_same_named_plugin"),
+        (Some(other), "effective", ""),
+        (None, "effective", ""),
+    ] {
+        let inventory = inventory_in(&fs, project);
+
+        for name in ["plugin:demo:search", "demo:extra"] {
+            assert_eq!(
+                provenances_and_states(&inventory, name),
+                [row("cloud_mirror", state, code)],
+                "{project:?}: {name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_installed_plugin_that_fails_to_load_still_keeps_the_synced_one_out() {
+    let fs = with_more_in_synced_demo(with_installed_demo(synced_home())).with_file(
+        installed_demo_folder().join(r".claude-plugin\plugin.json"),
+        r#"{ "name": "#,
+    );
+
+    let inventory = inventory(&fs);
+
+    for name in ["plugin:demo:docs", "demo:notes"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [
+                row("plugin", "invalid", "plugin_failed_to_load"),
+                row("cloud_mirror", "shadowed", "shadowed_by_same_named_plugin"),
+            ],
+            "{name}"
+        );
+    }
+    for name in ["plugin:demo:search", "demo:extra"] {
+        assert_eq!(
+            provenances_and_states(&inventory, name),
+            [row(
+                "cloud_mirror",
+                "shadowed",
+                "shadowed_by_same_named_plugin"
+            )],
             "{name}"
         );
     }

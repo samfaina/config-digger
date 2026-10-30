@@ -69,6 +69,26 @@ pub(crate) fn shadowed_by_plugin_order(
     }
 }
 
+/// A Shadowed Entry's reason: `agent_name` loads the plugin `winner`, in
+/// the folder `folder`, in place of the plugin named `name` the Entry is
+/// part of, and nothing of that one.
+pub(crate) fn shadowed_by_same_named_plugin(
+    agent_name: &str,
+    winner: &str,
+    folder: &Path,
+    name: &str,
+) -> Reason {
+    Reason {
+        code: ReasonCode::ShadowedBySameNamedPlugin,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "Shadowed by the plugin {winner} in {}: {agent_name} loads only one plugin named `{name}`, and none of this one.",
+            folder.display()
+        ),
+    }
+}
+
 /// The words a Shadowed Entry's reason says, after "which", of an Entry it
 /// competes with because they have the same endpoint, if they do.
 fn same_endpoint_words(same_endpoint: bool) -> &'static str {

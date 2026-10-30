@@ -15,6 +15,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex skills whose frontmatter is not YAML
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  adds a Claude Desktop package beside a classic folder in desktop-appdata
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NestedSkills  adds Claude Code skills in a .claude\skills deeper in the Project
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -InstalledSynced  adds an installed plugin of the synced plugin's name to the synced home
 param(
     [string]$Root = "E:\cd-throwaway",
     [switch]$Reset,
@@ -26,7 +27,8 @@ param(
     [switch]$CodexLayer,
     [switch]$Frontmatter,
     [switch]$DesktopOverlay,
-    [switch]$NestedSkills
+    [switch]$NestedSkills,
+    [switch]$InstalledSynced
 )
 $ErrorActionPreference = "Stop"
 
@@ -371,6 +373,34 @@ description: Throwaway skill for testing config-digger. Does nothing.
     if ($LASTEXITCODE -ne 0) {
         throw "Cannot run git init in $Root\project: install Git for Windows."
     }
+}
+
+# With -InstalledSynced, the synced home also installs a plugin of the synced
+# plugin's name from a marketplace, which its user settings turn on, with a
+# skill of its own. Claude Code then loads nothing of the synced plugin.
+if ($InstalledSynced) {
+    $installed = "$Root\claude-code-synced-home\.claude\plugins\cache\cd-throwaway\cd-throwaway-synced\1.0.0"
+    $installedJson = $installed -replace '\\', '\\'
+    Write-TestFile "$Root\claude-code-synced-home\.claude\plugins\installed_plugins.json" @"
+{
+  "version": 2,
+  "plugins": {
+    "cd-throwaway-synced@cd-throwaway": [{ "scope": "user", "installPath": "$installedJson", "version": "1.0.0" }]
+  }
+}
+"@
+    Write-TestFile "$installed\.claude-plugin\plugin.json" @"
+{ "name": "cd-throwaway-synced", "version": "1.0.0", "description": "Throwaway plugin for testing config-digger." }
+"@
+    Write-TestFile "$installed\skills\cd-throwaway-installed-skill\SKILL.md" @"
+---
+name: cd-throwaway-installed-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    Write-TestFile "$Root\claude-code-synced-home\.claude\settings.json" @"
+{ "enabledPlugins": { "cd-throwaway-synced@cd-throwaway": true } }
+"@
 }
 
 # With -Symlink, a skill committed in a repo with git's core.symlinks, as git

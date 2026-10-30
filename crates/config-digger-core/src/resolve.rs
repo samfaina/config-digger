@@ -14,7 +14,7 @@ use crate::definitions::{
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
     GateReading, HomeSource, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
-    ScannedParked, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
+    ScannedParked, ScannedPlugin, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
 use std::borrow::Cow;
@@ -168,6 +168,13 @@ pub(crate) fn resolve(
             || skipped_source(&definitions[entry.agent_index], snapshot, entry).is_some()
     };
 
+    // The plugin a same-named one keeps out whole competes with nothing.
+    let kept_out = |entry: &ScannedEntry| {
+        let definition = &definitions[entry.agent_index];
+        kept_out_by(definition, snapshot, entry, project_key.map(String::as_str)).is_some()
+    };
+    let absent = |entry: &ScannedEntry| unread(entry) || kept_out(entry);
+
     let reactions: Vec<Reaction> = snapshot
         .read_failures
         .iter()
@@ -196,7 +203,15 @@ pub(crate) fn resolve(
             && apart_rules(definition, entry).is_none()
         {
             let project = project_key.map(String::as_str);
-            item_key(definition, snapshot, &in_context, entry, project, &unread)
+            item_key(
+                definition,
+                snapshot,
+                &in_context,
+                entry,
+                project,
+                &unread,
+                &kept_out,
+            )
         } else {
             ItemKey::Alone(
                 entry.name.clone(),
@@ -237,10 +252,11 @@ pub(crate) fn resolve(
             };
             // Entries of equal rank, such as under two spellings of one Project
             // key, are ordered by key path so that the choice is stable.
-            // Unread Entries come last, so that they never name the Item.
+            // Unread Entries come last, so that they never name the Item, and
+            // so do those a same-named plugin keeps out.
             entries.sort_by(|a, b| {
-                (unread(a), rank(a), a.depth, &a.key_path).cmp(&(
-                    unread(b),
+                (absent(a), rank(a), a.depth, &a.key_path).cmp(&(
+                    absent(b),
                     rank(b),
                     b.depth,
                     &b.key_path,
@@ -299,6 +315,13 @@ pub(crate) fn resolve(
                 .iter()
                 .map(|entry| plugin_failure(snapshot, &reactions, entry))
                 .collect();
+            // The same-named plugin that keeps each Entry's plugin out whole.
+            let kept_by: Vec<Option<&ScannedPlugin>> = entries
+                .iter()
+                .map(|entry| {
+                    kept_out_by(definition, snapshot, entry, project_key.map(String::as_str))
+                })
+                .collect();
             let checks = &definition.rules(kind).checks;
             // A gate or rule checked before precedence takes the Entry out of
             // the competition; one checked after applies to the Entry that wins.
@@ -308,11 +331,12 @@ pub(crate) fn resolve(
             };
             // An Invalid Entry competes only where the Agent still lists it,
             // and an Unread one, a skipped skill or one of a plugin the Agent
-            // does not load never does.
+            // does not load, or loads another in place of, never does.
             let competes = |index: usize| {
                 !unread(entries[index])
                     && skipped[index].is_none()
                     && plugin_failures[index].is_none()
+                    && kept_by[index].is_none()
                     && !entries[index]
                         .plugin
                         .as_ref()
@@ -423,7 +447,7 @@ pub(crate) fn resolve(
                 .iter()
                 .map(|entry| {
                     let project = project_key.map(String::as_str);
-                    url_key(definition, snapshot, entry, project, &unread)
+                    url_key(definition, snapshot, entry, project, &absent)
                 })
                 .collect();
             let shadowed_by = |index: usize, winner: usize| {
@@ -758,6 +782,23 @@ pub(crate) fn resolve(
                                     ));
                                 }
                             }
+                            // The Agent loads another plugin in place of its own.
+                            Check::Precedence if kept_by[index].is_some() => {
+                                if let (Some(winner), Some(plugin)) =
+                                    (kept_by[index], entry.plugin.as_ref())
+                                {
+                                    failed.push((
+                                        check,
+                                        api::State::Shadowed,
+                                        explain::shadowed_by_same_named_plugin(
+                                            agent_name,
+                                            &winner.id,
+                                            &winner.folder,
+                                            &plugin.name,
+                                        ),
+                                    ));
+                                }
+                            }
                             // Same-named Entries the Agent merges take part
                             // together, and none Shadows another.
                             Check::Precedence if merges(index) => match merged.as_ref() {
@@ -843,6 +884,13 @@ pub(crate) fn resolve(
                                 }
                             };
                             for &check in checks {
+                                if check == Check::Precedence && kept_by[index].is_some() {
+                                    return api::WhatIf {
+                                        state: api::State::Shadowed,
+                                        effective: None,
+                                        sentence: render(api::State::Shadowed, None),
+                                    };
+                                }
                                 // It would take part with the others that
                                 // would, or lose to the one it lies with.
                                 if check == Check::Precedence && merges(index) {
@@ -1685,7 +1733,10 @@ fn competes(
 /// the name of the Entry the Agent ranks highest among those of other
 /// locations that have its endpoint and are read, or else its endpoint; or
 /// for a remote Entry that competes by URL, its URL. The context's Project
-/// has the key `project`.
+/// has the key `project`. `unread` says whether the Agent reads an Entry,
+/// and `kept_out` whether a same-named plugin keeps its plugin out whole:
+/// such an Entry competes by none of these, and goes by its name.
+#[allow(clippy::too_many_arguments)]
 fn item_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
@@ -1693,8 +1744,10 @@ fn item_key(
     entry: &ScannedEntry,
     project: Option<&str>,
     unread: &dyn Fn(&ScannedEntry) -> bool,
+    kept_out: &dyn Fn(&ScannedEntry) -> bool,
 ) -> ItemKey {
-    if let Some(url) = url_key(definition, snapshot, entry, project, unread) {
+    let absent = |entry: &ScannedEntry| unread(entry) || kept_out(entry);
+    if let Some(url) = url_key(definition, snapshot, entry, project, &absent) {
         return ItemKey::Url(url);
     }
     let location = definition.location(&entry.location);
@@ -1711,7 +1764,9 @@ fn item_key(
     }
     // Of same-named Entries that compete by endpoint, such as a plugin's
     // servers in two of its files, the Agent keeps the one it ranks
-    // highest: they compete with the others by its endpoint.
+    // highest: they compete with the others by its endpoint. One a
+    // same-named plugin keeps out goes with the others of its name, or by
+    // its name alone.
     let same_name = in_context
         .iter()
         .filter(|other| {
@@ -1719,6 +1774,7 @@ fn item_key(
                 && other.home == entry.home
                 && other.name == entry.name
                 && competition.by_endpoint(&other.location)
+                && !kept_out(other)
         })
         .min_by_key(|other| {
             (
@@ -1726,8 +1782,10 @@ fn item_key(
                 definition.rank(definition.location(&other.location)),
             )
         })
-        .copied()
-        .unwrap_or(entry);
+        .copied();
+    let Some(same_name) = same_name else {
+        return by_name(entry);
+    };
     let Some(endpoint) = blocks::endpoint(&same_name.config) else {
         return by_name(entry);
     };
@@ -1738,7 +1796,7 @@ fn item_key(
             let other_location = definition.location(&other.location);
             other_location.kind == location.kind
                 && !competition.by_endpoint(&other_location.id)
-                && !unread(other)
+                && !absent(other)
                 && blocks::endpoint(&other.config).as_ref() == Some(&endpoint)
         })
         .min_by_key(|other| definition.rank(definition.location(&other.location)));
@@ -2017,6 +2075,23 @@ fn reaction(
             .any(|location| location.reads_around_error()),
         next_paths,
     }
+}
+
+/// The plugin that keeps the plugin `entry` is part of out whole in the
+/// context of the Project with the key `project`: the first of those it
+/// loses to that applies there and that no switch turns off. One that
+/// fails to load still keeps it out.
+fn kept_out_by<'e>(
+    definition: &AgentDefinition,
+    snapshot: &Snapshot,
+    entry: &'e ScannedEntry,
+    project: Option<&str>,
+) -> Option<&'e ScannedPlugin> {
+    let plugin = entry.plugin.as_ref()?;
+    plugin.winners.iter().find(|winner| {
+        (winner.project.is_none() || winner.project.as_deref() == project)
+            && !disable::plugin_off(definition, snapshot, entry, winner, project)
+    })
 }
 
 /// The Read failure, with what the Agent does about it, of a file of the
@@ -3064,17 +3139,18 @@ fn also_read_by(definitions: &[AgentDefinition], items: &mut [api::Item]) {
 }
 
 /// The URL `entry` competes by, when its location's remote Entries compete
-/// by URL, the Feature gate that makes them is on, and it is read.
+/// by URL, the Feature gate that makes them is on, and it is not `absent`:
+/// read, and not kept out by a same-named plugin.
 fn url_key(
     definition: &AgentDefinition,
     snapshot: &Snapshot,
     entry: &ScannedEntry,
     project: Option<&str>,
-    unread: &dyn Fn(&ScannedEntry) -> bool,
+    absent: &dyn Fn(&ScannedEntry) -> bool,
 ) -> Option<String> {
     let location = definition.location(&entry.location);
     let block = definition.rules(location.kind).competition.same_url()?;
-    if unread(entry) || !gate_on(definition, snapshot, entry, &block.gate, project) {
+    if absent(entry) || !gate_on(definition, snapshot, entry, &block.gate, project) {
         return None;
     }
     block.url_of(&location.id, &entry.config)
