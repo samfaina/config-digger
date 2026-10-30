@@ -233,7 +233,7 @@ try {
     }
   };
   const nameOnly = { listed: ["- anthropic-skills:fold-s"], read: true, runs: true };
-  const userOnly = { listed: [], read: true, runs: true };
+  const userInvocableOnly = { listed: [], read: true, runs: true };
   const off = { listed: [], read: false, runs: false };
   const on = { listed: ["- anthropic-skills:fold-s (anthropic-skills:cd-throwaway-sname): planted in the bucket"], read: true, runs: true };
   for (const [table, where, file] of [
@@ -243,20 +243,19 @@ try {
   ]) {
     for (const [key, which] of [["anthropic-skills:fold-s", "`anthropic-skills:<folder>`"], ["fold-s", "the bare `<folder>`"]]) {
       await p.check(table, `in ${where}, \`name-only\` under ${which} lists a synced skill by its name alone and \`user-invocable-only\` lists it not at all, and both leave \`/anthropic-skills:<folder>\` running it`, async () => {
-        return same({ "name-only": await overridden(file, { [key]: "name-only" }), "user-invocable-only": await overridden(file, { [key]: "user-invocable-only" }) }, { "name-only": nameOnly, "user-invocable-only": userOnly });
+        return same({ "name-only": await overridden(file, { [key]: "name-only" }), "user-invocable-only": await overridden(file, { [key]: "user-invocable-only" }) }, { "name-only": nameOnly, "user-invocable-only": userInvocableOnly });
       });
     }
-    // Each pair of disagreeing keys, the prefixed one written first, then
-    // the bare one.
+    // Each pair of disagreeing keys, in both orders.
     await p.check(table, `in ${where}, of a synced skill's two keys that disagree, \`anthropic-skills:<folder>\` decides, whichever the file holds first: \`"on"\` there keeps it read beside \`"<folder>": "off"\`, and \`"off"\` there turns it off beside \`"<folder>": "on"\``, async () => {
       return same(
         {
-          "bare off": await overridden(file, { "anthropic-skills:fold-s": "on", "fold-s": "off" }),
-          "bare off, first": await overridden(file, { "fold-s": "off", "anthropic-skills:fold-s": "on" }),
-          "prefixed off": await overridden(file, { "anthropic-skills:fold-s": "off", "fold-s": "on" }),
+          "bare off, prefixed first": await overridden(file, { "anthropic-skills:fold-s": "on", "fold-s": "off" }),
+          "bare off, bare first": await overridden(file, { "fold-s": "off", "anthropic-skills:fold-s": "on" }),
+          "prefixed off, prefixed first": await overridden(file, { "anthropic-skills:fold-s": "off", "fold-s": "on" }),
           "prefixed off, bare first": await overridden(file, { "fold-s": "on", "anthropic-skills:fold-s": "off" }),
         },
-        { "bare off": on, "bare off, first": on, "prefixed off": off, "prefixed off, bare first": off },
+        { "bare off, prefixed first": on, "bare off, bare first": on, "prefixed off, prefixed first": off, "prefixed off, bare first": off },
       );
     });
   }

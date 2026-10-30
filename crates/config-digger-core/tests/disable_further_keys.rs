@@ -3,8 +3,8 @@
 //! fake ports: a location whose `name_template` names its Entries
 //! `synced:<name>`, beside a local one, and a switch that holds each Entry
 //! by its name or by its own name before the template, as Claude Code's
-//! `skillOverrides` holds a synced skill, a partial value under either key
-//! limiting it.
+//! `skillOverrides` holds a synced skill, a partial value under its own
+//! name limiting it.
 
 use config_digger_core::api::{Action, Context, Core, Inventory, Plan, ScanOptions, Targets};
 use config_digger_core::api::{Entry, WarningClass};

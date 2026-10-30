@@ -1021,10 +1021,11 @@ sources = [
 # decides, whichever the file holds first [test]. config-digger reads both
 # keys through `also_names`, and Disable writes the first; it counts `off`
 # under either, so it shows Disabled a skill whose prefixed key holds `on`
-# (#510). Each of the three switches marks what the probe did not test.
+# (#510). Each of the three switches marks what config-digger does not
+# show yet, and what the probe did not test.
 [[items.skill.disable]]
 unverified = [
-  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, though Claude Code then reads the skill: the prefixed key decides (#510).",
   "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill.",
 ]
 block = "json-field"
@@ -1042,7 +1043,7 @@ locations = ["managed-skills", "user-skills", "project-skills", "nested-skills",
 # settings, which apply in every Project.
 [[items.skill.disable]]
 unverified = [
-  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, though Claude Code then reads the skill: the prefixed key decides (#510).",
   "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
 ]
 block = "json-field"
@@ -1058,7 +1059,7 @@ enable_offered = false
 
 [[items.skill.disable]]
 unverified = [
-  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, which Claude Code reads first (#510).",
+  "Of a synced skill's two keys, config-digger counts `off` under the bare `<folder>` beside `\"anthropic-skills:<folder>\": \"on\"`, though Claude Code then reads the skill: the prefixed key decides (#510).",
   "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
 ]
 block = "json-field"
