@@ -190,7 +190,7 @@ Three more checks, behind no mark, test the data folder switch the definition's 
 
 ### VS Code
 
-The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. A file VS Code cannot parse holds `,,` between two servers, which no JSON parser accepts, and each such launch keeps a server in two other files. A plugin's `.mcp.json` and a `.code-workspace` file were also broken with four other errors, one launch each (#437), on 1.129.1, 1.135.0, 1.141.0 and 1.143.1, which all behave alike: a missing comma, a key with no value, an object left open at the end of the file, and a string left open inside a member.
+The MCP files, tested with `vscode.mjs` (#311) on 1.141.0, the installed version, and on 1.129.1 and 1.135.0 from their zip archives, which all behave alike. A file VS Code cannot parse holds `,,` between two servers, which no JSON parser accepts, and each such launch keeps a server in two other files. Four more errors, one launch each, break a plugin's `.mcp.json` and a `.code-workspace` file (#437): a missing comma, a key with no value, an object left open at the end of the file, and a string left open inside a member. Those launches ran on 1.129.1, 1.135.0, 1.141.0 and 1.143.1, which all behave alike.
 
 | Mark | What the probe saw | Outcome |
 |---|---|---|
