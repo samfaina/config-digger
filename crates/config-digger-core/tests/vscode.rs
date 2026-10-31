@@ -1497,6 +1497,117 @@ fn a_manifest_s_mcp_servers_file_adds_its_servers_to_the_plugin_s_mcp_json() {
     }
 }
 
+/// A manifest of a plugin named `name` whose `mcpServers` names `file`,
+/// with `,,` after both, as `vscode.mjs` breaks one.
+fn broken_manifest(name: &str, file: &str) -> String {
+    format!(r#"{{ "name": "{name}", "mcpServers": "{file}",, "version": "1.0.0" }}"#)
+}
+
+/// The fixture plugin `folder` holding `manifests`, each a path and its
+/// text, each manifest's `mcpServers` file with a server named after it,
+/// and a `.mcp.json` with the server `dot`: the plugin `vscode.mjs`'s
+/// `broken-manifest` launch gives the real VS Code. Its server Entries in
+/// `inventory`, each `<name> <state> <plugin's name>`, sorted.
+fn plugin_with_manifests(folder: &str, manifests: &[(&str, &str)]) -> Vec<String> {
+    let mut files: Vec<(&str, &str)> = manifests.to_vec();
+    files.push((
+        ".mcp.json",
+        r#"{ "mcpServers": { "dot": { "command": "dot" } } }"#,
+    ));
+    files.push((
+        "root.json",
+        r#"{ "mcpServers": { "root-file": { "command": "root" } } }"#,
+    ));
+    files.push((
+        "claude.json",
+        r#"{ "mcpServers": { "claude-file": { "command": "claude" } } }"#,
+    ));
+    let inventory = inventory(&with_listed(with_home(vscode()), &[(folder, &files)]));
+    let folder = review_kit().with_file_name(folder);
+    let mut servers: Vec<String> = inventory
+        .items
+        .iter()
+        .filter(|item| item.agent == "vscode" && item.home == "default" && json(item.kind) == "mcp")
+        .flat_map(|item| item.entries.iter().map(move |entry| (item, entry)))
+        .filter(|(_, entry)| entry.path.starts_with(&folder))
+        .map(|(item, entry)| {
+            let plugin = entry.plugin.as_ref().unwrap();
+            format!("{} {} {}", item.name, code(entry.state), plugin.name)
+        })
+        .collect();
+    servers.sort();
+    servers
+}
+
+#[test]
+fn a_plugin_whose_plugin_json_does_not_parse_is_named_and_served_by_its_claude_plugin_manifest() {
+    let root = broken_manifest("root-name", "./root.json");
+    let claude = r#"{ "name": "claude-name", "mcpServers": "./claude.json" }"#;
+
+    let servers = plugin_with_manifests(
+        "rb",
+        &[
+            ("plugin.json", &root),
+            (".claude-plugin/plugin.json", claude),
+        ],
+    );
+
+    assert_eq!(
+        servers,
+        [
+            "claude-file effective claude-name",
+            "dot effective claude-name"
+        ]
+    );
+}
+
+#[test]
+fn a_claude_plugin_manifest_that_does_not_parse_is_read_around_its_error_for_the_name_and_the_servers()
+ {
+    let root = r#"{ "name": "root-name", "mcpServers": "./root.json" }"#;
+    let claude = broken_manifest("claude-name", "./claude.json");
+
+    let servers = plugin_with_manifests(
+        "cb",
+        &[
+            ("plugin.json", root),
+            (".claude-plugin/plugin.json", &claude),
+        ],
+    );
+
+    assert_eq!(
+        servers,
+        [
+            "claude-file effective claude-name",
+            "dot effective claude-name"
+        ]
+    );
+}
+
+#[test]
+fn a_plugin_manifest_that_does_not_parse_is_a_read_failure_vs_code_reads_around() {
+    let claude = broken_manifest("claude-name", "./claude.json");
+    let fs = with_listed(
+        with_home(vscode()),
+        &[(
+            "cb",
+            &[
+                (".claude-plugin/plugin.json", &claude),
+                (
+                    "claude.json",
+                    r#"{ "mcpServers": { "claude-file": { "command": "claude" } } }"#,
+                ),
+            ],
+        )],
+    );
+    let inventory = inventory(&fs);
+
+    let manifest = review_kit()
+        .with_file_name("cb")
+        .join(r".claude-plugin\plugin.json");
+    assert_eq!(reaction(&inventory, &manifest), "reads_around_error");
+}
+
 #[test]
 fn a_plugin_vs_code_installed_from_a_marketplace_is_read_where_installed_json_says() {
     // `installed.json` as VS Code 1.143.1 writes it once it installs a

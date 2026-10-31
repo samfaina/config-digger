@@ -2513,6 +2513,17 @@
           },
           "default": []
         },
+        "on_read_failure": {
+          "description": "What the Agent does with the file when it does not parse:\n`reads_around_error` takes the name from what parses on both sides\nof the error, as VS Code reads a manifest through\n`node-jsonc-parser`, the reaction of the location that reads the\nsame file. Without it, a file that does not parse names no plugin,\nand the next place is tried.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadFailureReaction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }

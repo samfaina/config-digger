@@ -90,6 +90,8 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 The default data also holds Cursor as the fake backend sees it, with `appdata` as `%APPDATA%` and `claude-code-home` as the user's folder: Cursor has run, and its local plugin `cd-throwaway-kit` has a `.cursor-plugin\plugin.json` that does not parse and a `.claude-plugin\plugin.json` that declares `cd-throwaway-next`, which Cursor reads instead. Step 27.1 starts the app with `APPDATA` and `USERPROFILE` set to those folders; no other step sets either to them, so no other step sees this Cursor in the real app. The fake backend's fixtures hold it in every Inventory they record.
 
+The same folders hold VS Code: it has run, and its agent plugin `cd-throwaway-vsplugin`, listed in `claude-code-home\.vscode\agent-plugins\installed.json`, has a `.claude-plugin\plugin.json` with `,,` after its `mcpServers`, which VS Code takes for the manifest over the root's `plugin.json` and reads around the error: the server of the file it names, `cd-throwaway-vsplugin-server`, starts, and the root's, `cd-throwaway-vsplugin-root`, does not. Step 31.1 starts the app as step 27.1 does. VS Code also reads the Project's `.mcp.json`, so in the fake backend's Inventories its `cd-throwaway-project` sits beside Claude Code's.
+
 `-Symlink` needs Developer Mode or admin rights, as creating a symlink does on Windows, so the default data has no symlink. A step whose `setup` adds a switch to `-Reset`, such as step 11.12, gets it from the WebDriver walk too.
 
 The script refuses any `-Root` not named `cd-throwaway`, so `-Reset` can never delete another folder. It refuses an existing folder without `-Reset`. `cargo test -p xtask --test uat_data` checks both, on Windows.

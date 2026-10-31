@@ -9,7 +9,7 @@
 //   node uat/agents/vscode.mjs [--bin <Code.exe>] [--cli <config-digger.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
-// `manifests`, `install`, `files`,
+// `manifests`, `broken-manifest`, `install`, `files`,
 // `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
 // `experiments`, `trust`, `nonce`, `enablement`, `skills`, `extensions`,
 // `profiles` and `policy`.
@@ -490,6 +490,65 @@ if (runs("manifests")) {
   );
   await p.check("locations[plugin-manifest-mcp]", "of a server the plugin's `.mcp.json` and the file its manifest names both name, the `.mcp.json`'s starts, and the named file's does not", async () =>
     same(of("clash"), ["clash-dot"]),
+  );
+}
+
+// ---------------------------------------------------------------- a manifest that does not parse
+
+// Plugins whose first manifest does not parse: `,,` after its `name` and
+// its `mcpServers`, which no JSON parser accepts. Each plugin is a repo of
+// its own, with no `marketplace.json`, so that VS Code names it from its
+// manifests rather than from a marketplace's list: `root-broken` has a
+// broken `plugin.json` and a `.claude-plugin\plugin.json` of another name,
+// as #479 asks; `claude-broken` the other way round, `.claude-plugin`
+// being the place VS Code looks first. Each manifest names a file of its
+// own in `mcpServers`, and each plugin has a `.mcp.json` and a skill,
+// which VS Code lists as `<plugin's name>:<skill>`. `listed` sits in a
+// marketplace that lists it under a name its manifest does not give.
+// `tests/vscode.rs` reads the same two plugins.
+if (runs("broken-manifest")) {
+  const dir = fresh("broken-manifest", base);
+  const { plugins } = folders(dir);
+  const repo = (tag) => path.join(plugins, "cd-throwaway.invalid", "cd-throwaway", tag);
+  const brokenManifest = (name, file) => `{ "name": "${name}", "mcpServers": "${file}",, "version": "1.0.0" }`;
+  const lay = (tag, files) => {
+    for (const [file, content] of Object.entries({ ...files, ".mcp.json": dotMcp(`${tag}-dot`) })) write(path.join(repo(tag), file), content);
+    skill(path.join(repo(tag), "skills", "cd-throwaway-sk"), ["description: probe"]);
+  };
+  lay("rb", {
+    "plugin.json": brokenManifest("cd-throwaway-rb-root", "./root.json"),
+    ".claude-plugin/plugin.json": manifest("rb-claude", { mcpServers: "./claude.json" }),
+    "root.json": dotMcp("rb-root"),
+    "claude.json": dotMcp("rb-claude"),
+  });
+  lay("cb", {
+    "plugin.json": manifest("cb-root", { mcpServers: "./root.json" }),
+    ".claude-plugin/plugin.json": brokenManifest("cd-throwaway-cb-claude", "./claude.json"),
+    "root.json": dotMcp("cb-root"),
+    "claude.json": dotMcp("cb-claude"),
+  });
+  const listed = marketplace(plugins, [["listed", { "plugin.json": manifest("listed-manifest"), ".mcp.json": dotMcp("listed-dot") }]]).listed;
+  skill(path.join(listed, "skills", "cd-throwaway-sk"), ["description: probe"]);
+  // Each item names the plugin as VS Code's install writes it, by the name
+  // it read in the plugin's manifests: 1.129.1 loads a plugin only when the
+  // name it reads matches its item's [binary].
+  const installed = json(path.join(plugins, "installed.json"));
+  for (const tag of ["rb", "cb"]) installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: `https://cd-throwaway.invalid/cd-throwaway/${tag}.git`, name: `cd-throwaway-${tag}-claude` });
+  write(path.join(plugins, "installed.json"), installed);
+  const seen = await launch(dir, fresh("proj", dir));
+  // The name VS Code gives each plugin, from the command of its skill:
+  // `chat.getSkills` lists one skill of a name only.
+  const names = (seen.done.commands ?? []).map((s) => s.name).filter((n) => n.endsWith(":cd-throwaway-sk")).map((n) => n.slice(0, -":cd-throwaway-sk".length));
+  const plugin = (tag) => ({ names: names.filter((n) => n.startsWith(`cd-throwaway-${tag}`)), servers: seen.tags.filter((t) => t.startsWith(`${tag}-`)) });
+
+  await p.check("plugins[agent-plugins]", "of a plugin whose `plugin.json` does not parse and whose `.claude-plugin\\plugin.json` names it otherwise, VS Code takes `.claude-plugin\\plugin.json` for its manifest: its name, and its `mcpServers` file beside the `.mcp.json`, not the root's file", async () =>
+    same(plugin("rb"), { names: ["cd-throwaway-rb-claude"], servers: ["rb-claude", "rb-dot"] }),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "VS Code reads a `.claude-plugin\\plugin.json` that does not parse around its error, over a `plugin.json` that parses: the plugin's name and the file its `mcpServers` names come from the broken manifest, beside the `.mcp.json`", async () =>
+    same(plugin("cb"), { names: ["cd-throwaway-cb-claude"], servers: ["cb-claude", "cb-dot"] }),
+  );
+  await p.check("plugins[agent-plugins]", "VS Code names a plugin a marketplace lists by the name in that list, not by its manifest's `name`", async () =>
+    same(plugin("listed").names, ["cd-throwaway-listed"]),
   );
 }
 
