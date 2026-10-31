@@ -70,12 +70,12 @@ fn anchor<'d>(definition: &'d mut Value, id: &str) -> &'d mut Value {
 }
 
 #[test]
-fn the_schema_accepts_the_main_checkout_standing_in_for_a_linked_worktree() {
+fn the_schema_accepts_a_main_checkout_fallback_for_a_linked_worktree() {
     let mut definition = claude_code();
 
     assert_eq!(
         anchor(&mut definition, "project-skills")["linked_worktree"],
-        "main-checkout-stands-in"
+        "main-checkout-fallback"
     );
     assert_eq!(errors(&definition), Vec::<String>::new());
 }

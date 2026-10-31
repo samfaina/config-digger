@@ -39,6 +39,8 @@ fn repo() -> FakeFileSystem {
     with_skill(fs, MAIN, "main-only")
 }
 
+/// The inventory of a Claude Code home with no MCP server, in the Project
+/// `project`.
 fn inventory_at(fs: &FakeFileSystem, project: &str) -> Inventory {
     let env = FakeEnvironment::with_home(HOME);
     let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
@@ -63,6 +65,7 @@ fn names(inventory: &Inventory) -> Vec<&str> {
     names
 }
 
+/// The skill Items.
 fn skills(inventory: &Inventory) -> impl Iterator<Item = &Item> {
     inventory
         .items
@@ -70,6 +73,7 @@ fn skills(inventory: &Inventory) -> impl Iterator<Item = &Item> {
         .filter(|item| serde_json::to_value(item.kind).unwrap() == "skill")
 }
 
+/// The skill Item `name`.
 fn skill<'i>(inventory: &'i Inventory, name: &str) -> &'i Item {
     skills(inventory)
         .find(|item| item.name == name)
@@ -86,7 +90,7 @@ fn entries(inventory: &Inventory, name: &str) -> Vec<Value> {
 }
 
 #[test]
-fn the_main_checkout_s_skills_stand_in_when_the_worktree_root_has_no_skills_folder() {
+fn the_main_checkout_s_skills_are_read_when_the_worktree_root_has_no_skills_folder() {
     let inventory = inventory_at(&repo(), WORKTREE);
 
     assert_eq!(names(&inventory), ["main-only"]);
@@ -121,7 +125,31 @@ fn an_empty_skills_folder_at_the_worktree_root_keeps_the_main_checkout_s_out() {
 }
 
 #[test]
-fn a_claude_folder_without_skills_at_the_worktree_root_lets_the_main_checkout_s_stand_in() {
+fn a_skills_file_at_the_worktree_root_keeps_the_main_checkout_s_out() {
+    let fs = repo().with_file(
+        Path::new(WORKTREE).join(r".claude\skills"),
+        "not a folder\n",
+    );
+
+    let inventory = inventory_at(&fs, WORKTREE);
+
+    assert!(names(&inventory).is_empty(), "{:?}", names(&inventory));
+}
+
+#[test]
+fn a_junction_to_a_missing_folder_at_the_worktree_root_lets_the_main_checkout_s_in() {
+    let fs = repo().with_link(
+        Path::new(WORKTREE).join(r".claude\skills"),
+        r"E:\outer\gone",
+    );
+
+    let inventory = inventory_at(&fs, WORKTREE);
+
+    assert_eq!(names(&inventory), ["main-only"]);
+}
+
+#[test]
+fn a_claude_folder_without_skills_at_the_worktree_root_lets_the_main_checkout_s_in() {
     let fs = repo().with_folder(Path::new(WORKTREE).join(".claude"));
 
     let inventory = inventory_at(&fs, WORKTREE);
@@ -161,7 +189,7 @@ fn a_skills_folder_between_the_project_and_the_worktree_root_adds_to_the_main_ch
 }
 
 #[test]
-fn only_the_main_checkout_root_s_skills_stand_in_not_those_of_the_matching_folder_below_it() {
+fn only_the_main_checkout_root_s_skills_are_read_not_those_of_the_matching_folder_below_it() {
     let fs = with_skill(repo(), r"E:\outer\main\sub", "main-sub").with_folder(r"E:\outer\wt\sub");
 
     let inventory = inventory_at(&fs, r"E:\outer\wt\sub");
@@ -176,6 +204,25 @@ fn the_walk_stops_at_the_worktree_root() {
     let inventory = inventory_at(&fs, WORKTREE);
 
     assert_eq!(names(&inventory), ["main-only"]);
+}
+
+#[test]
+fn a_worktree_inside_the_main_checkout_without_skills_reads_the_main_checkout_s() {
+    let inside = r"E:\outer\main\.claude\worktrees\x";
+    let fs = repo()
+        .with_folder(Path::new(MAIN).join(r".git\worktrees\x"))
+        .with_file(
+            Path::new(inside).join(".git"),
+            "gitdir: E:/outer/main/.git/worktrees/x\n",
+        );
+
+    let inventory = inventory_at(&fs, inside);
+
+    assert_eq!(names(&inventory), ["main-only"]);
+    assert_eq!(
+        entries(&inventory, "main-only")[0]["path"],
+        r"E:\outer\main\.claude\skills\main-only"
+    );
 }
 
 #[test]
@@ -218,4 +265,63 @@ fn the_main_checkout_s_mcp_json_is_not_read_in_a_worktree_outside_it() {
         .map(|item| item.name.as_str())
         .collect();
     assert!(servers.is_empty(), "{servers:?}");
+}
+
+/// A Claude Code home with no MCP server, and a linked worktree at
+/// `E:\outer\wt` whose `.git` file names `gitdir`, its common git folder
+/// holding `worktrees\wt`, with a skill `in-common` in that folder's
+/// `.claude\skills` and one `beside-common` in its parent's.
+fn worktree_of(common: &str) -> FakeFileSystem {
+    let fs = FakeFileSystem::new()
+        .with_file(Path::new(HOME).join(".claude.json"), "{}")
+        .with_folder(Path::new(common).join(r"worktrees\wt"))
+        .with_file(
+            Path::new(WORKTREE).join(".git"),
+            format!("gitdir: {common}/worktrees/wt\n"),
+        );
+    let fs = with_skill(fs, common, "in-common");
+    with_skill(
+        fs,
+        Path::new(common).parent().unwrap().to_str().unwrap(),
+        "beside-common",
+    )
+}
+
+#[test]
+fn a_worktree_of_a_bare_repo_reads_the_bare_repo_s_folder() {
+    let inventory = inventory_at(&worktree_of(r"E:\outer\x.git"), WORKTREE);
+
+    assert_eq!(names(&inventory), ["in-common"]);
+    assert_eq!(
+        entries(&inventory, "in-common")[0]["path"],
+        r"E:\outer\x.git\.claude\skills\in-common"
+    );
+}
+
+#[test]
+fn a_worktree_of_a_separate_git_folder_reads_that_folder_not_the_main_checkout() {
+    let fs = with_skill(
+        worktree_of(r"E:\gitdirs\main"),
+        r"E:\outer\main",
+        "main-only",
+    )
+    .with_file(Path::new(MAIN).join(".git"), "gitdir: E:/gitdirs/main\n");
+
+    let inventory = inventory_at(&fs, WORKTREE);
+
+    assert_eq!(names(&inventory), ["in-common"]);
+}
+
+#[test]
+fn a_worktree_of_a_submodule_reads_the_submodule_s_git_folder_not_its_checkout() {
+    let fs = with_skill(
+        worktree_of(r"E:\super\.git\modules\sub"),
+        r"E:\super\sub",
+        "sub-checkout",
+    )
+    .with_file(r"E:\super\sub\.git", "gitdir: ../.git/modules/sub\n");
+
+    let inventory = inventory_at(&fs, WORKTREE);
+
+    assert_eq!(names(&inventory), ["in-common"]);
 }

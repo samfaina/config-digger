@@ -789,9 +789,14 @@ pub(crate) enum LinkedWorktree {
     #[default]
     Own,
     /// The worktree's own folders, up to its root, and when its root does
-    /// not hold the path, as a file or a folder, the path in the root of
-    /// the main checkout too, ranked below every folder of the walk.
-    MainCheckoutStandsIn,
+    /// not hold the path, as a file, a folder or a link that leads
+    /// somewhere, the path in the root of the main checkout too, ranked
+    /// below every folder of the walk. The main checkout is `<main>` of
+    /// the `<main>\.git\worktrees\<name>` the worktree's `.git` file
+    /// names; when the folder holding `worktrees` has another name, as for
+    /// a bare repo, a `--separate-git-dir` checkout or a submodule, it is
+    /// that folder itself.
+    MainCheckoutFallback,
 }
 
 impl Anchored for ProjectAnchor {
@@ -1129,11 +1134,16 @@ impl Anchor {
         }
     }
 
-    /// What its walk up to the repo root reads in a linked worktree.
-    pub fn linked_worktree(&self) -> LinkedWorktree {
+    /// The path its walk up to the repo root also reads in the root of a
+    /// linked worktree's main checkout, when the worktree's root lacks it.
+    pub fn main_checkout_fallback(&self) -> Option<&str> {
         match self {
-            Anchor::Project(block) => block.linked_worktree,
-            _ => LinkedWorktree::Own,
+            Anchor::Project(ProjectAnchor {
+                path,
+                linked_worktree: LinkedWorktree::MainCheckoutFallback,
+                ..
+            }) => Some(path),
+            _ => None,
         }
     }
 

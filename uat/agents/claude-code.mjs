@@ -686,10 +686,10 @@ function verbatimSkill(dir, folder) {
   const bare = await worktree(path.join(outer, "wt-bare"));
   fs.mkdirSync(path.join(bare, "sub"), { recursive: true });
   const atRoot = await listed(bare);
-  await p.check("locations[project-skills]", "in a worktree whose root has no `.claude/skills`, the main checkout root's skills stand in, and the walk stops at the worktree root", async () => {
+  await p.check("locations[project-skills]", "in a worktree whose root has no `.claude/skills`, the main checkout root's skills are read, and the walk stops at the worktree root", async () => {
     return same(atRoot.skills, ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"]);
   });
-  await p.check("locations[project-skills]", "below such a worktree's root, only the main checkout root's skills stand in, not those of the matching folder below it", async () => {
+  await p.check("locations[project-skills]", "below such a worktree's root, only the main checkout root's skills are read, not those of the matching folder below it", async () => {
     return same((await listed(path.join(bare, "sub"))).skills, ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"]);
   });
   await p.check("locations[project-mcp]", "in a worktree outside the main checkout, the main checkout's `.mcp.json` is not read", async () => {
@@ -704,11 +704,22 @@ function verbatimSkill(dir, folder) {
 
   const empty = await worktree(path.join(outer, "wt-empty"));
   fs.mkdirSync(path.join(empty, ".claude", "skills"), { recursive: true });
+  const file = await worktree(path.join(outer, "wt-file"));
+  write(path.join(file, ".claude", "skills"), "not a folder\n");
   const dotClaude = await worktree(path.join(outer, "wt-dot-claude"));
   fs.mkdirSync(path.join(dotClaude, ".claude"), { recursive: true });
-  await p.check("locations[project-skills]", "an empty `.claude/skills` at the worktree root keeps the main checkout's out, and a `.claude` without `skills` does not", async () => {
-    const lengths = { empty: (await listed(empty)).skills.length, dotClaude: (await listed(dotClaude)).skills.length };
-    return same(lengths, { empty: 0, dotClaude: 2 });
+  // A junction to a folder the probe deletes once it is made.
+  const dangling = await worktree(path.join(outer, "wt-dangling"));
+  const gone = path.join(dir, "gone");
+  fs.mkdirSync(gone, { recursive: true });
+  fs.mkdirSync(path.join(dangling, ".claude"), { recursive: true });
+  fs.symlinkSync(gone, path.join(dangling, ".claude", "skills"), "junction");
+  fs.rmSync(gone, { recursive: true });
+  await p.check("locations[project-skills]", "an empty `.claude/skills` folder or a `.claude/skills` file at the worktree root keeps the main checkout's skills out, and a `.claude` without `skills` or a junction to a missing folder does not", async () => {
+    const main = ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"];
+    const skills = {};
+    for (const [label, folder] of Object.entries({ empty, file, dotClaude, dangling })) skills[label] = (await listed(folder)).skills;
+    return same(skills, { empty: [], file: [], dotClaude: main, dangling: main });
   });
 
   const between = await worktree(path.join(outer, "wt-between"));
@@ -723,11 +734,57 @@ function verbatimSkill(dir, folder) {
   const insideOwn = await worktree(path.join(main, ".claude", "worktrees", "cd-throwaway-inside-own"));
   skill(path.join(insideOwn, ".claude", "skills", "cd-throwaway-inside-own"), ["description: inside own"]);
   const [inMain, inMainOwn] = [await listed(inside), await listed(insideOwn)];
-  await p.check("locations[project-skills]", "a worktree inside the main checkout reads as one outside it: the main checkout's skills stand in only when its root has none", async () => {
+  await p.check("locations[project-skills]", "a worktree inside the main checkout reads as one outside it: the main checkout's skills are read only when its root has none", async () => {
     return same({ inside: inMain.skills, insideOwn: inMainOwn.skills }, { inside: ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"], insideOwn: ["- cd-throwaway-inside-own: inside own"] });
   });
   await p.check("locations[project-mcp]", "in a worktree inside the main checkout, the walk of `.mcp.json` reaches the main checkout's", async () => {
     return same({ inside: inMain.servers, insideOwn: inMainOwn.servers }, { inside: ["cd-throwaway-main"], insideOwn: ["cd-throwaway-main"] });
+  });
+
+  // Worktrees whose `.git` file names a `worktrees` folder in a folder not
+  // named `.git`: of a bare repo, of a `--separate-git-dir` checkout, and of
+  // a submodule. Each has a skill in that folder, and one in the checkout or
+  // folder beside it.
+  const commit = async (folder) => {
+    write(path.join(folder, "README"), "throwaway\n");
+    await git(folder, "add", "README");
+    await git(folder, "commit", "-q", "-m", "throwaway");
+  };
+  const seed = path.join(dir, "seed");
+  await gitInit(seed);
+  await commit(seed);
+  const bareRepo = path.join(dir, "bare", "x.git");
+  await git(dir, "clone", "-q", "--bare", seed, bareRepo);
+  skill(path.join(bareRepo, ".claude", "skills", "cd-throwaway-common"), ["description: bare repo"]);
+  skill(path.join(dir, "bare", ".claude", "skills", "cd-throwaway-beside"), ["description: beside the bare repo"]);
+  const bareWorktree = path.join(dir, "bare", "wt");
+  await git(bareRepo, "worktree", "add", "-q", bareWorktree);
+
+  const gitDirs = path.join(dir, "gitdirs");
+  fs.mkdirSync(gitDirs, { recursive: true });
+  fs.mkdirSync(path.join(dir, "separate"), { recursive: true });
+  await git(path.join(dir, "separate"), "init", "-q", "--separate-git-dir", path.join(gitDirs, "main"), "main");
+  const separateMain = path.join(dir, "separate", "main");
+  await commit(separateMain);
+  skill(path.join(gitDirs, "main", ".claude", "skills", "cd-throwaway-common"), ["description: separate git folder"]);
+  skill(path.join(separateMain, ".claude", "skills", "cd-throwaway-beside"), ["description: separate checkout"]);
+  const separateWorktree = path.join(dir, "separate", "wt");
+  await git(separateMain, "worktree", "add", "-q", separateWorktree);
+
+  const superRepo = path.join(dir, "super");
+  await gitInit(superRepo);
+  await commit(superRepo);
+  await git(superRepo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", seed, "sub");
+  const sub = path.join(superRepo, "sub");
+  skill(path.join(superRepo, ".git", "modules", "sub", ".claude", "skills", "cd-throwaway-common"), ["description: submodule git folder"]);
+  skill(path.join(sub, ".claude", "skills", "cd-throwaway-beside"), ["description: submodule checkout"]);
+  const subWorktree = path.join(dir, "sub-wt");
+  await git(sub, "worktree", "add", "-q", subWorktree);
+
+  await p.check("locations[project-skills]", "in a worktree of a bare repo, a `--separate-git-dir` checkout or a submodule, the skills of the folder holding `worktrees` are read, not those of the checkout or folder beside it", async () => {
+    const skills = {};
+    for (const [label, folder] of Object.entries({ bare: bareWorktree, separate: separateWorktree, submodule: subWorktree })) skills[label] = (await listed(folder)).skills;
+    return same(skills, { bare: ["- cd-throwaway-common: bare repo"], separate: ["- cd-throwaway-common: separate git folder"], submodule: ["- cd-throwaway-common: submodule git folder"] });
   });
 }
 

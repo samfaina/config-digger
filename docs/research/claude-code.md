@@ -115,18 +115,19 @@ More observations [disk]:
 
 ### Project skills in a linked worktree
 
-Facts from the [skills](https://code.claude.com/docs/en/skills) and [worktrees](https://code.claude.com/docs/en/worktrees) docs pages as of 2026-10-29, and `uat/agents/claude-code.mjs` on a throwaway main checkout and its `git worktree add` worktrees with the local model stand-in, on 2.1.316 (#474).
+Facts from the [skills](https://code.claude.com/docs/en/skills) and [worktrees](https://code.claude.com/docs/en/worktrees) docs pages as of 2026-10-29, and `uat/agents/claude-code.mjs` on a throwaway main checkout and its `git worktree add` worktrees with the local model stand-in, on 2.1.299 to 2.1.309, 2.1.312, 2.1.314 and 2.1.316 (#474).
 
 - In a session in a linked worktree, made with `--worktree` or `git worktree add`, Claude Code searches parent folders for `.claude\skills` only up to the worktree root. A skill in a folder above the worktree is not read, nor is one in the main checkout's folders when the worktree is inside it (`--worktree`'s default, `.claude\worktrees\<name>`) [docs, test].
 - From v2.1.277, when the worktree root has no `.claude\skills`, for example because `.claude\skills` is gitignored, it loads the main checkout's project skills instead. In a worktree whose root has its own `.claude\skills`, only that copy loads [docs, test].
-- An empty `.claude\skills` folder at the worktree root keeps the main checkout's skills out; a `.claude` folder without `skills` does not [test].
+- An empty `.claude\skills` folder at the worktree root keeps the main checkout's skills out, and so does a `.claude\skills` file; a `.claude` folder without `skills`, or a junction at `.claude\skills` to a missing folder, does not [test].
+- The main checkout is `<main>` of the `<main>\.git\worktrees\<name>` the worktree's `.git` file names. When the folder holding `worktrees` is not named `.git`, Claude Code reads `.claude\skills` in that folder itself: `<repo>.git\.claude\skills` for a worktree of a bare repo, the git folder of a `--separate-git-dir` checkout, `.git\modules\<name>` for a worktree of a submodule; never the checkout of either of the last two, nor the bare repo's parent folder [test].
 - The main checkout's project skills are those of its root's `.claude\skills` only: with the Project in `<worktree>\sub`, `<main>\sub\.claude\skills` is not read [test].
 - They add to the skills of a `.claude\skills` between the Project and the worktree root, and lose a shared name to them, as a folder farther up loses to a nearer one [test].
 - A worktree inside the main checkout reads the same way as one outside it [test].
 - The same read-through covers `.claude\agents` and `.claude\commands`, which config-digger does not read [docs].
 - For a CLI session, the docs do not say that `.mcp.json`, settings or `CLAUDE.md` come from the main checkout, and in a worktree outside the main checkout the main checkout's `.mcp.json` is not read [test]. In one inside it, the walk of `.mcp.json` up to below the drive's root reaches it anyway [test]. For a worktree session started from the desktop app, the docs say Claude Code reads settings, hooks, skills, agents, commands and `.mcp.json` from the main checkout's root, while `CLAUDE.md` and `.claude\rules` still load from the worktree [docs]. config-digger does not read those sessions apart.
 
-config-digger reads this through `linked_worktree = "main-checkout-stands-in"` on the `project-skills` anchor: the main checkout root's `.claude\skills` is read as one more folder of the walk, below the worktree root, when the worktree root does not hold `.claude\skills`. Its skills are `project` Entries of the worktree's Project, at their real path in the main checkout.
+config-digger reads this through `linked_worktree = "main-checkout-fallback"` on the `project-skills` anchor: the main checkout root's `.claude\skills` is read as one more folder of the walk, below the worktree root, when the worktree root does not hold `.claude\skills`. Its skills are `project` Entries of the worktree's Project, at their real path in the main checkout.
 
 ### Nested skills
 

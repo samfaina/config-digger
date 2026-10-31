@@ -4043,10 +4043,10 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
-    fn only_a_walk_up_to_the_repo_root_lets_a_main_checkout_stand_in_for_a_linked_worktree() {
+    fn only_a_walk_up_to_the_repo_root_falls_back_to_a_linked_worktree_s_main_checkout() {
         let anchor = |walk: &str| {
             format!(
-                r#"{{ block = "project", path = ".test/skills", walk = {walk}, linked_worktree = "main-checkout-stands-in" }}"#
+                r#"{{ block = "project", path = ".test/skills", walk = {walk}, linked_worktree = "main-checkout-fallback" }}"#
             )
         };
         let up = with_skills(&anchor(r#""up-to-repo-root""#), SKILL_FORMAT, CHECKS);
