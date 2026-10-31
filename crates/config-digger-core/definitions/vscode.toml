@@ -621,7 +621,13 @@ sources = [
 # the workspace's store decides over the profile's, `true` included, and a
 # server without one is on [docs]. Disable writes `false` to the workspace's
 # store in a Project, and to the profile's otherwise; Enable takes the pair
-# out of both, as VS Code's own Enable does [docs].
+# out of both, as VS Code's own Enable does [docs]. An agent plugin's server,
+# of its `.mcp.json` or of the file its manifest's `mcpServers` names, is
+# held by `plugin.<plugin URI>.<name>`, the `file:` URI of the plugin's
+# folder and the server's name, and turns off alone [test]: Disable writes
+# that pair, so `plugin_entries` is on. Whether VS Code holds a plugin's
+# skill in `chat.disabledPromptFiles.skill` has not been tested, and
+# Disable is not offered for one.
 [[items.mcp.disable]]
 block = "json-item-list"
 switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }
@@ -632,6 +638,7 @@ disabled_item = ["{name}", false]
 enabled_item = ["{name}", true]
 reason = "disabled_natively"
 layered = true
+plugin_entries = true
 
 [[items.mcp.disable]]
 block = "json-item-list"
@@ -643,6 +650,7 @@ disabled_item = ["{name}", false]
 enabled_item = ["{name}", true]
 reason = "disabled_natively"
 layered = true
+plugin_entries = true
 
 # Skills are folders holding a `SKILL.md`, read one level down [docs], each
 # named by its folder [docs]. VS Code loads a `SKILL.md` with no

@@ -16,8 +16,8 @@ use crate::definitions::blocks::{
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
     ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
-    LocationDefinition, NameParts, PLUGIN_NAME, PROJECT_KEY, PluginNames, PluginsDefinition,
-    ReadFailureReaction, References, Replaces,
+    LocationDefinition, NameParts, PLUGIN_NAME, PLUGIN_URI, PROJECT_KEY, PluginNames,
+    PluginsDefinition, ReadFailureReaction, References, Replaces,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
 use crate::installations::{self, ScannedInstallation};
@@ -3522,7 +3522,7 @@ fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
         .replace(FOLDER_INDEX, &(entry.depth / MEMBER_RANKS).to_string())
         .replace("{uri_path}", &paths::uri_path(&entry.path))
         .replace("{skill_file}", &skill_file(entry).display().to_string())
-        .replace("{plugin_uri}", &plugin_uri)
+        .replace(PLUGIN_URI, &plugin_uri)
         .replace("{extension}", &extension)
 }
 

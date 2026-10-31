@@ -531,7 +531,10 @@ pub(crate) fn choose(
     if let Some(block) = merged_field {
         return through_merged_field(definition, snapshot, entry, project, block);
     }
-    // An Entry of a plugin is Disabled through the plugin's own switch only.
+    // An Entry of a plugin is Disabled through the plugin's own switch, or
+    // through a switch per Entry the definition says holds plugin Entries
+    // by an id that names their plugin. A switch keyed by plugin never
+    // holds an Entry of no plugin.
     let in_plugin = entry.plugin.is_some();
     let mechanisms = &definition.rules(location.kind).disable;
     let mut switched: Vec<(usize, Switched)> = mechanisms
@@ -549,7 +552,11 @@ pub(crate) fn choose(
                     project.map(|project| project.key),
                 )
                 && mechanism.disable_offered()
-                && mechanism.switch().plugins() == in_plugin
+                && if in_plugin {
+                    mechanism.switch().plugins() || mechanism.holds_plugin_entries()
+                } else {
+                    !mechanism.switch().plugins()
+                }
         })
         .collect();
     switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));

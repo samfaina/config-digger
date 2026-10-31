@@ -1149,6 +1149,9 @@ pub(crate) const ENTRY_NAME: &str = "{name}";
 pub(crate) const FOLDER_INDEX: &str = "{folder_index}";
 /// The `name_template` segment that stands for the name of the Entry's folder.
 pub(crate) const FOLDER_NAME: &str = "{folder}";
+/// The `switch_id` segment that stands for the `file:` URI of the folder
+/// of the Entry's plugin.
+pub(crate) const PLUGIN_URI: &str = "{plugin_uri}";
 
 /// What a `name_template` names an Entry by besides its own name.
 #[derive(Default)]
@@ -2582,13 +2585,13 @@ impl AgentDefinition {
                 };
                 self.validate_home_root(&mechanism.switch().anchor)
                     .map_err(context)?;
+                let covered: Vec<&str> = match mechanism.locations() {
+                    [] => declared.iter().copied().collect(),
+                    listed => listed.iter().map(String::as_str).collect(),
+                };
                 for name in mechanism.when().iter().filter_map(Condition::gate) {
                     let Some(gate) = self.feature_gate(name) else {
                         return Err(context(format!("undeclared feature gate `{name}`")));
-                    };
-                    let covered: Vec<&str> = match mechanism.locations() {
-                        [] => declared.iter().copied().collect(),
-                        listed => listed.iter().map(String::as_str).collect(),
                     };
                     if let Some(id) = covered
                         .iter()
@@ -2598,6 +2601,21 @@ impl AgentDefinition {
                             "feature gate `{name}` does not list `{id}` in `affects`"
                         )));
                     }
+                }
+                let names_no_plugin = |id: &&&str| {
+                    let location = self.location(id);
+                    location.anchor.plugin().is_some()
+                        && !location
+                            .switch_id
+                            .as_ref()
+                            .is_some_and(|switch_id| switch_id.contains(PLUGIN_URI))
+                };
+                if mechanism.holds_plugin_entries()
+                    && let Some(id) = covered.iter().find(names_no_plugin)
+                {
+                    return Err(context(format!(
+                        "plugin_entries needs each location in plugins it covers to have a `switch_id` naming its plugin with `{PLUGIN_URI}`, not `{id}`"
+                    )));
                 }
                 if mechanism.switch().plugins() {
                     if mechanism.locations().is_empty() {
@@ -5094,6 +5112,51 @@ reason = "plugin_disabled"
 locations = {locations}
 "#
         )
+    }
+
+    /// `with_plugins` whose `plugin-mcp` has the `switch_id` `id`, and
+    /// whose servers are Disabled through an item list holding plugin
+    /// Entries, whose key path holds `keys` after its first key.
+    fn with_plugin_entries(id: &str, keys: &str) -> String {
+        let template = "name_template = \"plugin:{plugin}:{name}\"\n";
+        let text = with_plugins(&format!(
+            r#"
+[[items.mcp.disable]]
+block = "json-item-list"
+switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["enablement", {keys}], named_by = "0", store_class = "plain" }}
+target = "entry"
+context = "all"
+enable_action = "remove-item"
+disabled_item = ["{{name}}", false]
+reason = "disabled_natively"
+plugin_entries = true
+"#
+        ));
+        assert!(text.contains(template), "`plugin-mcp` has no `{template}`");
+        text.replace(template, &format!("{template}switch_id = \"{id}\"\n"))
+    }
+
+    #[test]
+    fn a_switch_holds_plugin_entries_only_by_an_id_that_names_their_plugin() {
+        let text = with_plugin_entries("plugin.{plugin_uri}.{name}", r#""{name}""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        let text = with_plugin_entries("{name}", r#""{name}""#);
+        assert!(
+            error(&text).contains("`switch_id` naming its plugin"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_switch_keyed_by_plugin_does_not_hold_plugin_entries_by_id() {
+        let text = with_plugin_entries("plugin.{plugin_uri}.{name}", r#""{plugin_id}", "{name}""#);
+        assert!(
+            error(&text).contains("takes no plugin_entries"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

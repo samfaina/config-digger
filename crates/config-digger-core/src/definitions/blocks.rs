@@ -5492,6 +5492,14 @@ pub(crate) trait Disables {
         false
     }
 
+    /// Whether its switch, one per Entry, holds an Entry of a plugin too,
+    /// by the id its location's `switch_id` makes, which names its plugin.
+    /// Otherwise an Entry of a plugin is Disabled through a switch keyed
+    /// by plugin only.
+    fn holds_plugin_entries(&self) -> bool {
+        false
+    }
+
     /// Whether the Agent compares the ids of a list named by a field
     /// without regard to case.
     fn ignores_case(&self) -> bool {
@@ -5660,6 +5668,10 @@ impl Disables for Switched<'_> {
 
     fn disable_offered(&self) -> bool {
         self.block().disable_offered()
+    }
+
+    fn holds_plugin_entries(&self) -> bool {
+        self.block().holds_plugin_entries()
     }
 
     fn enable_lifts_partial(&self) -> bool {
@@ -6273,6 +6285,13 @@ pub(crate) struct JsonItemList {
     /// definition's order, the first whose list holds the Entry decides.
     #[serde(default)]
     pub layered: bool,
+    /// Whether the Agent holds an Entry of a plugin in the list too, by
+    /// the id its location's `switch_id` makes, which names its plugin
+    /// with `{plugin_uri}`, such as VS Code's `plugin.<plugin URI>.<name>`
+    /// in `mcp.enablement`. Omitted, an Entry of a plugin is Disabled
+    /// through a switch keyed by plugin only.
+    #[serde(default)]
+    pub plugin_entries: bool,
     /// The ids of the locations whose Entries it Disables. Omitted, it
     /// Disables Entries of every location of the Item kind.
     #[serde(default)]
@@ -6313,6 +6332,11 @@ impl Validate for JsonItemList {
         }
         if self.target != MechanismTarget::Entry {
             return Err("an item list's target must be `entry`".into());
+        }
+        if self.plugin_entries && self.switch.plugins() {
+            return Err(format!(
+                "an item list keyed by `{PLUGIN_KEY}` holds a plugin's Entries by plugin and takes no plugin_entries"
+            ));
         }
         match (self.enable_action, &self.enabled_item) {
             (_, Some(enabled)) if self.disabled_item.as_ref() == Some(enabled) => {
@@ -6417,6 +6441,10 @@ impl Disables for JsonItemList {
 
     fn layered(&self) -> bool {
         self.layered
+    }
+
+    fn holds_plugin_entries(&self) -> bool {
+        self.plugin_entries
     }
 
     /// An item Disables unless it holds what `enabled_item` holds: each of
