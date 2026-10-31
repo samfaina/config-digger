@@ -309,7 +309,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # `${VAR}` reference, since it expands none here [docs], a string being
 # checked for the characters first [binary]; and the name holds only
 # letters, digits, `-` and `_` [docs], the name being no key of that walk
-# [binary]. Claude Code walks no deeper than five levels of nesting
+# [binary], and is none of `constructor`, `prototype`, `__proto__`,
+# `__defineGetter__`, `__defineSetter__`, `__lookupGetter__` and
+# `__lookupSetter__`, matched exactly and with case [binary], a rule the docs
+# do not state. Claude Code walks no deeper than five levels of nesting
 # [binary]; config-digger checks every depth, and every string for the
 # characters before any for a reference. A dropped entry competes with no server by name: a user server of
 # its name loads, beside an entry with a command or at an `http://` URL, in
@@ -319,6 +322,7 @@ id = "managed-settings-mcp"
 unverified = [
   { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
   "Every character the rule against control and invisible formatting characters refuses is taken from the 2.1.312 binary, with config-digger's Unicode tables; none was tested.",
+  "The seven server names Claude Code refuses are read from the 2.1.312 binary; none was tested.",
 ]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }
@@ -328,7 +332,7 @@ scope = "managed"
 provenance = "managed"
 store_class = "plain"
 on_read_failure = "unknown"
-shape = { block = "fields", required = ["type", "url"], values = { type = ["http", "sse", "streamable-http"] }, prefixes = { url = "https://" }, forbidden = ["command", "args", "env", "headersHelper"], refused_chars = "control-or-format", no_references = true, name = "letters-digits-dash-underscore", types = { type = "string", url = "string", headers = "string-map" } }
+shape = { block = "fields", required = ["type", "url"], values = { type = ["http", "sse", "streamable-http"] }, prefixes = { url = "https://" }, forbidden = ["command", "args", "env", "headersHelper"], refused_chars = "control-or-format", no_references = true, name = "letters-digits-dash-underscore", refused_names = ["constructor", "prototype", "__proto__", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"], types = { type = "string", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "local-mcp"

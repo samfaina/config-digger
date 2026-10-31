@@ -1975,6 +1975,7 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
         Malformed::Name(NameChars::LettersDigitsDashUnderscore) => {
             "its name may hold only letters, digits, `-` and `_`".to_owned()
         }
+        Malformed::RefusedName(names) => format!("its name must not be {}", any_of(names)),
     };
     let sentence = if competes {
         format!("{agent_name} cannot use this Entry: {why}. It still competes by name.")

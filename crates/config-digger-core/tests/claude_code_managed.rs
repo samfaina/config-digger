@@ -542,6 +542,77 @@ fn a_managed_server_name_holds_only_letters_digits_dashes_and_underscores() {
 }
 
 #[test]
+fn a_managed_server_may_not_be_named_after_one_of_seven_object_property_names() {
+    for name in [
+        "constructor",
+        "prototype",
+        "__proto__",
+        "__defineGetter__",
+        "__defineSetter__",
+        "__lookupGetter__",
+        "__lookupSetter__",
+    ] {
+        assert_eq!(
+            managed_checks(json!({ name: remote(), "wiki": remote() }), json!({})),
+            [
+                check(
+                    name,
+                    "invalid",
+                    "Claude Code skips this Entry: its name must not be `constructor`, `prototype`, `__proto__`, `__defineGetter__`, `__defineSetter__`, `__lookupGetter__` or `__lookupSetter__`."
+                ),
+                check("wiki", "effective", ""),
+            ],
+            "{name}"
+        );
+    }
+    for name in [
+        "toString",
+        "valueOf",
+        "hasOwnProperty",
+        "Constructor",
+        "__foo__",
+        "__proto",
+    ] {
+        assert_eq!(
+            managed_checks(json!({ name: remote() }), json!({})),
+            [check(name, "effective", "")],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_managed_server_named_after_an_object_property_does_not_compete_by_name() {
+    let checks = managed_checks(
+        json!({ "constructor": remote() }),
+        json!({ "mcpServers": { "constructor": { "command": "my-tool" } } }),
+    );
+    assert_eq!(
+        checks
+            .iter()
+            .map(|(_, state, _)| state.as_str())
+            .collect::<Vec<_>>(),
+        ["effective", "invalid"],
+        "{checks:?}"
+    );
+}
+
+#[test]
+fn a_managed_server_with_a_refused_name_and_a_failing_value_fails_the_value_check() {
+    assert_eq!(
+        managed_checks(
+            json!({ "constructor": { "type": "http", "url": "http://mcp.corp.example/a" } }),
+            json!({})
+        ),
+        [check(
+            "constructor",
+            "invalid",
+            "Claude Code skips this Entry: `url` must start with `https://`."
+        )]
+    );
+}
+
+#[test]
 fn a_managed_server_failing_several_checks_fails_the_first() {
     for (failing, sentence) in [
         (

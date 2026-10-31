@@ -3654,6 +3654,22 @@ shape = {{ block = \"fields\", {fields} }}
     }
 
     #[test]
+    fn a_shape_refusing_names_alone_loads() {
+        let text = with_shape(r#"refused_names = ["constructor", "__proto__"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_refused_name_must_not_be_empty() {
+        let text = with_shape(r#"refused_names = ["constructor", ""]"#);
+        assert!(
+            error(&text).contains("refused name must not be empty"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
     fn a_shape_field_must_not_be_empty() {
         for fields in [
             r#"required = ["url", ""]"#,
