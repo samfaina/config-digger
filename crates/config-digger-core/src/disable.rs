@@ -1326,6 +1326,18 @@ pub(crate) fn by_name_everywhere(mechanism: Switched) -> bool {
     mechanism.target() == MechanismTarget::Name && mechanism.context() == MechanismContext::All
 }
 
+/// The name `hit`, a switch that holds `entry`, holds Entries by: the
+/// Entry's name for the key Disable writes, as Disable names it even where
+/// the switch holds it in lower case, and the key itself for a further one
+/// of `also_names`.
+pub(crate) fn held_name(hit: &Hit, entry: &ScannedEntry) -> String {
+    if switch_key(hit.mechanism, entry).is_some_and(|key| key == hit.key) {
+        entry.name.clone()
+    } else {
+        hit.key.clone().into_owned()
+    }
+}
+
 /// The Scope the plugin of `entry` is installed at, as the Agent records it.
 fn plugin_scope(entry: &ScannedEntry) -> Option<&str> {
     entry.plugin.as_ref()?.scope.as_deref()

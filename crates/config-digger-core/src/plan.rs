@@ -925,10 +925,12 @@ impl Targeted<'_> {
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
-                        if disable::by_name_everywhere(hit.mechanism)
-                            && !by_name.contains(&scanned.name)
-                        {
-                            by_name.push(scanned.name.clone());
+                        // A further key it deletes, as well as the Entry's name.
+                        if disable::by_name_everywhere(hit.mechanism) {
+                            let name = disable::held_name(&hit, scanned);
+                            if !by_name.contains(&name) {
+                                by_name.push(name);
+                            }
                         }
                         let sqlite = hit.mechanism.switch().sqlite();
                         let syntax = hit.mechanism.switch().syntax();
