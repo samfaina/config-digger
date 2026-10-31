@@ -198,17 +198,23 @@ fn has_item(inventory: &Inventory, name: &str) -> bool {
     codex_items(inventory).any(|item| item.name == name)
 }
 
-#[test]
-fn skill_folders_are_found_up_to_6_folders_below_a_root() {
-    let web = project(r"mono\apps\web");
-    let roots = [
+/// The six folders of skill folders Codex reads in the Project at `web`,
+/// plugins left out.
+fn skill_roots(web: &Path) -> [PathBuf; 6] {
+    [
         web.join(r".codex\skills"),
         web.join(r".agents\skills"),
         Path::new(CODEX).join("skills"),
         Path::new(HOME).join(r".agents\skills"),
         Path::new(CODEX).join(r"skills\.system"),
         Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\skills"),
-    ];
+    ]
+}
+
+#[test]
+fn skill_folders_are_found_up_to_6_folders_below_a_root() {
+    let web = project(r"mono\apps\web");
+    let roots = skill_roots(&web);
     let fs = roots
         .iter()
         .fold(monorepo(true), |fs, root| deep_skills(fs, root));
@@ -224,16 +230,9 @@ fn skill_folders_are_found_up_to_6_folders_below_a_root() {
 }
 
 #[test]
-fn every_root_names_a_skill_without_a_name_after_its_folder() {
+fn every_codex_skill_location_names_a_skill_without_a_name_after_its_folder() {
     let web = project(r"mono\apps\web");
-    let roots = [
-        web.join(r".codex\skills"),
-        web.join(r".agents\skills"),
-        Path::new(CODEX).join("skills"),
-        Path::new(HOME).join(r".agents\skills"),
-        Path::new(CODEX).join(r"skills\.system"),
-        Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\skills"),
-    ];
+    let roots = skill_roots(&web);
     let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
     let nameless = "---\ndescription: Does it.\n---\n";
     let fs = roots
@@ -241,13 +240,8 @@ fn every_root_names_a_skill_without_a_name_after_its_folder() {
         .enumerate()
         .fold(monorepo(true), |fs, (index, root)| {
             fs.with_file(skill(root, &format!("s{index}")), nameless)
-        })
-        .with_file(
-            pets.parent()
-                .unwrap()
-                .join(".codex-remote-plugin-install.json"),
-            r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
-        )
+        });
+    let fs = installed_remotely(fs, &pets)
         .with_file(skill(&pets.join("skills"), "create-pet"), nameless);
 
     let inventory = inventory_at(&fs, &web);
@@ -282,6 +276,17 @@ fn plugin(marketplace: &str, name: &str, version: &str) -> PathBuf {
         .join(marketplace)
         .join(name)
         .join(version)
+}
+
+/// `fs` with the record Codex writes beside the plugin `work-pets` at
+/// `pets` when the account installed it.
+fn installed_remotely(fs: FakeFileSystem, pets: &Path) -> FakeFileSystem {
+    fs.with_file(
+        pets.parent()
+            .unwrap()
+            .join(".codex-remote-plugin-install.json"),
+        r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
+    )
 }
 
 #[test]
@@ -416,6 +421,18 @@ fn a_frontmatter_without_a_name_or_with_an_empty_one_names_the_skill_after_its_f
                 "{name} in {text:?}"
             );
         }
+    }
+}
+
+#[test]
+fn a_skill_md_without_frontmatter_is_invalid() {
+    let inventory = with_skill_md("# Review\n\ndescription: Reviews.\n");
+
+    for sentence in invalid_reasons(&inventory) {
+        assert!(
+            sentence.contains("does not open with a `---` frontmatter"),
+            "{sentence}"
+        );
     }
 }
 
@@ -829,14 +846,7 @@ fn servers_a_manifest_declares_by_path_compete_like_those_of_mcp_json() {
 #[test]
 fn a_remote_plugin_is_account_managed_and_read_only() {
     let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
-    let fs = FakeFileSystem::new()
-        .with_file(user_config(), "")
-        .with_file(
-            pets.parent()
-                .unwrap()
-                .join(".codex-remote-plugin-install.json"),
-            r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
-        )
+    let fs = installed_remotely(FakeFileSystem::new().with_file(user_config(), ""), &pets)
         .with_file(
             pets.join(".mcp.json"),
             mcp_json("pets", "https://pets.example/mcp"),
@@ -862,14 +872,7 @@ fn a_remote_plugin_is_account_managed_and_read_only() {
 #[test]
 fn what_a_remote_plugin_s_manifest_declares_is_account_managed_and_read_only() {
     let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
-    let fs = FakeFileSystem::new()
-        .with_file(user_config(), "")
-        .with_file(
-            pets.parent()
-                .unwrap()
-                .join(".codex-remote-plugin-install.json"),
-            r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
-        )
+    let fs = installed_remotely(FakeFileSystem::new().with_file(user_config(), ""), &pets)
         .with_file(
             manifest_of(&pets),
             json!({
