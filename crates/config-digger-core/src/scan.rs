@@ -6,9 +6,9 @@ use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
-    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
-    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
-    NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
+    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, LinkedWorktree,
+    ListPlugins, Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom,
+    NameRuleOn, NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
     PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
     SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList, Spelling, StoreClass,
     Unlisted, is_entry_key,
@@ -3440,14 +3440,20 @@ fn folders_read(
         }
         ProjectWalk::UpToRepoRoot => {
             let up: Vec<&Path> = folder.ancestors().collect();
-            match up.iter().position(|parent| fs.exists(&parent.join(".git"))) {
-                Some(root) => up[..=root]
-                    .iter()
-                    .enumerate()
-                    .map(|(depth, parent)| (parent.to_path_buf(), depth))
-                    .collect(),
-                None => vec![(folder.to_path_buf(), 0)],
+            let Some(root) = up.iter().position(|parent| fs.exists(&parent.join(".git"))) else {
+                return vec![(folder.to_path_buf(), 0)];
+            };
+            let mut read: Vec<(PathBuf, usize)> = up[..=root]
+                .iter()
+                .enumerate()
+                .map(|(depth, parent)| (parent.to_path_buf(), depth))
+                .collect();
+            if anchor.linked_worktree() == LinkedWorktree::MainCheckoutStandsIn
+                && let Some(main) = stand_in_checkout(fs, up[root], anchor)
+            {
+                read.push((main, root + 1));
             }
+            read
         }
         ProjectWalk::UpToBelowRoot => folder
             .ancestors()
@@ -3456,6 +3462,16 @@ fn folders_read(
             .map(|(depth, parent)| (parent.to_path_buf(), depth))
             .collect(),
     }
+}
+
+/// The main checkout whose path stands in for the one the root `root` of a
+/// linked worktree lacks: none when `root` is a main checkout's, or holds
+/// the path of `anchor`, as a file or a folder.
+fn stand_in_checkout(fs: &dyn FileSystem, root: &Path, anchor: &Anchor) -> Option<PathBuf> {
+    let (_, main) = repository(fs, root);
+    let main = main.filter(|main| main != root)?;
+    let own = anchor.path(&Roots::default(), Some(root))?;
+    (!fs.exists(&own)).then_some(main)
 }
 
 /// The root of the git repository the folder `folder` is in, the folder at

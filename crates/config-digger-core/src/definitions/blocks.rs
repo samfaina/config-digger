@@ -763,13 +763,35 @@ pub(crate) struct ProjectAnchor {
     /// below it. Only a location can walk.
     #[serde(default)]
     pub walk: ProjectWalk,
+    /// With `walk = "up-to-repo-root"`, what is read in a linked worktree,
+    /// whose `.git` file names its main checkout. Without it, a linked
+    /// worktree is read as any repo, up to its own root.
+    #[serde(default)]
+    pub linked_worktree: LinkedWorktree,
 }
 
 impl Validate for ProjectAnchor {
     fn validate(&self) -> Result<(), String> {
         validate_relative(&self.path)?;
+        if self.linked_worktree != LinkedWorktree::Own && self.walk != ProjectWalk::UpToRepoRoot {
+            return Err("`linked_worktree` needs `walk = \"up-to-repo-root\"`".into());
+        }
         self.walk.validate()
     }
+}
+
+/// What a walk up to the repo root reads when the repo is a linked
+/// worktree, as `git worktree add` makes one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum LinkedWorktree {
+    /// The worktree's own folders, up to its root, as in any repo.
+    #[default]
+    Own,
+    /// The worktree's own folders, up to its root, and when its root does
+    /// not hold the path, as a file or a folder, the path in the root of
+    /// the main checkout too, ranked below every folder of the walk.
+    MainCheckoutStandsIn,
 }
 
 impl Anchored for ProjectAnchor {
@@ -1101,8 +1123,17 @@ impl Anchor {
             Anchor::Project(ProjectAnchor {
                 path,
                 walk: ProjectWalk::Down(down),
+                ..
             }) => Some((down, path)),
             _ => None,
+        }
+    }
+
+    /// What its walk up to the repo root reads in a linked worktree.
+    pub fn linked_worktree(&self) -> LinkedWorktree {
+        match self {
+            Anchor::Project(block) => block.linked_worktree,
+            _ => LinkedWorktree::Own,
         }
     }
 

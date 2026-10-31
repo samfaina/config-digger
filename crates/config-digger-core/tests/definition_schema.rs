@@ -51,3 +51,39 @@ fn the_schema_rejects_a_package_family_without_its_publisher_id() {
 
     assert_ne!(errors(&definition), Vec::<String>::new());
 }
+
+/// The built-in Claude Code definition, as JSON.
+fn claude_code() -> Value {
+    toml::from_str(include_str!("../definitions/claude-code.toml")).unwrap()
+}
+
+/// The anchor of the location `id` of `definition`.
+fn anchor<'d>(definition: &'d mut Value, id: &str) -> &'d mut Value {
+    definition["locations"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|location| location["id"] == id)
+        .unwrap()
+        .get_mut("anchor")
+        .unwrap()
+}
+
+#[test]
+fn the_schema_accepts_the_main_checkout_standing_in_for_a_linked_worktree() {
+    let mut definition = claude_code();
+
+    assert_eq!(
+        anchor(&mut definition, "project-skills")["linked_worktree"],
+        "main-checkout-stands-in"
+    );
+    assert_eq!(errors(&definition), Vec::<String>::new());
+}
+
+#[test]
+fn the_schema_rejects_an_unknown_linked_worktree_rule() {
+    let mut definition = claude_code();
+    anchor(&mut definition, "project-skills")["linked_worktree"] = "main-checkout-adds".into();
+
+    assert_ne!(errors(&definition), Vec::<String>::new());
+}

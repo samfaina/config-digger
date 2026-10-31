@@ -359,6 +359,9 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # server, not its file [docs], and are read from the Project's own settings
 # and state too. Claude Code skips a `.mcp.json` it cannot parse, the
 # others still read, and `claude mcp list` reports it [test].
+# A linked worktree's walk is no other: the main checkout's `.mcp.json` is
+# read in a worktree inside it, as a folder above, and not in one outside
+# it, where nothing stands in for the worktree's own [test].
 [[locations]]
 id = "project-mcp"
 anchor = { block = "project", path = ".mcp.json", walk = "up-to-below-root" }
@@ -825,9 +828,20 @@ on_read_failure = "ignores_file"
 # `.claude/skills` in the Project folder and in every parent up to the repo
 # root [docs]. Outside a repo only the Project folder is read. Of two
 # same-named skills in that walk, the nearest folder's wins [test].
+# In a linked worktree, made with `--worktree` or `git worktree add`, the
+# walk stops at the worktree root, inside the main checkout or outside it
+# [docs, test]. When the worktree root has no `.claude/skills`, the main
+# checkout root's `.claude/skills` is read too, below every folder of the
+# walk [docs, test]: its skills add to those of a folder between the
+# Project and the worktree root, and lose a shared name to them [test]. An
+# empty `.claude/skills` at the worktree root keeps them out, and a `.claude`
+# without `skills` does not; the main checkout's other `.claude/skills`
+# folders are never read [test]. They are the worktree's Project skills, at
+# their path in the main checkout. Claude Code does this from 2.1.277
+# [docs], before the tested range.
 [[locations]]
 id = "project-skills"
-anchor = { block = "project", path = ".claude/skills", walk = "up-to-repo-root" }
+anchor = { block = "project", path = ".claude/skills", walk = "up-to-repo-root", linked_worktree = "main-checkout-stands-in" }
 format = { block = "skill-folder", name_from = "folder", reserved = ["synced", "anthropic-skills"], no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "folder-name", name_rule = "visible-chars" }
 name_rule_when = { gate = "tengu_slate_wicket" }
 kind = "skill"

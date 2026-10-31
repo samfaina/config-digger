@@ -512,6 +512,10 @@
               "description": "Which folders the path is read in, from the Project folder up, or\nbelow it. Only a location can walk.",
               "$ref": "#/$defs/ProjectWalk"
             },
+            "linked_worktree": {
+              "description": "With `walk = \"up-to-repo-root\"`, what is read in a linked worktree,\nwhose `.git` file names its main checkout. Without it, a linked\nworktree is read as any repo, up to its own root.",
+              "$ref": "#/$defs/LinkedWorktree"
+            },
             "block": {
               "type": "string",
               "const": "project"
@@ -749,6 +753,21 @@
         "ignore_files",
         "ignores_path",
         "follow_links"
+      ]
+    },
+    "LinkedWorktree": {
+      "description": "What a walk up to the repo root reads when the repo is a linked\nworktree, as `git worktree add` makes one.",
+      "oneOf": [
+        {
+          "description": "The worktree's own folders, up to its root, as in any repo.",
+          "type": "string",
+          "const": "own"
+        },
+        {
+          "description": "The worktree's own folders, up to its root, and when its root does\nnot hold the path, as a file or a folder, the path in the root of\nthe main checkout too, ranked below every folder of the walk.",
+          "type": "string",
+          "const": "main-checkout-stands-in"
+        }
       ]
     },
     "PluginIds": {

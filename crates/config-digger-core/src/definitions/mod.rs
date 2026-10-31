@@ -4042,6 +4042,31 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
         }
     }
 
+    #[test]
+    fn only_a_walk_up_to_the_repo_root_lets_a_main_checkout_stand_in_for_a_linked_worktree() {
+        let anchor = |walk: &str| {
+            format!(
+                r#"{{ block = "project", path = ".test/skills", walk = {walk}, linked_worktree = "main-checkout-stands-in" }}"#
+            )
+        };
+        let up = with_skills(&anchor(r#""up-to-repo-root""#), SKILL_FORMAT, CHECKS);
+        assert!(parse("test.toml", &up).is_ok(), "{}", error(&up));
+        for walk in [r#""none""#, r#""up-to-below-root""#, DOWN] {
+            let text = with_skills(&anchor(walk), SKILL_FORMAT, CHECKS);
+            assert!(
+                error(&text).contains("`linked_worktree` needs `walk = \"up-to-repo-root\"`"),
+                "{walk}: {}",
+                error(&text)
+            );
+        }
+        let own = with_skills(
+            r#"{ block = "project", path = ".test/skills", linked_worktree = "own" }"#,
+            SKILL_FORMAT,
+            CHECKS,
+        );
+        assert!(parse("test.toml", &own).is_ok(), "{}", error(&own));
+    }
+
     const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = [".ignore", ".gitignore"], ignores_path = true, follow_links = false } }"#;
 
     /// Every walk a location can take, as a TOML value.

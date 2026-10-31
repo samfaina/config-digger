@@ -648,6 +648,89 @@ function verbatimSkill(dir, folder) {
   });
 }
 
+// ---------------------------------------------------------------- linked worktrees
+
+{
+  const dir = fresh("worktrees", base);
+  const home = path.join(dir, "home");
+  fs.mkdirSync(home, { recursive: true });
+  const git = async (cwd, ...args) => {
+    const { code, stderr } = await run("git", ["-c", "user.name=cd-throwaway", "-c", "user.email=cd-throwaway@example.invalid", ...args], { cwd });
+    if (code !== 0) throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
+  };
+  // A main checkout with one commit, its skills and `.mcp.json` untracked,
+  // so that a worktree `git worktree add` makes has none of them; and a
+  // skill above it, which no walk from a worktree beside it reaches.
+  const outer = path.join(dir, "outer");
+  const main = path.join(outer, "main");
+  await gitInit(main);
+  write(path.join(main, "README"), "throwaway\n");
+  await git(main, "add", "README");
+  await git(main, "commit", "-q", "-m", "throwaway");
+  skill(path.join(outer, ".claude", "skills", "cd-throwaway-outer"), ["description: above the worktree"]);
+  skill(path.join(main, ".claude", "skills", "cd-throwaway-main-only"), ["description: main root"]);
+  skill(path.join(main, ".claude", "skills", "cd-throwaway-shared"), ["description: main shared"]);
+  skill(path.join(main, "sub", ".claude", "skills", "cd-throwaway-main-sub"), ["description: main sub"]);
+  write(path.join(main, ".mcp.json"), { mcpServers: { "cd-throwaway-main": stdio("main") } });
+  const worktree = async (folder) => {
+    await git(main, "worktree", "add", "-q", folder);
+    return folder;
+  };
+  // The throwaway skill lines a session in `cwd` lists to its model, as
+  // `- <name>: <description>`, and its throwaway servers.
+  const listed = async (cwd) => {
+    const s = await session(home, cwd);
+    return { skills: throwaway(s.listed).sort(), servers: throwaway(s.servers) };
+  };
+
+  const bare = await worktree(path.join(outer, "wt-bare"));
+  fs.mkdirSync(path.join(bare, "sub"), { recursive: true });
+  const atRoot = await listed(bare);
+  await p.check("locations[project-skills]", "in a worktree whose root has no `.claude/skills`, the main checkout root's skills stand in, and the walk stops at the worktree root", async () => {
+    return same(atRoot.skills, ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"]);
+  });
+  await p.check("locations[project-skills]", "below such a worktree's root, only the main checkout root's skills stand in, not those of the matching folder below it", async () => {
+    return same((await listed(path.join(bare, "sub"))).skills, ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"]);
+  });
+  await p.check("locations[project-mcp]", "in a worktree outside the main checkout, the main checkout's `.mcp.json` is not read", async () => {
+    return same(atRoot.servers, []);
+  });
+
+  const own = await worktree(path.join(outer, "wt-own"));
+  skill(path.join(own, ".claude", "skills", "cd-throwaway-wt-only"), ["description: worktree root"]);
+  await p.check("locations[project-skills]", "in a worktree whose root has its own `.claude/skills`, only those load", async () => {
+    return same((await listed(own)).skills, ["- cd-throwaway-wt-only: worktree root"]);
+  });
+
+  const empty = await worktree(path.join(outer, "wt-empty"));
+  fs.mkdirSync(path.join(empty, ".claude", "skills"), { recursive: true });
+  const dotClaude = await worktree(path.join(outer, "wt-dot-claude"));
+  fs.mkdirSync(path.join(dotClaude, ".claude"), { recursive: true });
+  await p.check("locations[project-skills]", "an empty `.claude/skills` at the worktree root keeps the main checkout's out, and a `.claude` without `skills` does not", async () => {
+    const lengths = { empty: (await listed(empty)).skills.length, dotClaude: (await listed(dotClaude)).skills.length };
+    return same(lengths, { empty: 0, dotClaude: 2 });
+  });
+
+  const between = await worktree(path.join(outer, "wt-between"));
+  skill(path.join(between, "sub", ".claude", "skills", "cd-throwaway-between"), ["description: between"]);
+  skill(path.join(between, "sub", ".claude", "skills", "cd-throwaway-shared"), ["description: between shared"]);
+  await p.check("locations[project-skills]", "skills between the Project and a worktree root that has none add to the main checkout's, and win a shared name", async () => {
+    return same((await listed(path.join(between, "sub"))).skills, ["- cd-throwaway-between: between", "- cd-throwaway-main-only: main root", "- cd-throwaway-shared: between shared"]);
+  });
+
+  // `--worktree`'s default place, inside the main checkout.
+  const inside = await worktree(path.join(main, ".claude", "worktrees", "cd-throwaway-inside"));
+  const insideOwn = await worktree(path.join(main, ".claude", "worktrees", "cd-throwaway-inside-own"));
+  skill(path.join(insideOwn, ".claude", "skills", "cd-throwaway-inside-own"), ["description: inside own"]);
+  const [inMain, inMainOwn] = [await listed(inside), await listed(insideOwn)];
+  await p.check("locations[project-skills]", "a worktree inside the main checkout reads as one outside it: the main checkout's skills stand in only when its root has none", async () => {
+    return same({ inside: inMain.skills, insideOwn: inMainOwn.skills }, { inside: ["- cd-throwaway-main-only: main root", "- cd-throwaway-shared: main shared"], insideOwn: ["- cd-throwaway-inside-own: inside own"] });
+  });
+  await p.check("locations[project-mcp]", "in a worktree inside the main checkout, the walk of `.mcp.json` reaches the main checkout's", async () => {
+    return same({ inside: inMain.servers, insideOwn: inMainOwn.servers }, { inside: ["cd-throwaway-main"], insideOwn: ["cd-throwaway-main"] });
+  });
+}
+
 // ---------------------------------------------------------------- bundles and declared skills
 
 {
