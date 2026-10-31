@@ -925,9 +925,10 @@ impl Targeted<'_> {
                         if lifted.iter().any(|known| known.same_switch(&hit)) {
                             continue;
                         }
-                        // A further key it deletes, as well as the Entry's name.
+                        // Each key Enable deletes from the switch, a further
+                        // one of `also_names` as well as the Entry's name.
                         if disable::by_name_everywhere(hit.mechanism) {
-                            let name = disable::held_name(&hit, scanned);
+                            let name = hit.wide_reach_name(scanned);
                             if !by_name.contains(&name) {
                                 by_name.push(name);
                             }

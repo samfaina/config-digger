@@ -55,6 +55,18 @@ impl Hit<'_> {
         locator::render(&self.switch.path, &self.key_path)
     }
 
+    /// The name the `wide-reach` warning gives the key of `entry` this
+    /// switch holds: the Entry's name for the key Disable writes, in its own
+    /// case even where the switch holds it in lower case, and the key itself
+    /// for a further one of `also_names`.
+    pub fn wide_reach_name(&self, entry: &ScannedEntry) -> String {
+        if switch_key(self.mechanism, entry).is_some_and(|key| key == self.key) {
+            entry.name.clone()
+        } else {
+            self.key.clone().into_owned()
+        }
+    }
+
     /// The State the switch gives the Entry: Blocked for managed policy,
     /// Disabled otherwise.
     pub fn state(&self) -> State {
@@ -1324,18 +1336,6 @@ pub(crate) fn failed_switch_files(
 /// context, so that a write reaches every Entry of a name wherever it is.
 pub(crate) fn by_name_everywhere(mechanism: Switched) -> bool {
     mechanism.target() == MechanismTarget::Name && mechanism.context() == MechanismContext::All
-}
-
-/// The name `hit`, a switch that holds `entry`, holds Entries by: the
-/// Entry's name for the key Disable writes, as Disable names it even where
-/// the switch holds it in lower case, and the key itself for a further one
-/// of `also_names`.
-pub(crate) fn held_name(hit: &Hit, entry: &ScannedEntry) -> String {
-    if switch_key(hit.mechanism, entry).is_some_and(|key| key == hit.key) {
-        entry.name.clone()
-    } else {
-        hit.key.clone().into_owned()
-    }
 }
 
 /// The Scope the plugin of `entry` is installed at, as the Agent records it.
