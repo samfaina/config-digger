@@ -3435,7 +3435,7 @@
       "description": "The minimal shape of the Entries of a location.",
       "oneOf": [
         {
-          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `one_of`; each field of `required`, in\nits order, then the other fields of `values` and `prefixes`, each field\nchecked for being held, then against `values`, then `prefixes`;\n`forbidden`; `types`; `no_references`; then `name`.",
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `one_of`; each field of `required`, in\nits order, then the other fields of `values` and `prefixes`, each field\nchecked for being held, then against `values`, then `prefixes`;\n`forbidden`; `types`; `refused_chars`; `no_references`; then `name`.",
           "type": "object",
           "properties": {
             "one_of": {
@@ -3491,6 +3491,17 @@
               },
               "default": []
             },
+            "refused_chars": {
+              "description": "The characters no key or string the Entry holds, at any depth, may\nhold. The Entry's name is not checked.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RefusedChars"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "no_references": {
               "description": "Whether no string the Entry holds, at any depth, may hold a `${...}`\nreference, as for an Agent that does not expand them.",
               "type": "boolean",
@@ -3536,6 +3547,16 @@
           "required": [
             "block"
           ]
+        }
+      ]
+    },
+    "RefusedChars": {
+      "description": "Characters no key or string of an Entry may hold.",
+      "oneOf": [
+        {
+          "description": "Control and format characters, Unicode's `Cc` and `Cf`, and the line\nand paragraph separators U+2028 and U+2029.",
+          "type": "string",
+          "const": "control-or-format"
         }
       ]
     },

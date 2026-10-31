@@ -491,6 +491,35 @@ fn no_value_of_a_managed_server_may_hold_a_reference() {
 }
 
 #[test]
+fn no_key_or_value_of_a_managed_server_may_hold_a_control_or_invisible_character() {
+    let refused = "no key or value may hold a control or invisible formatting character";
+    for failing in [
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { "X-A": "a\u{7}b" } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { "X-\u{200B}A": "b" } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/\u{202E}a" }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "oauth": { "client": { "name": "a\u{2028}b" } } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { "X-A": "a\tb" } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { "X-A": "a\nb" } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "oauth": { "scopes": ["read", "wr\u{7F}ite"] } }),
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { "X-A": "\u{7}${TOKEN}" } }),
+    ] {
+        assert_eq!(
+            beside_a_passing_server(failing.clone()),
+            fails(refused),
+            "{failing}"
+        );
+    }
+    for passing in ["a\u{A0}b", "notes 📝", "búsqueda", "检索"] {
+        let server = json!({ "type": "http", "url": "https://mcp.corp.example/a", "headers": { passing: passing } });
+        assert_eq!(
+            beside_a_passing_server(server)[0],
+            check("failing", "effective", ""),
+            "{passing}"
+        );
+    }
+}
+
+#[test]
 fn a_managed_server_name_holds_only_letters_digits_dashes_and_underscores() {
     for name in ["corp search", "corp.search", "búsqueda", "corp/search"] {
         assert_eq!(

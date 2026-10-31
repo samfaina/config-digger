@@ -14,11 +14,13 @@ use crate::paths;
 use crate::ports::{Environment, FileSystem, Hive, Ports, RegistryData};
 use crate::roots::Roots;
 use crate::version::Version;
+use regex::Regex;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path, PathBuf};
+use std::sync::LazyLock;
 use std::time::{Duration, SystemTime};
 
 /// Checks a block's parameters beyond what deserialisation enforces.
@@ -5064,6 +5066,9 @@ pub(crate) enum Malformed {
     WrongPrefix(String, String),
     /// It holds this field, which it must not.
     Forbidden(String),
+    /// A key or a string it holds, at any depth, holds a character of
+    /// this class.
+    RefusedChars(RefusedChars),
     /// A string it holds, at any depth, holds a `${...}` reference.
     Reference,
     /// Its name holds a character this rule does not allow.
@@ -5126,7 +5131,7 @@ impl Conform for Shape {
 /// it does not pass, in this order: `one_of`; each field of `required`, in
 /// its order, then the other fields of `values` and `prefixes`, each field
 /// checked for being held, then against `values`, then `prefixes`;
-/// `forbidden`; `types`; `no_references`; then `name`.
+/// `forbidden`; `types`; `refused_chars`; `no_references`; then `name`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
@@ -5146,6 +5151,10 @@ pub(crate) struct FieldShape {
     /// The Entry must hold none of these, such as `command`.
     #[serde(default)]
     pub forbidden: Vec<String>,
+    /// The characters no key or string the Entry holds, at any depth, may
+    /// hold. The Entry's name is not checked.
+    #[serde(default)]
+    pub refused_chars: Option<RefusedChars>,
     /// Whether no string the Entry holds, at any depth, may hold a `${...}`
     /// reference, as for an Agent that does not expand them.
     #[serde(default)]
@@ -5223,6 +5232,7 @@ impl Validate for FieldShape {
             && self.forbidden.is_empty()
             && self.values.is_empty()
             && self.prefixes.is_empty()
+            && self.refused_chars.is_none()
             && !self.no_references
             && self.name.is_none();
         if checks_nothing {
@@ -5250,16 +5260,52 @@ impl NameChars {
     }
 }
 
-/// Whether a string of `value`, at any depth, holds a `${...}` reference.
-fn holds_reference(value: &Value) -> bool {
+/// Characters no key or string of an Entry may hold.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum RefusedChars {
+    /// Control and format characters, Unicode's `Cc` and `Cf`, and the line
+    /// and paragraph separators U+2028 and U+2029.
+    ControlOrFormat,
+}
+
+/// Unicode's control and format characters, and U+2028 and U+2029.
+static CONTROL_OR_FORMAT: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[\p{Cc}\p{Cf}\x{2028}\x{2029}]").expect("a valid class"));
+
+impl RefusedChars {
+    fn refuses(self, text: &str) -> bool {
+        match self {
+            RefusedChars::ControlOrFormat => CONTROL_OR_FORMAT.is_match(text),
+        }
+    }
+}
+
+/// Whether a string of `value`, at any depth, passes `test`, or, with
+/// `keys`, a key of one of its objects does.
+fn any_string(value: &Value, keys: bool, test: &dyn Fn(&str) -> bool) -> bool {
     match value {
-        Value::String(text) => text
-            .split_once("${")
-            .is_some_and(|(_, rest)| rest.contains('}')),
-        Value::Array(items) => items.iter().any(holds_reference),
-        Value::Object(object) => object.values().any(holds_reference),
+        Value::String(text) => test(text),
+        Value::Array(items) => items.iter().any(|item| any_string(item, keys, test)),
+        Value::Object(object) => object
+            .iter()
+            .any(|(key, value)| (keys && test(key)) || any_string(value, keys, test)),
         _ => false,
     }
+}
+
+/// Whether a key or a string of `value`, at any depth, holds a character
+/// `refused` refuses.
+fn holds_refused(value: &Value, refused: RefusedChars) -> bool {
+    any_string(value, true, &|text| refused.refuses(text))
+}
+
+/// Whether a string of `value`, at any depth, holds a `${...}` reference.
+fn holds_reference(value: &Value) -> bool {
+    any_string(value, false, &|text| {
+        text.split_once("${")
+            .is_some_and(|(_, rest)| rest.contains('}'))
+    })
 }
 
 impl FieldShape {
@@ -5320,6 +5366,11 @@ impl Conform for FieldShape {
             (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
         }) {
             return Some(malformed);
+        }
+        if let Some(refused) = self.refused_chars
+            && holds_refused(value, refused)
+        {
+            return Some(Malformed::RefusedChars(refused));
         }
         (self.no_references && holds_reference(value)).then_some(Malformed::Reference)
     }

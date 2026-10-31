@@ -3607,6 +3607,12 @@ shape = {{ block = \"fields\", {fields} }}
     }
 
     #[test]
+    fn a_shape_refusing_control_or_format_characters_alone_loads() {
+        let text = with_shape(r#"refused_chars = "control-or-format""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
     fn a_shape_field_must_not_be_empty() {
         for fields in [
             r#"required = ["url", ""]"#,
