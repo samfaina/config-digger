@@ -9,7 +9,8 @@
 //   node uat/agents/vscode.mjs [--bin <Code.exe>] [--cli <config-digger.exe>] [--sign-in]
 //
 // `CD_PROBE_ONLY=files,broken-dot` runs those launches only: `plugins`,
-// `files`, `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
+// `manifests`, `install`, `files`,
+// `broken-<folder|dot|user|plugin|workspace>`, `discovery`,
 // `experiments`, `trust`, `nonce`, `enablement`, `skills`, `extensions`,
 // `profiles` and `policy`.
 //
@@ -29,6 +30,7 @@
 // starts the same. The other launches sign in to nothing.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { fresh, json, probe, root, run, same, skill, write } from "./lib.mjs";
@@ -46,6 +48,11 @@ const commit = fs.readdirSync(path.dirname(bin)).find((f) => fs.existsSync(path.
 // and the built-in extensions.
 const app = path.join(path.dirname(bin), commit, "resources", "app");
 const version = json(path.join(app, "product.json")).version;
+// Whether the version is 1.`minor` or later.
+const fromMinor = (minor) => {
+  const [major, own] = version.split(".").map(Number);
+  return major > 1 || own >= minor;
+};
 // The CLI of config-digger that the `nonce` launch asks, `--cli`, or else
 // the debug build of this checkout, which `cargo build -p
 // config-digger-cli` makes.
@@ -198,7 +205,10 @@ const storedUri = (file) => ({ $mid: 1, path: pathToFileURL(file).pathname, sche
 // default value of each setting of `inspect`, and the skills of the
 // proposed API `chatPromptFiles`: those VS Code lists to its model,
 // `chat.getSkills`, and those the user can run, `chat.getSlashCommands`.
-function extension(dir, { provider, start = { autoTrustChanges: true }, inspect = [] }) {
+// With `ask`, it first runs that command, which asks for a text, writes
+// `asking.json` for the probe to type it, and waits for the command,
+// whose result `done.json` holds as `answered`.
+function extension(dir, { provider, start = { autoTrustChanges: true }, inspect = [], ask = null }) {
   write(path.join(dir, "package.json"), {
     name: "probe",
     publisher: "cd-throwaway",
@@ -210,7 +220,7 @@ function extension(dir, { provider, start = { autoTrustChanges: true }, inspect 
     capabilities: { untrustedWorkspaces: { supported: true } },
     contributes: { mcpServerDefinitionProviders: [{ id: "cd-throwaway-provider", label: "cd-throwaway-provider" }] },
   });
-  write(path.join(dir, "probe.json"), { provider, start, inspect, done: path.join(dir, "done.json") });
+  write(path.join(dir, "probe.json"), { provider, start, inspect, ask, asking: path.join(dir, "asking.json"), done: path.join(dir, "done.json") });
   write(
     path.join(dir, "extension.js"),
     `const vscode = require("vscode");
@@ -230,6 +240,13 @@ exports.activate = async () => {
   }
   await sleep(8000);
   let error = null;
+  let answered = null;
+  if (config.ask) {
+    const asked = vscode.commands.executeCommand(config.ask, { skipReveal: true });
+    fs.writeFileSync(config.asking, "{}");
+    answered = await Promise.race([asked.then((r) => r ?? null, (e) => "threw: " + String(e)), sleep(90000).then(() => "timeout")]);
+    await sleep(8000);
+  }
   try {
     await Promise.race([vscode.commands.executeCommand("workbench.mcp.startServer", "*", config.start), sleep(20000)]);
   } catch (e) {
@@ -247,6 +264,7 @@ exports.activate = async () => {
   }
   fs.writeFileSync(config.done, JSON.stringify({
     error,
+    answered,
     folders: (vscode.workspace.workspaceFolders ?? []).map((f) => f.uri.fsPath),
     workspaceFile: vscode.workspace.workspaceFile ? vscode.workspace.workspaceFile.fsPath : null,
     trusted: vscode.workspace.isTrusted,
@@ -267,7 +285,10 @@ exports.activate = async () => {
 // workspace's `mcp.extCachedServers`. A launch with `trust` keeps
 // workspace trust on, and one with `shared: false` leaves the shared data
 // folder where VS Code puts it, `~\.vscode-shared` of the launch's home.
-async function launch(dir, open, { settings = {}, provider = null, start, inspect, env = {}, args: extra = [], trust = false, shared = true, seconds = 120 } = {}) {
+// One with `answer`, `{ command, text }`, has the extension run `command`
+// and types `text` into the input box it opens, over the Chrome DevTools
+// Protocol.
+async function launch(dir, open, { settings = {}, provider = null, start, inspect, env = {}, args: extra = [], trust = false, shared = true, answer = null, seconds = 120 } = {}) {
   const d = folders(dir);
   write(path.join(d.user, "settings.json"), {
     "security.workspace.trust.enabled": trust,
@@ -280,9 +301,12 @@ async function launch(dir, open, { settings = {}, provider = null, start, inspec
     "chat.mcp.autostart": "never",
     ...settings,
   });
-  extension(d.probeExt, { provider, start, inspect });
+  extension(d.probeExt, { provider, start, inspect, ask: answer?.command });
   const doneFile = path.join(d.probeExt, "done.json");
+  const askingFile = path.join(d.probeExt, "asking.json");
   fs.rmSync(doneFile, { force: true });
+  fs.rmSync(askingFile, { force: true });
+  const port = answer && (await freePort());
   // 1.129.1 starts a profile's servers in the home folder, and fails to
   // when it does not exist.
   fs.mkdirSync(d.home, { recursive: true });
@@ -295,12 +319,17 @@ async function launch(dir, open, { settings = {}, provider = null, start, inspec
     "--skip-welcome",
     "--skip-release-notes",
     "--log=trace",
+    ...(port ? [`--remote-debugging-port=${port}`] : []),
     ...extra,
     "--new-window",
     open,
   ];
   spawn(bin, args, { detached: true, stdio: "ignore", env: { ...process.env, USERPROFILE: d.home, APPDATA: d.appData, ...env } }).unref();
   const end = Date.now() + seconds * 1000;
+  if (answer) {
+    while (!fs.existsSync(askingFile) && Date.now() < end) await sleep(1000);
+    if (fs.existsSync(askingFile)) await typeAnswer(port, answer.text);
+  }
   while (!fs.existsSync(doneFile) && Date.now() < end) await sleep(1000);
   await sleep(3000);
   await stop(d.data);
@@ -309,6 +338,44 @@ async function launch(dir, open, { settings = {}, provider = null, start, inspec
     ? Object.fromEntries(fs.readdirSync(markers).map((f) => [f.slice(0, -".json".length), json(path.join(markers, f))]))
     : {};
   return { done, started, tags: Object.keys(started).sort(), cache: extCache(d.data) };
+}
+
+const freePort = () =>
+  new Promise((resolve) => {
+    const s = net.createServer().listen(0, "127.0.0.1", () => {
+      const { port } = s.address();
+      s.close(() => resolve(port));
+    });
+  });
+
+// Types `text` into the input box the window on the DevTools port `port`
+// shows, once it shows one, and presses Enter.
+async function typeAnswer(port, text) {
+  const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+  const page = targets.find((t) => t.type === "page" && t.url.includes("workbench"));
+  const ws = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((r) => ws.addEventListener("open", r));
+  let id = 0;
+  const pending = new Map();
+  ws.addEventListener("message", (e) => {
+    const m = JSON.parse(e.data);
+    pending.get(m.id)?.(m);
+    pending.delete(m.id);
+  });
+  const send = (method, params) =>
+    new Promise((resolve) => {
+      pending.set(++id, resolve);
+      ws.send(JSON.stringify({ id, method, params }));
+    });
+  const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true })).result?.result?.value;
+  const input = `[...document.querySelectorAll(".quick-input-widget input")].find((i) => i.offsetParent !== null)`;
+  const end = Date.now() + 20_000;
+  while (!(await evaluate(`Boolean(${input})`)) && Date.now() < end) await sleep(500);
+  await evaluate(`${input}?.focus()`);
+  await send("Input.insertText", { text });
+  await sleep(500);
+  for (const type of ["keyDown", "keyUp"]) await send("Input.dispatchKeyEvent", { type, key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+  ws.close();
 }
 
 // The `mcp.extCachedServers` of the workspace the launch opened.
@@ -377,6 +444,120 @@ if (runs("plugins")) {
   );
 }
 
+// ---------------------------------------------------------------- what a manifest's `mcpServers` holds
+
+// Plugins like `plugin-named` of the `plugins` launch, each with a
+// `.mcp.json`: one per other place of the manifest, naming a file; one
+// whose manifest holds its servers inline, one a list of a path and an
+// object; and one whose `.mcp.json` and named file both name
+// `cd-throwaway-clash`, with `chat.mcp.collisionBehavior` at `disable`, so
+// that only one of the two can run. `tests/vscode.rs` reads the same
+// plugins.
+if (runs("manifests")) {
+  const dir = fresh("manifests", base);
+  const { plugins } = folders(dir);
+  const named = (tag, place) => [tag, { [place]: manifest(tag, { mcpServers: "./servers.json" }), ".mcp.json": dotMcp(`${tag}-dot`), "servers.json": dotMcp(`${tag}-file`) }];
+  marketplace(plugins, [
+    named("github", ".github/plugin/plugin.json"),
+    named("claude", ".claude-plugin/plugin.json"),
+    named("open", ".plugin/plugin.json"),
+    ["inline", { "plugin.json": manifest("inline", { mcpServers: { "cd-throwaway-inline-object": server("inline-object") } }), ".mcp.json": dotMcp("inline-dot") }],
+    ["list", { "plugin.json": manifest("list", { mcpServers: ["./servers.json", { "cd-throwaway-list-object": server("list-object") }] }), ".mcp.json": dotMcp("list-dot"), "servers.json": dotMcp("list-file") }],
+    [
+      "clash",
+      {
+        "plugin.json": manifest("clash", { mcpServers: "./servers.json" }),
+        ".mcp.json": { mcpServers: { "cd-throwaway-clash": server("clash-dot") } },
+        "servers.json": { mcpServers: { "cd-throwaway-clash": server("clash-file") } },
+      },
+    ],
+  ]);
+  const seen = await launch(dir, fresh("proj", dir), { settings: { "chat.mcp.collisionBehavior": "disable" } });
+  const of = (tag) => seen.tags.filter((t) => t.startsWith(`${tag}-`));
+
+  await p.check("locations[plugin-manifest-mcp]", "a manifest in `.claude-plugin` or `.plugin` that names a file in `mcpServers` adds that file's servers to the `.mcp.json`'s, as the root `plugin.json` does", async () =>
+    same({ claude: of("claude"), open: of("open") }, { claude: ["claude-dot", "claude-file"], open: ["open-dot", "open-file"] }),
+  );
+  // 1.143.1 reads it, and fails this check.
+  await p.check("locations[plugin-manifest-mcp]", "a manifest in `.github\\plugin` is not read: the file its `mcpServers` names adds nothing to the `.mcp.json`'s servers", async () =>
+    same(of("github"), ["github-dot"]),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "a manifest's inline `mcpServers` object takes the place of the plugin's `.mcp.json`: its servers start, and the `.mcp.json`'s do not", async () =>
+    same(of("inline"), ["inline-object"]),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "of a manifest's `mcpServers` list of a path and an object, VS Code reads the path, beside the `.mcp.json`, and skips the object", async () =>
+    same(of("list"), ["list-dot", "list-file"]),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "of a server the plugin's `.mcp.json` and the file its manifest names both name, the `.mcp.json`'s starts, and the named file's does not", async () =>
+    same(of("clash"), ["clash-dot"]),
+  );
+}
+
+// ---------------------------------------------------------------- a plugin VS Code installs from a marketplace
+
+// VS Code installs a plugin itself: the extension runs `Install Plugin from
+// Source`, `workbench.action.chat.installPluginFromSource`, and the probe
+// types the marketplace's URL into the box it opens. The marketplace is a
+// git repo of the launch, which `chat.plugins.marketplaces` names by an
+// `https` URL on a host that does not exist: git's `insteadOf`, in a
+// throwaway global config that `GIT_CONFIG_GLOBAL` gives VS Code, clones
+// it from the repo's folder, so that no request leaves the machine. The
+// marketplace is trusted beforehand in the profile's store, as VS Code
+// trusts it once the user agrees to its dialog; its key is the marketplace's
+// `canonicalId` in VS Code's code [binary]. A marketplace of one plugin
+// installs that plugin without asking which.
+if (runs("install")) {
+  const dir = fresh("install", base);
+  const d = folders(dir);
+  const repo = path.join(dir, "market-repo");
+  write(path.join(repo, ".github", "plugin", "marketplace.json"), {
+    name: "cd-throwaway-market",
+    owner: { name: "cd-throwaway" },
+    plugins: [{ name: "cd-throwaway-installed", source: "./plugins/installed", description: "probe plugin", version: "1.0.0" }],
+  });
+  write(path.join(repo, "plugins", "installed", "plugin.json"), manifest("installed"));
+  write(path.join(repo, "plugins", "installed", ".mcp.json"), dotMcp("installed"));
+  const gitconfig = path.join(dir, "gitconfig");
+  fs.writeFileSync(
+    gitconfig,
+    `[user]\n\tname = cd-throwaway\n\temail = cd-throwaway@cd-throwaway.invalid\n[url "${pathToFileURL(repo).href}"]\n\tinsteadOf = ${marketUrl}\n`,
+  );
+  const gitEnv = { GIT_CONFIG_GLOBAL: gitconfig, GIT_CONFIG_NOSYSTEM: "1", GIT_TERMINAL_PROMPT: "0" };
+  for (const args of [["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "cd-throwaway"]]) {
+    const done = await run("git", args, { cwd: repo, env: gitEnv });
+    if (done.code !== 0) throw new Error(`git ${args[0]} failed: ${done.stderr}`);
+  }
+  plant(d.global, { "chat.plugins.trustedMarketplaces.v1": ["git:cd-throwaway.invalid/cd-throwaway/market.git"] });
+  const seen = await launch(dir, fresh("proj", dir), {
+    settings: { "chat.plugins.marketplaces": [marketUrl] },
+    env: gitEnv,
+    answer: { command: "workbench.action.chat.installPluginFromSource", text: marketUrl },
+    seconds: 240,
+  });
+  const listed = fs.existsSync(path.join(d.plugins, "installed.json")) ? json(path.join(d.plugins, "installed.json")) : null;
+  const clone = path.join(d.plugins, "cd-throwaway.invalid", "cd-throwaway", "market");
+  const folder = path.join(clone, "plugins", "installed");
+  // 1.143.1 adds the folder's path below `agent-plugins`, which 1.141.0
+  // does not write.
+  const relativePath = fromMinor(143) ? { relativePath: path.relative(d.plugins, folder).replaceAll("\\", "/") } : {};
+
+  await p.check("plugins[agent-plugins]", "VS Code clones a marketplace it installs a plugin from into `agent-plugins\\<host>\\<owner>\\<repo>`, and lists the plugin in `installed.json` as `{\"version\": 1, \"installed\": [{\"pluginUri\", \"marketplace\", \"name\"}]}`, its `pluginUri` the `file:` URI of the plugin's folder in the clone, from 1.143.1 with a `relativePath` too", async () =>
+    same(
+      {
+        answered: seen.done.answered,
+        clone: fs.existsSync(path.join(clone, ".git")),
+        listed,
+      },
+      {
+        answered: true,
+        clone: true,
+        listed: { version: 1, installed: [{ pluginUri: vscodeUri(folder), ...relativePath, marketplace: marketUrl, name: "cd-throwaway-installed" }] },
+      },
+    ),
+  );
+  await p.check("plugins[agent-plugins]", "VS Code starts the server of the `.mcp.json` of the plugin it installed", async () => same(seen.tags, ["installed"]));
+}
+
 // ---------------------------------------------------------------- the MCP files, read whole
 
 if (runs("files")) {
@@ -419,8 +600,7 @@ if (runs("files")) {
   );
   await p.check("locations[claude-desktop-mcp]", "the user's `chat.mcp.discovery.enabled` turns Claude Desktop's config on", async () => same(seen.tags.includes("desktop"), true));
   // `external` is there from 1.135.0 on, and not in 1.129.1.
-  const [major, minor] = version.split(".").map(Number);
-  const hasExternal = major > 1 || minor >= 135;
+  const hasExternal = fromMinor(135);
   await p.check("locations[extension-mcp]", "the cache spells a launch's `env` as an object, its `headers` as `[name, value]` pairs, its `args` as an array, and its `uri` as a URI object whose `authority`, `query` and `fragment` hold the userinfo, the query and the fragment, and, from 1.135.0, whose `external` holds the whole URL with `=` and `&` encoded", async () => {
     const servers = seen.cache?.["cd-throwaway.probe/cd-throwaway-provider"]?.servers ?? [];
     const launchOf = (label) => servers.find((s) => s.label === label)?.launch;
