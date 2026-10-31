@@ -4,7 +4,9 @@
 //! `synced:<name>`, beside a local one, and a switch that holds each Entry
 //! by its name or by its own name before the template, as Claude Code's
 //! `skillOverrides` holds a synced skill, a partial value under its own
-//! name limiting it.
+//! name limiting it. The switch is in the Project's settings, or moved to
+//! the Agent home and read in every context, where `wide-reach` names each
+//! key Enable deletes.
 
 use config_digger_core::api::{Action, Context, Core, Inventory, Plan, ScanOptions, Targets};
 use config_digger_core::api::{Entry, WarningClass};
@@ -107,10 +109,15 @@ fn fixture(local: bool, overrides: Value) -> FakeFileSystem {
 }
 
 fn core(fs: &FakeFileSystem) -> Core {
+    core_with(fs, DEFINITION)
+}
+
+/// A core over `fs` with `definition` as the extra Agent definition.
+fn core_with(fs: &FakeFileSystem, definition: &str) -> Core {
     let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
     Core::with_extra_definitions(
         fake::ports(fs.clone(), env),
-        &[("test-agent.toml", DEFINITION)],
+        &[("test-agent.toml", definition)],
     )
     .unwrap()
 }
@@ -155,7 +162,11 @@ fn plan(core: &Core, action: Action, selector: &str) -> Plan {
 }
 
 fn settings_json(fs: &FakeFileSystem) -> Value {
-    serde_json::from_slice(&fs.contents(settings()).unwrap()).unwrap()
+    json_file(fs, settings())
+}
+
+fn json_file(fs: &FakeFileSystem, path: PathBuf) -> Value {
+    serde_json::from_slice(&fs.contents(path).unwrap()).unwrap()
 }
 
 fn local_pdf() -> String {
@@ -256,4 +267,86 @@ fn a_partial_value_under_the_own_name_key_limits_the_entry() {
         pdf.notes[0].switch,
         Some(format!("{}#overrides.pdf", settings().display()))
     );
+}
+
+/// The switch moved to a file of the Agent home and read in every context,
+/// so that it holds each name for the Entries of every Project.
+fn everywhere_definition() -> String {
+    let moved = DEFINITION
+        .replace(
+            r#"roots.synced = ".test-agent-synced.json""#,
+            r#"roots.synced = ".test-agent-synced.json"
+roots.overrides = ".test-agent-overrides.json""#,
+        )
+        .replace(
+            r#"anchor = { block = "project", path = ".test-agent/settings.json" }"#,
+            r#"anchor = { block = "home", root = "overrides" }"#,
+        )
+        .replace(r#"context = "project""#, r#"context = "all""#);
+    assert_ne!(moved, DEFINITION, "the switch did not move");
+    assert!(moved.contains(r#"root = "overrides""#), "{moved}");
+    assert!(moved.contains(r#"context = "all""#), "{moved}");
+    moved
+}
+
+fn home_overrides() -> PathBuf {
+    PathBuf::from(HOME).join(".test-agent-overrides.json")
+}
+
+/// The synced server `pdf` alone, and the home's switch holding `overrides`.
+fn everywhere_fixture(overrides: Value) -> FakeFileSystem {
+    fixture(false, json!({})).with_file(
+        home_overrides(),
+        json!({ "overrides": overrides }).to_string(),
+    )
+}
+
+fn everywhere_core(fs: &FakeFileSystem) -> Core {
+    core_with(fs, &everywhere_definition())
+}
+
+fn home_overrides_json(fs: &FakeFileSystem) -> Value {
+    json_file(fs, home_overrides())
+}
+
+#[test]
+fn enable_of_a_switch_read_everywhere_names_every_key_it_deletes() {
+    let fs = everywhere_fixture(json!({ "synced:pdf": "off", "pdf": "off" }));
+    let core = everywhere_core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+
+    let sentence = wide_reach(&enable).expect("a wide-reach warning");
+    assert!(sentence.contains("`synced:pdf`"), "{sentence}");
+    assert!(sentence.contains("`pdf`"), "{sentence}");
+    core.execute(enable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(home_overrides_json(&fs), json!({ "overrides": {} }));
+}
+
+#[test]
+fn enable_of_a_switch_read_everywhere_names_only_the_further_key_that_disables() {
+    let fs = everywhere_fixture(json!({ "pdf": "off" }));
+    let core = everywhere_core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+
+    let sentence = wide_reach(&enable).expect("a wide-reach warning");
+    assert!(sentence.contains("`pdf`"), "{sentence}");
+    assert!(!sentence.contains("`synced:pdf`"), "{sentence}");
+    core.execute(enable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(home_overrides_json(&fs), json!({ "overrides": {} }));
+}
+
+#[test]
+fn enable_of_a_switch_read_everywhere_names_only_the_entry_s_name_that_disables() {
+    let fs = everywhere_fixture(json!({ "synced:pdf": "off" }));
+    let core = everywhere_core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+
+    let sentence = wide_reach(&enable).expect("a wide-reach warning");
+    assert!(sentence.contains("`synced:pdf`"), "{sentence}");
+    assert!(!sentence.contains("`pdf`"), "{sentence}");
+    core.execute(enable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(home_overrides_json(&fs), json!({ "overrides": {} }));
 }

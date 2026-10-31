@@ -55,6 +55,18 @@ impl Hit<'_> {
         locator::render(&self.switch.path, &self.key_path)
     }
 
+    /// The name the `wide-reach` warning gives the key of `entry` this
+    /// switch holds: the Entry's name for the key Disable writes, in its own
+    /// case even where the switch holds it in lower case, and the key itself
+    /// for a further one of `also_names`.
+    pub fn wide_reach_name(&self, entry: &ScannedEntry) -> String {
+        if switch_key(self.mechanism, entry).is_some_and(|key| key == self.key) {
+            entry.name.clone()
+        } else {
+            self.key.clone().into_owned()
+        }
+    }
+
     /// The State the switch gives the Entry: Blocked for managed policy,
     /// Disabled otherwise.
     pub fn state(&self) -> State {
