@@ -9029,6 +9029,139 @@ impl Holds for GateCondition {
     }
 }
 
+// --- Installation folders ---------------------------------------------------
+
+/// Where an Installation's folders are: a path glob, or a block that asks
+/// for them.
+// Deserialised by hand, so that a block's own error, such as a missing
+// field, is the one reported.
+#[derive(Debug, JsonSchema)]
+#[schemars(untagged)]
+pub(crate) enum InstallationFolder {
+    /// A glob of the folder, starting with `~/`, `%NAME%` or a drive; `*`
+    /// and `?` stay within one folder name and `{a,b}` is either, such as a
+    /// version folder.
+    Glob(String),
+    /// A block, for folders a glob cannot list.
+    Block(FolderSource),
+}
+
+impl<'de> Deserialize<'de> for InstallationFolder {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match toml::Value::deserialize(deserializer)? {
+            toml::Value::String(glob) => Ok(InstallationFolder::Glob(glob)),
+            block => FolderSource::deserialize(block)
+                .map(InstallationFolder::Block)
+                .map_err(serde::de::Error::custom),
+        }
+    }
+}
+
+impl Validate for InstallationFolder {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            InstallationFolder::Glob(glob) => paths::validate_glob(glob),
+            InstallationFolder::Block(block) => block.validate(),
+        }
+    }
+}
+
+impl InstallationFolder {
+    /// The folders it names on this machine, sorted: those its glob
+    /// matches, or those its block finds.
+    pub fn folders(&self, ports: &Ports) -> Vec<PathBuf> {
+        match self {
+            InstallationFolder::Glob(glob) => {
+                paths::expand_glob(glob, ports.fs.as_ref(), ports.env.as_ref())
+            }
+            InstallationFolder::Block(block) => block.folders(ports),
+        }
+    }
+}
+
+/// Where an Installation's folders are, when a glob cannot list them.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(tag = "block", rename_all = "kebab-case")]
+pub(crate) enum FolderSource {
+    MsixPackage(MsixPackage),
+}
+
+impl Validate for FolderSource {
+    fn validate(&self) -> Result<(), String> {
+        match self {
+            FolderSource::MsixPackage(block) => block.validate(),
+        }
+    }
+}
+
+impl FolderSource {
+    /// The folders it finds on this machine, sorted.
+    fn folders(&self, ports: &Ports) -> Vec<PathBuf> {
+        match self {
+            FolderSource::MsixPackage(block) => block.folders(ports),
+        }
+    }
+}
+
+/// A package family name, `<name>_<publisher id>`: the name in letters,
+/// digits, `.` and `-`, and the 13 lower-case letters and digits of the
+/// publisher id.
+const PACKAGE_FAMILY: &str = r"^[A-Za-z0-9.-]+_[0-9a-z]{13}$";
+
+static PACKAGE_FAMILY_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(PACKAGE_FAMILY).expect("the package family regex compiles"));
+
+/// The install folder of each MSIX package of a package family installed
+/// for the current user, as Windows names it, such as
+/// `C:\Program Files\WindowsApps\Claude_<version>_x64__pzs8sxrjxfjjc`.
+/// `WindowsApps`, which only an administrator can list, is never listed. A
+/// family can hold several packages, such as a resource package beside the
+/// main one, or two versions during an update: those without the
+/// executable are no Installations. None is found off Windows, nor when
+/// Windows cannot be asked.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MsixPackage {
+    /// The package family name, `<name>_<publisher id>`, such as
+    /// `Claude_pzs8sxrjxfjjc`: the publisher id keeps out a package of the
+    /// same name from another publisher.
+    #[schemars(regex(pattern = PACKAGE_FAMILY))]
+    pub family: String,
+}
+
+impl Validate for MsixPackage {
+    fn validate(&self) -> Result<(), String> {
+        if !PACKAGE_FAMILY_REGEX.is_match(&self.family) {
+            return Err(format!(
+                "package family `{}` must be `<name>_<publisher id>`, such as `Claude_pzs8sxrjxfjjc`",
+                self.family
+            ));
+        }
+        Ok(())
+    }
+}
+
+impl MsixPackage {
+    /// The install folders of the family's packages, sorted.
+    fn folders(&self, ports: &Ports) -> Vec<PathBuf> {
+        match ports.env.package_folders(&self.family) {
+            Ok(mut folders) => {
+                folders.sort();
+                folders
+            }
+            // Off Windows, there is no Windows to ask.
+            Err(error) if error.kind() == std::io::ErrorKind::Unsupported => {
+                tracing::debug!(family = %self.family, %error, "cannot ask Windows for a package family's packages");
+                Vec::new()
+            }
+            Err(error) => {
+                tracing::warn!(family = %self.family, %error, "cannot ask Windows for a package family's packages");
+                Vec::new()
+            }
+        }
+    }
+}
+
 // --- Version sources --------------------------------------------------------
 
 /// Reads an Installation's version from a file or the registry, never by

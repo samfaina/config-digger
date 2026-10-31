@@ -2568,6 +2568,42 @@
       ]
     },
     {
+      "id": "30",
+      "title": "La Installation de un paquete MSIX de Claude Desktop",
+      "steps": [
+        {
+          "id": "30.1",
+          "title": "Claude Desktop instalado como paquete MSIX tiene su Installation",
+          "goal": "config-digger encuentra la Installation de un Claude Desktop instalado como paquete MSIX sin listar C:\\Program Files\\WindowsApps, que un usuario sin derechos de administrador no puede listar: pregunta a Windows por los paquetes de su familia y lee la versión del AppxManifest.xml del paquete.",
+          "instructions": [
+            "Este paso necesita Claude Desktop instalado como paquete MSIX, desde claude.ai o desde la Microsoft Store. Si no lo está, marca Blocked.",
+            "Ejecuta en PowerShell la orden «Ver el paquete de Claude Desktop».",
+            "Apunta el Name, la Version y el InstallLocation que da.",
+            "Abre config-digger como siempre, sin derechos de administrador.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Mira la cabecera de Claude Desktop."
+          ],
+          "commands": [
+            {
+              "label": "Ver el paquete de Claude Desktop",
+              "shell": "powershell",
+              "text": "Get-AppxPackage -Name Claude, AnthropicPBC.Claude | Select-Object Name, Version, InstallLocation"
+            }
+          ],
+          "expect": [
+            "Para el Name Claude, la cabecera de Claude Desktop dice «msix» seguido de la Version apuntada.",
+            "Para el Name AnthropicPBC.Claude, la cabecera de Claude Desktop dice «msix-anthropicpbc» seguido de la Version apuntada.",
+            "Tras la versión, la cabecera dice «read from» seguido del InstallLocation apuntado y «\\AppxManifest.xml».",
+            "La cabecera de Claude Desktop no dice «no Installation found»."
+          ],
+          "covers": [
+            "#469"
+          ]
+        }
+      ]
+    },
+    {
       "id": "18",
       "title": "Leftovers en un Agent home oculto",
       "steps": [

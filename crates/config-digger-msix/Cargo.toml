@@ -1,0 +1,16 @@
+[package]
+name = "config-digger-msix"
+description = "The MSIX packages installed for the current user, asked of Windows's package API."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+
+# Not the workspace's lints, whose only one, `unsafe_code = "forbid"`, would
+# refuse the Win32 calls: their unsafe code stays in this crate (ADR 0012).
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"

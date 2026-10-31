@@ -611,10 +611,10 @@ fn core_while_claude_runs_with(
     path: Option<PathBuf>,
     cmdlines: &[&str],
 ) -> Core {
-    let mut ports = fake::ports(
-        fs.clone(),
-        env().with_var("ProgramFiles", r"C:\Program Files"),
-    );
+    let env = env()
+        .with_var("ProgramFiles", r"C:\Program Files")
+        .with_package("Claude_pzs8sxrjxfjjc", PACKAGE);
+    let mut ports = fake::ports(fs.clone(), env);
     let mut processes = FakeProcesses::default();
     for (pid, cmdline) in (7000..).zip(cmdlines) {
         processes = processes.with_process(RunningProcess {

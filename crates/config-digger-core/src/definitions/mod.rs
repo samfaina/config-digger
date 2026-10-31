@@ -10,10 +10,10 @@ use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
-    FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, Interpolation,
-    JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins, Locate, Locator, LookUp,
-    Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule, SessionFiles,
-    SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, InstallationFolder,
+    Interpolation, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins, Locate,
+    Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
+    SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -451,16 +451,17 @@ impl Validate for VerifiedRange {
 }
 
 /// A launchable copy of the Agent, with its own version. It is found when
-/// its executable exists, once per folder its `folder` glob matches.
+/// its executable exists, once per folder its `folder` names.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct InstallationDefinition {
     /// A stable id, such as `native`, unique in the definition.
     pub id: String,
-    /// A glob of the folder it is in, starting with `~/`, `%NAME%` or a
-    /// drive; `*` and `?` stay within one folder name and `{a,b}` is
-    /// either, such as a version folder.
-    pub folder: String,
+    /// The folder it is in: a glob, starting with `~/`, `%NAME%` or a
+    /// drive, where `*` and `?` stay within one folder name and `{a,b}` is
+    /// either, such as a version folder; or a block, such as the packages
+    /// of an MSIX package family.
+    pub folder: InstallationFolder,
     /// The `/`-separated path of its executable, relative to its folder.
     pub executable: String,
     /// Where its version is, tried in order: the first one read wins.
@@ -1703,7 +1704,7 @@ impl AgentDefinition {
         )?;
         for installation in &self.installations {
             let context = |e: String| format!("installation `{}`: {e}", installation.id);
-            crate::paths::validate_glob(&installation.folder).map_err(context)?;
+            installation.folder.validate().map_err(context)?;
             blocks::validate_relative(&installation.executable).map_err(context)?;
             if installation.versions.is_empty() {
                 return Err(context("versions needs at least one source".into()));
@@ -3728,6 +3729,37 @@ homes = ["default"]"#;
             "{}",
             error(&text)
         );
+    }
+
+    #[test]
+    fn an_installation_s_folder_can_be_the_packages_of_an_msix_package_family() {
+        let package = |family: &str| {
+            INSTALLATION.replace(
+                r#""%LOCALAPPDATA%/Programs/test-*""#,
+                &format!(r#"{{ block = "msix-package"{family} }}"#),
+            )
+        };
+        let text = with_installations("", &package(r#", family = "Claude_pzs8sxrjxfjjc""#));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_installations("", &package(""));
+        assert!(
+            error(&text).contains("missing field `family`"),
+            "{}",
+            error(&text)
+        );
+        for family in [
+            "Claude_*",
+            "Claude",
+            "Claude_PZS8SXRJXFJJC",
+            "_pzs8sxrjxfjjc",
+        ] {
+            let text = with_installations("", &package(&format!(r#", family = "{family}""#)));
+            assert!(
+                error(&text).contains("must be `<name>_<publisher id>`"),
+                "{family}: {}",
+                error(&text)
+            );
+        }
     }
 
     #[test]

@@ -39,19 +39,21 @@ name = "Claude Desktop"
 notes = ["cloud_connectors_not_on_disk"]
 
 # Each MSIX package installs to its own folder under `WindowsApps`, whose
-# manifest gives its version [disk]. A package's app reads the homes of its
-# lookup order, its `LocalCache` laid over the classic folder, and the
+# manifest gives its version [disk]. A user who is not an administrator
+# cannot list `WindowsApps`, but can read a package's folder [disk], which
+# Windows names for the package's family [docs]. A package's app reads the homes
+# of its lookup order, its `LocalCache` laid over the classic folder, and the
 # third-party home.
 [[installations]]
 id = "msix"
-folder = "%ProgramFiles%/WindowsApps/Claude_*"
+folder = { block = "msix-package", family = "Claude_pzs8sxrjxfjjc" }
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
 homes = ["claude-data", "msix-moved", "msix", "third-party"]
 
 [[installations]]
 id = "msix-anthropicpbc"
-folder = "%ProgramFiles%/WindowsApps/AnthropicPBC.Claude_*"
+folder = { block = "msix-package", family = "AnthropicPBC.Claude_fnn82j28hfe8t" }
 executable = "app/claude.exe"
 versions = [{ block = "appx-identity" }, { block = "exe-version" }]
 homes = ["claude-data", "msix-anthropicpbc-moved", "msix-anthropicpbc", "third-party"]

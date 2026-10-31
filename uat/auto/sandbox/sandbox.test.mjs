@@ -47,7 +47,7 @@ function testerPc(t, { lines = {}, env: more = {} } = {}) {
   const ui = join(repo, "crates", "config-digger-app", "ui");
   mkdirSync(ui, { recursive: true });
   writeFileSync(join(repo, "Cargo.toml"), `[workspace.package]\nversion = "${version}"\n`);
-  writeFileSync(join(repo, "Cargo.lock"), ["config-digger-app", "config-digger-cli", "config-digger-core", "xtask"].map((name) => `[[package]]\nname = "${name}"\nversion = "${version}"\n`).join("\n"));
+  writeFileSync(join(repo, "Cargo.lock"), ["config-digger-app", "config-digger-cli", "config-digger-core", "config-digger-msix", "xtask"].map((name) => `[[package]]\nname = "${name}"\nversion = "${version}"\n`).join("\n"));
   writeFileSync(join(ui, "package.json"), JSON.stringify({ name: "config-digger-ui", version }, null, 2));
   writeFileSync(join(ui, "package-lock.json"), JSON.stringify({ name: "config-digger-ui", version, packages: { "": { name: "config-digger-ui", version } } }, null, 2));
 

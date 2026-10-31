@@ -10,10 +10,10 @@ pub(crate) mod pe;
 use crate::api;
 use crate::definitions::blocks::{self, InstallationPaths, ReadVersion, VersionRead};
 use crate::definitions::{AgentDefinition, DefinitionNote};
+use crate::explain;
 use crate::ports::Ports;
 use crate::scan::{LastRanReading, Mirror, ScannedHome, Snapshot};
 use crate::version::{Standing, Version};
-use crate::{explain, paths};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
@@ -23,7 +23,7 @@ pub(crate) struct ScannedInstallation {
     pub agent_index: usize,
     /// The id of its definition's installation.
     pub id: String,
-    /// The folder its definition's `folder` glob matched.
+    /// A folder its definition's `folder` names.
     pub folder: PathBuf,
     pub executable: PathBuf,
     /// `None` when no source of its version could be read.
@@ -195,14 +195,12 @@ pub(crate) fn reads_laid_out(
 }
 
 /// Every Installation of every Agent, in definition order, each found once
-/// per folder its `folder` glob matches where its executable exists.
+/// per folder its `folder` names where its executable exists.
 pub(crate) fn find(definitions: &[AgentDefinition], ports: &Ports) -> Vec<ScannedInstallation> {
     let mut found = Vec::new();
     for (agent_index, definition) in definitions.iter().enumerate() {
         for installation in &definition.installations {
-            let folders =
-                paths::expand_glob(&installation.folder, ports.fs.as_ref(), ports.env.as_ref());
-            for folder in folders {
+            for folder in installation.folder.folders(ports) {
                 let executable = blocks::join_relative(&folder, &installation.executable);
                 if !ports.fs.exists(&executable) {
                     continue;

@@ -229,7 +229,7 @@
       ]
     },
     "InstallationDefinition": {
-      "description": "A launchable copy of the Agent, with its own version. It is found when\nits executable exists, once per folder its `folder` glob matches.",
+      "description": "A launchable copy of the Agent, with its own version. It is found when\nits executable exists, once per folder its `folder` names.",
       "type": "object",
       "properties": {
         "id": {
@@ -237,8 +237,8 @@
           "type": "string"
         },
         "folder": {
-          "description": "A glob of the folder it is in, starting with `~/`, `%NAME%` or a\ndrive; `*` and `?` stay within one folder name and `{a,b}` is\neither, such as a version folder.",
-          "type": "string"
+          "description": "The folder it is in: a glob, starting with `~/`, `%NAME%` or a\ndrive, where `*` and `?` stay within one folder name and `{a,b}` is\neither, such as a version folder; or a block, such as the packages\nof an MSIX package family.",
+          "$ref": "#/$defs/InstallationFolder"
         },
         "executable": {
           "description": "The `/`-separated path of its executable, relative to its folder.",
@@ -271,6 +271,47 @@
         "folder",
         "executable",
         "versions"
+      ]
+    },
+    "InstallationFolder": {
+      "description": "Where an Installation's folders are: a path glob, or a block that asks\nfor them.",
+      "anyOf": [
+        {
+          "description": "A glob of the folder, starting with `~/`, `%NAME%` or a drive; `*`\nand `?` stay within one folder name and `{a,b}` is either, such as a\nversion folder.",
+          "type": "string"
+        },
+        {
+          "description": "A block, for folders a glob cannot list.",
+          "$ref": "#/$defs/FolderSource"
+        }
+      ]
+    },
+    "FolderSource": {
+      "description": "Where an Installation's folders are, when a glob cannot list them.",
+      "oneOf": [
+        {
+          "description": "The install folder of each MSIX package of a package family installed\nfor the current user, as Windows names it, such as\n`C:\\Program Files\\WindowsApps\\Claude_<version>_x64__pzs8sxrjxfjjc`.\n`WindowsApps`, which only an administrator can list, is never listed. A\nfamily can hold several packages, such as a resource package beside the\nmain one, or two versions during an update: those without the\nexecutable are no Installations. None is found off Windows, nor when\nWindows cannot be asked.",
+          "type": "object",
+          "properties": {
+            "family": {
+              "description": "The package family name, `<name>_<publisher id>`, such as\n`Claude_pzs8sxrjxfjjc`: the publisher id keeps out a package of the\nsame name from another publisher.",
+              "type": "string",
+              "pattern": "^[A-Za-z0-9.-]+_[0-9a-z]{13}$"
+            },
+            "block": {
+              "type": "string",
+              "const": "msix-package"
+            },
+            "unverified": {
+              "$ref": "#/$defs/Unverified"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "block",
+            "family"
+          ]
+        }
       ]
     },
     "VersionSource": {

@@ -536,9 +536,11 @@ dependencies = [
 name = "config-digger-core"
 version = "0.1.0-rc.3"
 dependencies = [
+ "config-digger-msix",
  "humantime",
  "ignore",
  "jsonc-parser",
+ "jsonschema",
  "junction",
  "regex",
  "regex-lite",
@@ -556,6 +558,13 @@ dependencies = [
  "toml_edit 0.25.15+spec-1.1.0",
  "tracing",
  "winreg 0.56.0",
+]
+
+[[package]]
+name = "config-digger-msix"
+version = "0.1.0-rc.3"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

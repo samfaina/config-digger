@@ -154,6 +154,10 @@ impl Environment for Fixture {
     fn registry_values(&self, _: Hive, _: &str) -> Option<Vec<(String, RegistryData)>> {
         None
     }
+
+    fn package_folders(&self, _: &str) -> std::io::Result<Vec<PathBuf>> {
+        Ok(Vec::new())
+    }
 }
 
 #[cfg(test)]
