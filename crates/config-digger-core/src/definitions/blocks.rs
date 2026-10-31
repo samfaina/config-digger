@@ -5274,33 +5274,38 @@ static CONTROL_OR_FORMAT: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"[\p{Cc}\p{Cf}\x{2028}\x{2029}]").expect("a valid class"));
 
 impl RefusedChars {
-    /// Whether a key or a string of `value`, at any depth, holds one of
-    /// these characters.
-    fn held_in(self, value: &Value) -> bool {
-        let class = match self {
-            RefusedChars::ControlOrFormat => &*CONTROL_OR_FORMAT,
-        };
-        match value {
-            Value::String(text) => class.is_match(text),
-            Value::Array(items) => items.iter().any(|item| self.held_in(item)),
-            Value::Object(object) => object
-                .iter()
-                .any(|(key, value)| class.is_match(key) || self.held_in(value)),
-            _ => false,
+    fn refuses(self, text: &str) -> bool {
+        match self {
+            RefusedChars::ControlOrFormat => CONTROL_OR_FORMAT.is_match(text),
         }
     }
 }
 
-/// Whether a string of `value`, at any depth, holds a `${...}` reference.
-fn holds_reference(value: &Value) -> bool {
+/// Whether a string of `value`, at any depth, passes `test`, or, with
+/// `keys`, a key of one of its objects does.
+fn any_string(value: &Value, keys: bool, test: &dyn Fn(&str) -> bool) -> bool {
     match value {
-        Value::String(text) => text
-            .split_once("${")
-            .is_some_and(|(_, rest)| rest.contains('}')),
-        Value::Array(items) => items.iter().any(holds_reference),
-        Value::Object(object) => object.values().any(holds_reference),
+        Value::String(text) => test(text),
+        Value::Array(items) => items.iter().any(|item| any_string(item, keys, test)),
+        Value::Object(object) => object
+            .iter()
+            .any(|(key, value)| (keys && test(key)) || any_string(value, keys, test)),
         _ => false,
     }
+}
+
+/// Whether a key or a string of `value`, at any depth, holds a character
+/// `refused` refuses.
+fn holds_refused(value: &Value, refused: RefusedChars) -> bool {
+    any_string(value, true, &|text| refused.refuses(text))
+}
+
+/// Whether a string of `value`, at any depth, holds a `${...}` reference.
+fn holds_reference(value: &Value) -> bool {
+    any_string(value, false, &|text| {
+        text.split_once("${")
+            .is_some_and(|(_, rest)| rest.contains('}'))
+    })
 }
 
 impl FieldShape {
@@ -5363,7 +5368,7 @@ impl Conform for FieldShape {
             return Some(malformed);
         }
         if let Some(refused) = self.refused_chars
-            && refused.held_in(value)
+            && holds_refused(value, refused)
         {
             return Some(Malformed::RefusedChars(refused));
         }

@@ -306,11 +306,12 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # `headersHelper` [docs]; no key or value holds a control or invisible
 # formatting character [docs], a control or format character, U+2028 or
 # U+2029, in any key of an object or any string [binary]; no value holds a
-# `${VAR}` reference, since it expands none here [docs], checked after the
-# characters [binary]; and the name holds only letters, digits, `-` and `_`
-# [docs], the name being no key of that walk [binary]. Claude Code walks no
-# deeper than five levels of nesting [binary]; config-digger checks every
-# depth. A dropped entry competes with no server by name: a user server of
+# `${VAR}` reference, since it expands none here [docs], a string being
+# checked for the characters first [binary]; and the name holds only
+# letters, digits, `-` and `_` [docs], the name being no key of that walk
+# [binary]. Claude Code walks no deeper than five levels of nesting
+# [binary]; config-digger checks every depth, and every string for the
+# characters before any for a reference. A dropped entry competes with no server by name: a user server of
 # its name loads, beside an entry with a command or at an `http://` URL, in
 # `managed-settings.json` or the HKLM value [test].
 [[locations]]
