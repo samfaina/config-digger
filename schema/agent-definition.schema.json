@@ -4743,6 +4743,11 @@
               "type": "boolean",
               "default": false
             },
+            "plugin_entries": {
+              "description": "Whether the Agent holds an Entry of a plugin in the list too, by\nthe id its location's `switch_id` makes, which names its plugin\nwith `{plugin_uri}`, such as VS Code's `plugin.<plugin URI>.<name>`\nin `mcp.enablement`. Omitted, an Entry of a plugin is Disabled\nthrough a switch keyed by plugin only.",
+              "type": "boolean",
+              "default": false
+            },
             "locations": {
               "description": "The ids of the locations whose Entries it Disables. Omitted, it\nDisables Entries of every location of the Item kind.",
               "type": "array",

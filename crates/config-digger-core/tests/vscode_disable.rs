@@ -1175,28 +1175,142 @@ fn review_kit() -> PathBuf {
     Path::new(HOME).join(r".vscode\agent-plugins\github.com\acme\review-market\plugins\review-kit")
 }
 
-/// The message `action` on the fixture plugin's server `linear` is refused
-/// with, its `.mcp.json` holding `text`.
-fn refused_on_plugin_server(action: Action, text: &str) -> String {
+/// The plan of `action` on the fixture plugin's server `linear`, its
+/// `.mcp.json` holding `text`.
+fn plan_on_plugin_server(action: Action, text: &str) -> Result<Plan, Error> {
     let mcp_json = review_kit().join(".mcp.json");
     let fs = with_home(vscode()).with_file(&mcp_json, text);
     let linear = format!(r"{}#mcpServers.linear", mcp_json.display());
-    let error = plan(&core(&fs), &context(None), action, &[&linear])
-        .err()
-        .expect("the plan is refused");
-    assert_eq!(code(error.code), "blocked");
-    error.message
+    plan(&core(&fs), &context(None), action, &[&linear])
+}
+
+/// Each file a plan writes and the edits it makes there.
+fn edits(plan: &Plan) -> Value {
+    plan.preview()
+        .files
+        .iter()
+        .map(|file| json!([file.path, file.edits]))
+        .collect()
 }
 
 #[test]
 fn a_server_read_around_the_error_of_a_plugin_mcp_json_takes_the_answers_of_one_that_parses() {
     let parses = r#"{ "mcpServers": { "linear": { "url": "https://mcp.linear.app/mcp" }, "fetch": { "command": "uvx" } } }"#;
     let broken = parses.replace("},", "},,");
-    for action in [Action::Disable, Action::Remove] {
-        // VS Code keeps no switch per plugin, and a plugin goes whole.
-        assert_eq!(
-            refused_on_plugin_server(action, &broken),
-            refused_on_plugin_server(action, parses),
+
+    // `mcp.enablement` holds the server by its plugin's URI.
+    let disable = |text: &str| edits(&plan_on_plugin_server(Action::Disable, text).unwrap());
+    assert_eq!(disable(parses)[0][0], json!(profile_store()));
+    assert_eq!(disable(&broken), disable(parses));
+    // A plugin goes whole.
+    let remove = |text: &str| {
+        let error = plan_on_plugin_server(Action::Remove, text)
+            .err()
+            .expect("Remove is refused");
+        assert_eq!(code(error.code), "blocked");
+        error.message
+    };
+    assert_eq!(remove(&broken), remove(parses));
+}
+
+/// The id `mcp.enablement` holds the fixture plugin's server `name` by.
+fn review_kit_switch_id(name: &str) -> String {
+    format!(
+        "plugin.file:///c%3A/Users/fixture/.vscode/agent-plugins/github.com/acme/review-market/plugins/review-kit.{name}"
+    )
+}
+
+/// The fixture plugin's server `linear`, in its `.mcp.json`.
+fn plugin_linear() -> String {
+    format!(
+        r"{}#mcpServers.linear",
+        review_kit().join(".mcp.json").display()
+    )
+}
+
+#[test]
+fn disable_of_a_plugin_s_server_without_a_project_pairs_its_plugin_id_with_false_in_the_profile_s_store()
+ {
+    let fs = with_home(vscode());
+    let core = core(&fs);
+
+    let plan = plan(&core, &context(None), Action::Disable, &[&plugin_linear()]).unwrap();
+    assert_eq!(plan.preview().files[0].path, profile_store());
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        item_value(&fs, &profile_store(), "mcp.enablement"),
+        Some(json!([[review_kit_switch_id("linear"), false]]))
+    );
+    let inventory = inventory(&core, &context(None));
+    assert_eq!(code(item(&inventory, "linear").state), "disabled");
+}
+
+#[test]
+fn disable_of_a_plugin_s_server_in_a_project_pairs_its_plugin_id_with_false_in_the_workspace_s_store()
+ {
+    let fs = with_project(with_home(vscode()), "app");
+    let core = core(&fs);
+    let app = context(Some(&project("app")));
+
+    let plan = plan(&core, &app, Action::Disable, &[&plugin_linear()]).unwrap();
+    assert_eq!(plan.preview().files[0].path, app_store());
+    core.execute(plan, &[]).unwrap();
+
+    assert_eq!(
+        item_value(&fs, &app_store(), "mcp.enablement"),
+        Some(json!([[review_kit_switch_id("linear"), false]]))
+    );
+    assert_eq!(item_value(&fs, &profile_store(), "mcp.enablement"), None);
+    let inventory = inventory(&core, &app);
+    assert_eq!(code(item(&inventory, "linear").state), "disabled");
+}
+
+#[test]
+fn enable_takes_a_plugin_s_server_s_pair_out_of_the_workspace_s_store_and_the_profile_s() {
+    let pair = json!([[review_kit_switch_id("linear"), false]]).to_string();
+    let fs = with_project(with_home(vscode()), "app")
+        .with_sqlite_item(profile_store(), "mcp.enablement", &pair)
+        .with_sqlite_item(app_store(), "mcp.enablement", &pair);
+    let core = core(&fs);
+    let app = context(Some(&project("app")));
+
+    let plan = plan(&core, &app, Action::Enable, &[&plugin_linear()]).unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        item_value(&fs, &app_store(), "mcp.enablement"),
+        Some(json!([]))
+    );
+    assert_eq!(
+        item_value(&fs, &profile_store(), "mcp.enablement"),
+        Some(json!([]))
+    );
+    let inventory = inventory(&core, &app);
+    assert_eq!(code(item(&inventory, "linear").state), "effective");
+}
+
+#[test]
+fn disable_of_a_server_of_the_file_a_plugin_s_manifest_names_pairs_its_plugin_id_with_false() {
+    let servers = review_kit().join("servers.json");
+    let fs = with_home(vscode())
+        .with_file(
+            review_kit().join("plugin.json"),
+            r#"{ "name": "review-kit", "mcpServers": "./servers.json" }"#,
+        )
+        .with_file(
+            &servers,
+            r#"{ "mcpServers": { "sentry": { "command": "sentry" } } }"#,
         );
-    }
+    let core = core(&fs);
+    let sentry = format!(r"{}#mcpServers.sentry", servers.display());
+
+    let plan = plan(&core, &context(None), Action::Disable, &[&sentry]).unwrap();
+    assert_eq!(plan.preview().files[0].path, profile_store());
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        item_value(&fs, &profile_store(), "mcp.enablement"),
+        Some(json!([[review_kit_switch_id("sentry"), false]]))
+    );
 }
