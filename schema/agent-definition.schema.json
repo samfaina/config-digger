@@ -3516,7 +3516,7 @@
       "description": "The minimal shape of the Entries of a location.",
       "oneOf": [
         {
-          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `one_of`; each field of `required`, in\nits order, then the other fields of `values` and `prefixes`, each field\nchecked for being held, then against `values`, then `prefixes`;\n`forbidden`; `types`; `refused_chars`; `no_references`; `name`; then\n`refused_names`.",
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `name`, then `refused_names`, on its\nname; then on its value, `forbidden`, in its order; `values`, a field\nthe Entry does not hold failing it; `prefixes`, checked only on a\nstring; one walk of the keys and strings the value holds, at any depth,\nin the order it holds them, each key checked against `refused_chars`\nand each string against `refused_chars`, then `no_references`;\n`required`, in its order; `one_of`; then `types`.",
           "type": "object",
           "properties": {
             "one_of": {
