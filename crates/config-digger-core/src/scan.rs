@@ -1634,7 +1634,7 @@ fn read_as_if(
             if !location.anchor.project_file() {
                 for (project_folder, key) in &folders {
                     for (folder, depth) in
-                        folders_read(ports, project_folder, &location.anchor, &mut walks)
+                        folders_read(ports, &as_if, project_folder, &location.anchor, &mut walks)
                     {
                         read.push((folder, key, depth));
                     }
@@ -1648,7 +1648,7 @@ fn read_as_if(
                     }
                     for (index, member) in members.iter().enumerate() {
                         for (folder, depth) in
-                            folders_read(ports, member, &location.anchor, &mut walks)
+                            folders_read(ports, &as_if, member, &location.anchor, &mut walks)
                         {
                             read.push((folder, key, index * MEMBER_RANKS + depth));
                         }
@@ -3420,9 +3420,12 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
 
 /// The folders the location anchored at `anchor` in the Project folder
 /// `folder` is read in, with how many levels up each one is: 0 for a
-/// folder below it.
+/// folder below it. Whether a linked worktree's root holds the path, and
+/// which main checkout it names, is read as if the planned folders were
+/// done, from `as_if`.
 fn folders_read(
     ports: &Ports,
+    as_if: &dyn FileSystem,
     folder: &Path,
     anchor: &Anchor,
     walks: &mut walk::WalksDown,
@@ -3440,14 +3443,21 @@ fn folders_read(
         }
         ProjectWalk::UpToRepoRoot => {
             let up: Vec<&Path> = folder.ancestors().collect();
-            match up.iter().position(|parent| fs.exists(&parent.join(".git"))) {
-                Some(root) => up[..=root]
-                    .iter()
-                    .enumerate()
-                    .map(|(depth, parent)| (parent.to_path_buf(), depth))
-                    .collect(),
-                None => vec![(folder.to_path_buf(), 0)],
+            let Some(root) = up.iter().position(|parent| fs.exists(&parent.join(".git"))) else {
+                return vec![(folder.to_path_buf(), 0)];
+            };
+            let mut read: Vec<(PathBuf, usize)> = up[..=root]
+                .iter()
+                .enumerate()
+                .map(|(depth, parent)| (parent.to_path_buf(), depth))
+                .collect();
+            if let Some(path) = anchor.main_checkout_fallback()
+                && !as_if.exists(&blocks::join_relative(up[root], path))
+                && let Some(common) = linked_common_folder(as_if, up[root])
+            {
+                read.push((fallback_folder(common), root + 1));
             }
+            read
         }
         ProjectWalk::UpToBelowRoot => folder
             .ancestors()
@@ -3469,26 +3479,50 @@ fn repository(fs: &dyn FileSystem, folder: &Path) -> (Option<PathBuf>, Option<Pa
     else {
         return (None, None);
     };
-    // A `.git` folder cannot be read as a file.
-    let main = fs
-        .read(&root.join(".git"))
-        .ok()
-        .and_then(|bytes| String::from_utf8(bytes).ok())
-        .and_then(|text| {
-            let gitdir = text.lines().find_map(|line| line.strip_prefix("gitdir:"))?;
-            let gitdir = paths::lexical(&root.join(gitdir.trim()));
-            let worktrees = gitdir.parent()?;
-            let dot_git = worktrees.parent()?;
-            let named = |path: &Path, name: &str| {
-                path.file_name()
-                    .is_some_and(|known| known.eq_ignore_ascii_case(name))
-            };
-            (named(worktrees, "worktrees") && named(dot_git, ".git"))
-                .then(|| dot_git.parent().map(Path::to_path_buf))
-                .flatten()
-        });
+    let main = linked_main_checkout(fs, root);
     let root = root.to_path_buf();
     (Some(root.clone()), Some(main.unwrap_or(root)))
+}
+
+/// The main checkout of the linked worktree whose root is `root`, whose
+/// `.git` is a file naming `<main>\.git\worktrees\<name>`: that `<main>`.
+/// None for any other root.
+fn linked_main_checkout(fs: &dyn FileSystem, root: &Path) -> Option<PathBuf> {
+    let common = linked_common_folder(fs, root)?;
+    named(&common, ".git")
+        .then(|| common.parent().map(Path::to_path_buf))
+        .flatten()
+}
+
+/// The folder a linked worktree whose common git folder is `common` falls
+/// back to: the main checkout `<main>` of `<main>\.git`, or `common` itself
+/// when it has another name, as for a bare repo, a `--separate-git-dir`
+/// checkout or a submodule.
+fn fallback_folder(common: PathBuf) -> PathBuf {
+    match common.parent() {
+        Some(main) if named(&common, ".git") => main.to_path_buf(),
+        _ => common,
+    }
+}
+
+/// The common git folder of the linked worktree whose root is `root`: the
+/// `<common>` of the `<common>\worktrees\<name>` its `.git` file names,
+/// such as `<main>\.git` or a bare repo's folder. None for any other root.
+fn linked_common_folder(fs: &dyn FileSystem, root: &Path) -> Option<PathBuf> {
+    // A `.git` folder cannot be read as a file.
+    let text = String::from_utf8(fs.read(&root.join(".git")).ok()?).ok()?;
+    let gitdir = text.lines().find_map(|line| line.strip_prefix("gitdir:"))?;
+    let gitdir = paths::lexical(&root.join(gitdir.trim()));
+    let worktrees = gitdir.parent()?;
+    named(worktrees, "worktrees")
+        .then(|| worktrees.parent().map(Path::to_path_buf))
+        .flatten()
+}
+
+/// Whether the last part of `path` is `name`, without regard to case.
+fn named(path: &Path, name: &str) -> bool {
+    path.file_name()
+        .is_some_and(|known| known.eq_ignore_ascii_case(name))
 }
 
 /// The `SKILL.md` of the skill Entry `entry` at its real path: through the

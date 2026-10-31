@@ -763,13 +763,40 @@ pub(crate) struct ProjectAnchor {
     /// below it. Only a location can walk.
     #[serde(default)]
     pub walk: ProjectWalk,
+    /// With `walk = "up-to-repo-root"`, what is read in a linked worktree,
+    /// whose `.git` file names its main checkout. Without it, a linked
+    /// worktree is read as any repo, up to its own root.
+    #[serde(default)]
+    pub linked_worktree: LinkedWorktree,
 }
 
 impl Validate for ProjectAnchor {
     fn validate(&self) -> Result<(), String> {
         validate_relative(&self.path)?;
+        if self.linked_worktree != LinkedWorktree::Own && self.walk != ProjectWalk::UpToRepoRoot {
+            return Err("`linked_worktree` needs `walk = \"up-to-repo-root\"`".into());
+        }
         self.walk.validate()
     }
+}
+
+/// What a walk up to the repo root reads when the repo is a linked
+/// worktree, as `git worktree add` makes one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum LinkedWorktree {
+    /// The worktree's own folders, up to its root, as in any repo.
+    #[default]
+    Own,
+    /// The worktree's own folders, up to its root, and when its root does
+    /// not hold the path, as a file, a folder or a link that leads
+    /// somewhere, the path in the root of the main checkout too, ranked
+    /// below every folder of the walk. The main checkout is `<main>` of
+    /// the `<main>\.git\worktrees\<name>` the worktree's `.git` file
+    /// names; when the folder holding `worktrees` has another name, as for
+    /// a bare repo, a `--separate-git-dir` checkout or a submodule, it is
+    /// that folder itself.
+    MainCheckoutFallback,
 }
 
 impl Anchored for ProjectAnchor {
@@ -1101,7 +1128,21 @@ impl Anchor {
             Anchor::Project(ProjectAnchor {
                 path,
                 walk: ProjectWalk::Down(down),
+                ..
             }) => Some((down, path)),
+            _ => None,
+        }
+    }
+
+    /// The path its walk up to the repo root also reads in the root of a
+    /// linked worktree's main checkout, when the worktree's root lacks it.
+    pub fn main_checkout_fallback(&self) -> Option<&str> {
+        match self {
+            Anchor::Project(ProjectAnchor {
+                path,
+                linked_worktree: LinkedWorktree::MainCheckoutFallback,
+                ..
+            }) => Some(path),
             _ => None,
         }
     }
