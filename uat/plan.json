@@ -2453,6 +2453,43 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -Frontmatter"
           },
           "covers": ["#299"]
+        },
+        {
+          "id": "23.3",
+          "title": "VS Code conserva los valores que puede leer de un frontmatter que no es YAML",
+          "goal": "VS Code lee con su propio parser un frontmatter que no es YAML: una skill cuya description lleva «: » sale Effective con esa description, y una cuya description abre un «[» que nunca cierra sale Effective sin description, con la nota de que VS Code no la lista a su modelo.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con el APPDATA de prueba».",
+            "En el panel Agents, elige VS Code.",
+            "En el desplegable Project, elige E:\\cd-throwaway\\project.",
+            "Busca cd-throwaway-fm-vscode en la lista Items.",
+            "Abre el Item cd-throwaway-fm-vscode-colon.",
+            "Lee la configuración de su Entry.",
+            "Abre el Item cd-throwaway-fm-vscode-unclosed.",
+            "Lee la configuración y las notas de su Entry.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con el APPDATA de prueba",
+              "shell": "powershell",
+              "text": "$env:APPDATA = 'E:\\cd-throwaway\\vscode-appdata'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            }
+          ],
+          "expect": [
+            "El Item «cd-throwaway-fm-vscode-colon» sale «Effective».",
+            "La configuración de su Entry tiene la línea «\"description\": \"Throwaway skill for testing config-digger. Use when: never.\"».",
+            "El Item «cd-throwaway-fm-vscode-unclosed» sale «Effective».",
+            "La configuración de su Entry no tiene ninguna línea «\"description\"».",
+            "Su Entry tiene la nota «The user can still run this skill in VS Code, but VS Code does not list it to its model: its SKILL.md has no `description`.»."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba con perfiles de VS Code y frontmatters que no son YAML",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -VsCode -Frontmatter"
+          },
+          "covers": ["#473"]
         }
       ]
     },

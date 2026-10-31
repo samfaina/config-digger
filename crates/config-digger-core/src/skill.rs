@@ -8,6 +8,7 @@
 use crate::api::{Error, SkillContent, SkillFile, SkillFileChange, SkillFileChangeKind};
 use crate::definitions::blocks::{SkillDefect, SkillFallback, Unlisted};
 use crate::ports::FileSystem;
+use crate::yaml_around_error::{self, Node};
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -129,11 +130,13 @@ pub(crate) struct Frontmatter {
     /// Its top-level scalar keys, as far as a skill's `name` and
     /// `description` need.
     pub keys: BTreeMap<String, String>,
-    /// Whether it is YAML the Agent reads, as far as config-digger can
-    /// tell: not read line by line, and with no plain value opening a `[`
-    /// or `{` collection it never closes, which YAML refuses though
-    /// config-digger reads the value as a string.
-    pub read_as_yaml: bool,
+    /// Whether config-digger reads its values as the Agent does: read with
+    /// the Agent's own parser, as `keep-values` says, or YAML the Agent
+    /// reads, as far as config-digger can tell: not read line by line, and
+    /// with no plain value opening a `[` or `{` collection it never
+    /// closes, which YAML refuses though config-digger reads the value as
+    /// a string.
+    pub as_the_agent_reads: bool,
     /// Whether it sets `disable-model-invocation` to the boolean `true`.
     pub disables_model_invocation: bool,
 }
@@ -142,8 +145,15 @@ pub(crate) struct Frontmatter {
 /// `malformed_frontmatter` is `reading` reads it. Or why it has none: the
 /// text does not open with a `---` frontmatter, the frontmatter is not YAML
 /// the Agent reads, or, read line by line, it lacks the `name` or the
-/// `description`.
+/// `description`. An Agent that keeps the values of a frontmatter that is
+/// not YAML reads every frontmatter with its own parser, which never fails.
 pub(crate) fn frontmatter(text: &str, reading: SkillFallback) -> Result<Frontmatter, SkillDefect> {
+    if reading == SkillFallback::KeepValues {
+        return match lines(text) {
+            Ok(None) => Err(SkillDefect::NoFrontmatter),
+            _ => Ok(kept_values(frontmatter_text(text))),
+        };
+    }
     let lines = match lines(text) {
         Ok(lines) => lines,
         Err(Unclosed) if reading.reads_again() => return Err(SkillDefect::NoFrontmatter),
@@ -152,7 +162,10 @@ pub(crate) fn frontmatter(text: &str, reading: SkillFallback) -> Result<Frontmat
     .ok_or(SkillDefect::NoFrontmatter)?;
     let read = scalars(&lines);
     let yaml = read.as_ref().filter(|read| match reading {
-        SkillFallback::Skip | SkillFallback::FolderName => !read.any(|scalar| scalar.colon),
+        // `keep-values` reads with the Agent's own parser above.
+        SkillFallback::Skip | SkillFallback::FolderName | SkillFallback::KeepValues => {
+            !read.any(|scalar| scalar.colon)
+        }
         SkillFallback::QuoteValues => {
             !read.indented_first
                 && !read.any(Scalar::refused_quoted)
@@ -176,7 +189,7 @@ pub(crate) fn frontmatter(text: &str, reading: SkillFallback) -> Result<Frontmat
                 .iter()
                 .map(|(key, scalar)| (key.clone(), scalar.value.clone()))
                 .collect(),
-            read_as_yaml: !read.any(|scalar| scalar.unclosed_collection),
+            as_the_agent_reads: !read.any(|scalar| scalar.unclosed_collection),
             disables_model_invocation: read
                 .keys
                 .get("disable-model-invocation")
@@ -190,13 +203,60 @@ pub(crate) fn frontmatter(text: &str, reading: SkillFallback) -> Result<Frontmat
     }
 }
 
+/// The frontmatter `text` as VS Code's own parser reads it: the scalars of
+/// the mapping it gives, of a key given twice the first
+/// alone, and no scalar when that first value is a collection. VS Code
+/// takes an empty `description` for none, and only the value `true`,
+/// quoted or not, for the boolean.
+fn kept_values(text: &str) -> Frontmatter {
+    let mut first: BTreeMap<String, Node> = BTreeMap::new();
+    if let Some(Node::Map(properties)) = yaml_around_error::parse(text) {
+        for (key, value) in properties {
+            first.entry(key).or_insert(value);
+        }
+    }
+    let keys: BTreeMap<String, String> = first
+        .into_iter()
+        .filter_map(|(key, value)| match value {
+            Node::Scalar(value) => Some((key, value)),
+            Node::Sequence | Node::Map(_) => None,
+        })
+        .filter(|(key, value)| key != "description" || !value.is_empty())
+        .collect();
+    Frontmatter {
+        disables_model_invocation: keys
+            .get("disable-model-invocation")
+            .is_some_and(|value| value == "true"),
+        keys,
+        as_the_agent_reads: true,
+    }
+}
+
+/// The text of the frontmatter of a `SKILL.md` that opens with `---`, each
+/// line with its line break, up to the line that closes it or, when none
+/// does, the end of the file.
+fn frontmatter_text(text: &str) -> &str {
+    let text = text.trim_start_matches('\u{feff}');
+    let mut lines = text.split_inclusive('\n');
+    let start = lines.next().map_or(0, str::len);
+    let mut end = start;
+    for line in lines {
+        if line.trim_end() == "---" {
+            break;
+        }
+        end += line.len();
+    }
+    &text[start..end]
+}
+
 /// Of `reasons`, in their order as declared, those for which an Agent
 /// leaves out of its model's list the skill whose `SKILL.md` holds `text`
 /// and whose frontmatter it reads as `read`. A frontmatter that is not
 /// YAML config-digger reads, or that never closes, gives no other reason
 /// than the malformed frontmatter, as the Agent may keep values from it
-/// that config-digger does not read; one the Agent reads as no
-/// frontmatter gives none.
+/// that config-digger does not read, unless config-digger reads it with
+/// the Agent's own parser; one the Agent reads as no frontmatter gives
+/// none.
 pub(crate) fn unlisted(
     text: &str,
     read: &Result<Frontmatter, SkillDefect>,
@@ -208,8 +268,8 @@ pub(crate) fn unlisted(
             matches!(lines(text), Ok(None))
         }
         (Err(SkillDefect::MalformedFrontmatter), Unlisted::MalformedFrontmatter) => true,
-        (Ok(read), Unlisted::MalformedFrontmatter) => !read.read_as_yaml,
-        (Ok(read), _) if !read.read_as_yaml => false,
+        (Ok(read), Unlisted::MalformedFrontmatter) => !read.as_the_agent_reads,
+        (Ok(read), _) if !read.as_the_agent_reads => false,
         (Ok(read), Unlisted::NoDescription) => !read.keys.contains_key("description"),
         (Ok(read), Unlisted::DisableModelInvocation) => read.disables_model_invocation,
         (Err(_), _) => false,

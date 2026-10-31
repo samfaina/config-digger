@@ -784,6 +784,62 @@ fn vs_code_loads_a_skill_whose_frontmatter_is_not_yaml_under_its_folder_s_name()
     assert_eq!(json(skill(&inventory, "broken").state), "effective");
 }
 
+#[test]
+fn vs_code_keeps_the_values_it_can_read_from_a_frontmatter_that_is_not_yaml_or_never_closes() {
+    // The probe's skills, and the description `chat.getSkills` gives each.
+    for (text, description) in [
+        ("---\ndescription: [unclosed\n---\n", Value::Null),
+        (
+            "---\ndescription: probe\nargument-hint: [unclosed\n---\n",
+            "probe".into(),
+        ),
+        ("---\ndescription: probe\nnot a key\n---\n", "probe".into()),
+        ("---\ndescription: a: b\n---\n", "a: b".into()),
+        ("---\ndescription: probe\nbody\n", "probe".into()),
+    ] {
+        for entry in in_project_and_user_folder("broken", text) {
+            assert_eq!(
+                entry_json(&entry)["config"]["description"],
+                description,
+                "{text} in {}",
+                entry.scope
+            );
+        }
+    }
+}
+
+#[test]
+fn vs_code_reads_every_frontmatter_with_its_own_parser() {
+    for (text, description) in [
+        // YAML would refuse these, though config-digger's own reading takes
+        // them as a description.
+        ("---\ndescription: - item\n---\n", Value::Null),
+        ("---\ndescription:x\n---\n", Value::Null),
+        // A deeper key is one of the mapping, and a key with no value an
+        // empty one.
+        ("---\na:\n  b: c\n description: d\n---\n", "d".into()),
+        // A comment, an escaped quote, an escape and a block scalar.
+        ("---\ndescription: foo # c\n---\n", "foo".into()),
+        ("---\ndescription: 'it''s'\n---\n", "it's".into()),
+        ("---\ndescription: \"a\\nb\"\n---\n", "a\nb".into()),
+        // A line break inside quotes folds into a space.
+        ("---\ndescription: \"a\nb\"\n---\n", "a b".into()),
+        (
+            "---\ndescription: |\n  one\n  two\n---\n",
+            "one\ntwo\n".into(),
+        ),
+    ] {
+        for entry in in_project_and_user_folder("parsed", text) {
+            assert_eq!(
+                entry_json(&entry)["config"]["description"],
+                description,
+                "{text} in {}",
+                entry.scope
+            );
+        }
+    }
+}
+
 /// The sentences of the `unlisted` notes of `entry`, each checked to name
 /// no switch.
 fn unlisted(entry: &Entry) -> Vec<&str> {
@@ -885,9 +941,7 @@ fn a_skill_with_a_description_that_leaves_model_invocation_on_is_listed() {
     for text in [
         "---\ndescription: Deploys.\ndisable-model-invocation: false\n---\n",
         "---\ndescription: Deploys.\n---\n",
-        // Quoted, it is a string, not the boolean.
-        "---\ndescription: Deploys.\ndisable-model-invocation: \"true\"\n---\n",
-        // How VS Code reads another spelling of the boolean is not known.
+        // VS Code reads only the value `true` as the boolean.
         "---\ndescription: Deploys.\ndisable-model-invocation: True\n---\n",
     ] {
         assert_eq!(
@@ -899,15 +953,60 @@ fn a_skill_with_a_description_that_leaves_model_invocation_on_is_listed() {
 }
 
 #[test]
-fn a_frontmatter_config_digger_reads_as_malformed_gives_no_unlisted_note() {
+fn a_skill_is_unlisted_for_what_vs_code_s_parser_reads_from_its_frontmatter() {
+    const DISABLED: &str = "The user can still run this skill in VS Code, but VS Code does not list it to its model: its SKILL.md sets `disable-model-invocation: true`.";
+    for (text, note) in [
+        // A collection that never closes is no description.
+        ("---\ndescription: [unclosed\n---\n", NO_DESCRIPTION),
+        (
+            "---\nname: broken\nargument-hint: {unclosed\n---\n",
+            NO_DESCRIPTION,
+        ),
+        // An empty one is none.
+        ("---\ndescription:\nnot a key\n---\n", NO_DESCRIPTION),
+        ("---\ndescription: \"\"\n---\n", NO_DESCRIPTION),
+        ("---\ndescription: [a, b]\n---\n", NO_DESCRIPTION),
+        ("---\ndescription: - item\n---\n", NO_DESCRIPTION),
+        (
+            "---\ndisable-model-invocation: true\nnot a key\n---\n",
+            NO_DESCRIPTION_AND_DISABLED,
+        ),
+        (
+            "---\ndisable-model-invocation: true\nbody\n",
+            NO_DESCRIPTION_AND_DISABLED,
+        ),
+        (
+            "---\ndescription: probe\ndisable-model-invocation: true\nnot a key\n---\n",
+            DISABLED,
+        ),
+        // VS Code reads only the value `true` as the boolean, quoted or not.
+        (
+            "---\ndescription: a: b\ndisable-model-invocation: \"true\"\n---\n",
+            DISABLED,
+        ),
+        (
+            "---\ndescription: Deploys.\ndisable-model-invocation: \"true\"\n---\n",
+            DISABLED,
+        ),
+    ] {
+        assert_eq!(
+            unlisted_in_project_and_user_folder("broken", text),
+            [[note]; 2],
+            "{text}"
+        );
+    }
+}
+
+#[test]
+fn a_frontmatter_that_is_not_yaml_with_a_description_vs_code_reads_is_listed() {
     for text in [
-        "---\ndescription: [unclosed\n---\n",
-        // VS Code keeps the values it can read around a collection that
-        // never closes, which config-digger reads as a string.
+        // The collection that never closes takes in the line after it.
         "---\ndescription: probe\nargument-hint: [unclosed\ndisable-model-invocation: true\n---\n",
-        "---\nname: broken\nargument-hint: {unclosed\n---\n",
-        "---\ndisable-model-invocation: true\nnot a key\n---\n",
-        "---\ndisable-model-invocation: true\nbody\n",
+        // A line that is no key ends the frontmatter.
+        "---\ndescription: probe\nnot a key\ndisable-model-invocation: true\n---\n",
+        // Of a key given twice, the first wins.
+        "---\ndescription: probe\ndisable-model-invocation: false\ndisable-model-invocation: true\n---\n",
+        "---\ndescription: probe\ndisable-model-invocation: True\nnot a key\n---\n",
     ] {
         assert_eq!(
             unlisted_in_project_and_user_folder("broken", text),
@@ -956,6 +1055,35 @@ fn an_extension_s_or_an_agent_plugin_s_skill_with_no_description_is_unlisted() {
         assert_eq!(code(entry.state), "effective");
         assert_eq!(unlisted(entry), [NO_DESCRIPTION], "{name}");
     }
+}
+
+#[test]
+fn an_extension_s_or_an_agent_plugin_s_frontmatter_that_is_not_yaml_keeps_its_values() {
+    let extension_skill =
+        Path::new(HOME).join(r".vscode\extensions\acme.helper-1.0.0\skills\troubleshoot");
+    let plugin_skill = review_kit().join(r"skills\triage");
+    let fs = with_home(vscode())
+        .with_file(
+            extension_skill.join("SKILL.md"),
+            "---\ndescription: probe\nnot a key\n---\n",
+        )
+        .with_file(
+            plugin_skill.join("SKILL.md"),
+            "---\ndescription: [unclosed\n---\n",
+        );
+    let inventory = inventory(&fs);
+
+    let troubleshoot = &skill(&inventory, "troubleshoot").entries[0];
+    assert_eq!(code(troubleshoot.provenance), "extension");
+    assert_eq!(entry_json(troubleshoot)["config"]["description"], "probe");
+    assert!(unlisted(troubleshoot).is_empty());
+    let triage = &skill(&inventory, "triage").entries[0];
+    assert_eq!(code(triage.provenance), "plugin");
+    assert_eq!(code(triage.state), "effective");
+    assert_eq!(unlisted(triage), [NO_DESCRIPTION]);
+    // The skill's content shows the description VS Code reads too.
+    let content = core(&fs).skill_content(&extension_skill, "vscode").unwrap();
+    assert_eq!(content.description.as_deref(), Some("probe"));
 }
 
 #[test]

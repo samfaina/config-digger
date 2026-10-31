@@ -60,7 +60,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  # adds Claude Code skills whose folder names break its name rule
 .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  # adds a Project whose Claude Code settings hold plain-string MCP lists
 .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   # adds a git Project whose git-versioned Codex layer declares a server
-.\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  # adds Codex skills whose frontmatter is not YAML
+.\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  # adds Codex, Gemini CLI and VS Code skills whose frontmatter is not YAML
 .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  # adds a Claude Desktop package beside a classic folder in desktop-appdata
 .\uat\data\cd-throwaway-setup.ps1 -Reset -NestedSkills  # adds Claude Code skills in a .claude\skills deeper in the Project
 .\uat\data\cd-throwaway-setup.ps1 -Reset -InstalledSynced  # adds an installed plugin of the synced plugin's name to the synced home
@@ -72,7 +72,7 @@ When a change to the app makes a step wrong, change the step's text and keep its
 
 `-CodexLayer` adds `codex-project`, a git repo made with `git init` that the Codex home trusts, whose `.codex\config.toml`, added to the git index, declares `cd-throwaway-codex-layer`, a server the Codex home does not declare. Disable of it writes a Stand-in in the home's `config.toml`; step 22.1 walks it.
 
-`-Frontmatter` adds two skills to the Codex home's `skills` folder whose frontmatter is not YAML: `cd-throwaway-fm-colon`, whose `description` holds `: `, which Codex reads quoted, and `cd-throwaway-fm-stray`, with a line that is no key, which Codex skips. Step 23.1 walks them. It also adds `gemini-home`, a Gemini CLI home whose `.gemini\skills` holds the same two, which Gemini CLI reads line by line, and `cd-throwaway-fm-gemini-noname`, with no `name` line, which it skips. Step 23.2 adds the home, walks them and takes the home off the list again.
+`-Frontmatter` adds two skills to the Codex home's `skills` folder whose frontmatter is not YAML: `cd-throwaway-fm-colon`, whose `description` holds `: `, which Codex reads quoted, and `cd-throwaway-fm-stray`, with a line that is no key, which Codex skips. Step 23.1 walks them. It also adds `gemini-home`, a Gemini CLI home whose `.gemini\skills` holds the same two, which Gemini CLI reads line by line, and `cd-throwaway-fm-gemini-noname`, with no `name` line, which it skips. Step 23.2 adds the home, walks them and takes the home off the list again. And it adds two skills to the Project's `.github\skills`, which only VS Code reads: `cd-throwaway-fm-vscode-colon`, whose `description` holds `: `, and `cd-throwaway-fm-vscode-unclosed`, whose `description` opens a `[` that never closes, both read with VS Code's own parser. Step 23.3 walks them with `-VsCode -Frontmatter`, since only with `-VsCode` does VS Code know the Project.
 
 `-DesktopOverlay` writes Claude Desktop's folders as they would be in an `%APPDATA%` and a `%LOCALAPPDATA%` of their own, `desktop-appdata\Roaming` and `desktop-appdata\Local`: a classic `Claude` folder whose `claude_desktop_config.json` declares `cd-throwaway-overlay`, and the Store package's `LocalCache\Roaming\Claude` beside it, which holds no config of its own and so reads the classic one through its overlay (#306). Steps 25.1 and 25.2 start the app with both variables set to those folders, so config-digger's own data folder is a throwaway one there too.
 

@@ -3347,8 +3347,8 @@ pub(crate) struct SkillFolder {
     pub no_frontmatter: SkillFallback,
     /// What the Agent does with a frontmatter that is not YAML it reads:
     /// besides `skip` and `folder-name`, it may read it another way,
-    /// `quote-values` or `line-by-line`, and skip only a skill that way
-    /// fails.
+    /// `quote-values`, `line-by-line` or `keep-values`, and skip only a
+    /// skill that way fails.
     pub malformed_frontmatter: SkillFallback,
     /// What the Agent does with a frontmatter without a `name`, when
     /// `name_from` is `frontmatter`.
@@ -3494,19 +3494,33 @@ pub(crate) enum SkillFallback {
     /// no `name`, and without a `description` line the skill is skipped.
     /// An unclosed frontmatter is no frontmatter.
     LineByLine,
+    /// It reads every frontmatter with its own parser, which never fails,
+    /// keeping each value it can read, as VS Code does: a collection that
+    /// never closes takes in the lines after it, a line that is no key ends
+    /// the frontmatter, a second `: ` on a line is part of the value, a
+    /// quote that never closes takes in the rest, and of a key given twice
+    /// the first wins. A scalar is a string whatever it holds, an empty
+    /// `description` is none, and only the value `true`, quoted or not, is
+    /// the boolean. A frontmatter that never closes runs to the end of the
+    /// file. The skill always loads.
+    KeepValues,
 }
 
 impl SkillFallback {
     /// Whether the Agent reads a malformed frontmatter another way.
     pub fn reads_again(self) -> bool {
-        matches!(self, SkillFallback::QuoteValues | SkillFallback::LineByLine)
+        matches!(
+            self,
+            SkillFallback::QuoteValues | SkillFallback::LineByLine | SkillFallback::KeepValues
+        )
     }
 }
 
 /// Why an Agent leaves a skill out of the skills it lists to its model,
 /// because of the skill's own `SKILL.md`. config-digger tells of
 /// `no-description` and `disable-model-invocation` only for a `SKILL.md`
-/// with no frontmatter or with one it reads as YAML.
+/// with no frontmatter, with one it reads as YAML, or with one it reads as
+/// `keep-values` says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum Unlisted {
@@ -3577,7 +3591,14 @@ impl Validate for SkillFolder {
         }
         if self.no_frontmatter.reads_again() || self.no_name.reads_again() {
             return Err(
-                "only malformed_frontmatter can be quote-values or line-by-line: they read a frontmatter again".into(),
+                "only malformed_frontmatter can be quote-values, line-by-line or keep-values: they read a frontmatter again".into(),
+            );
+        }
+        if self.malformed_frontmatter == SkillFallback::KeepValues
+            && self.unlisted.contains(&Unlisted::MalformedFrontmatter)
+        {
+            return Err(
+                "an Agent that keeps the values of a malformed frontmatter parses it: it cannot leave it unlisted as one it cannot parse".into(),
             );
         }
         if self

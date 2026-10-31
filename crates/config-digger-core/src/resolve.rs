@@ -302,7 +302,8 @@ pub(crate) fn resolve(
                                 // validation keeps them off the other defects.
                                 SkillFallback::Skip
                                 | SkillFallback::QuoteValues
-                                | SkillFallback::LineByLine => (Some(defect), None),
+                                | SkillFallback::LineByLine
+                                | SkillFallback::KeepValues => (Some(defect), None),
                                 SkillFallback::FolderName => (None, Some(defect)),
                             },
                             _ => (None, None),
