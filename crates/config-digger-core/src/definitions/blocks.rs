@@ -1932,6 +1932,14 @@ impl Validate for PluginRegistry {
     }
 }
 
+impl PluginRegistry {
+    /// Whether a plugin that neither its record nor its manifest names is
+    /// named by its folder, rather than by its id.
+    pub fn folder_fallback(&self) -> bool {
+        matches!(self, PluginRegistry::JsonPluginList(block) if block.folder_fallback)
+    }
+}
+
 impl ListPlugins for PluginRegistry {
     fn anchors(&self) -> Vec<&Anchor> {
         match self {
@@ -2633,6 +2641,11 @@ pub(crate) struct JsonPluginList {
     pub name: Option<String>,
     /// The field of an item that holds the plugin's version.
     pub version: Option<String>,
+    /// Whether a plugin that neither its item nor its manifest names is
+    /// named by its folder, as VS Code names an agent plugin. Without it,
+    /// the plugin is named by its id, as its `[[plugins]]` says.
+    #[serde(default)]
+    pub folder_fallback: bool,
 }
 
 impl Validate for JsonPluginList {

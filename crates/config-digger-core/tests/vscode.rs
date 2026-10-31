@@ -1209,6 +1209,126 @@ fn a_listed_plugin_is_named_by_its_manifest_wherever_it_lies_or_else_by_its_fold
 }
 
 #[test]
+fn a_listed_plugin_is_named_by_a_manifest_with_comments_and_trailing_commas_wherever_it_lies() {
+    let manifest = |name: &str| {
+        format!(
+            "{{\n  // The plugin's name.\n  /* VS Code reads it as JSONC. */\n  \"name\": \"{name}\",\n}}\n"
+        )
+    };
+    let servers =
+        |name: &str| format!(r#"{{ "mcpServers": {{ "{name}": {{ "command": "x" }} }} }}"#);
+    let places = [
+        ("root", "plugin.json"),
+        ("github", ".github/plugin/plugin.json"),
+        ("claude", ".claude-plugin/plugin.json"),
+        ("open", ".plugin/plugin.json"),
+    ];
+    let files: Vec<[String; 2]> = places
+        .iter()
+        .map(|(folder, _)| {
+            [
+                manifest(&format!("named-{folder}")),
+                servers(&format!("s-{folder}")),
+            ]
+        })
+        .collect();
+    let listed: Vec<(&str, [(&str, &str); 2])> = places
+        .iter()
+        .zip(&files)
+        .map(|((folder, file), [manifest, servers])| {
+            (
+                *folder,
+                [(*file, manifest.as_str()), (".mcp.json", servers.as_str())],
+            )
+        })
+        .collect();
+    let listed: Vec<(&str, &[(&str, &str)])> = listed
+        .iter()
+        .map(|(folder, files)| (*folder, files.as_slice()))
+        .collect();
+    let inventory = inventory(&with_listed(with_home(vscode()), &listed));
+
+    let names: Vec<String> = ["s-root", "s-github", "s-claude", "s-open"]
+        .into_iter()
+        .map(|server| plugin_of(&inventory, server))
+        .collect();
+    assert_eq!(
+        names,
+        ["named-root", "named-github", "named-claude", "named-open"]
+    );
+}
+
+/// An Agent that lists its plugins in `~\.lister\installed.json` as VS
+/// Code does, with no folder fallback, and reads each one's `.mcp.json`.
+const PLUGIN_LISTER: &str = r#"
+format_version = 1
+
+[agent]
+id = "plugin-lister"
+name = "Plugin Lister"
+
+[[homes]]
+id = "default"
+folder = { block = "path", path = "~" }
+roots.lister = ".lister"
+
+[[scopes]]
+id = "plugin"
+
+[[plugins]]
+id = "listed"
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.lister/installed.json" }, list = ["installed"], folder = "path" }
+name = { file = "plugin.json", key_path = ["name"] }
+
+[[locations]]
+id = "plugin-mcp"
+anchor = { block = "plugin", plugins = "listed", path = ".mcp.json" }
+format = { block = "json", dialect = "strict" }
+root = ["mcpServers"]
+kind = "mcp"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.mcp]
+precedence = ["plugin-mcp"]
+competition = { block = "exact-name" }
+checks = ["disable", "precedence"]
+"#;
+
+#[test]
+fn a_plugin_list_without_the_folder_fallback_names_an_unnamed_plugin_by_its_id() {
+    let lister = Path::new(HOME).join(".lister");
+    let bare = lister.join(r"plugins\bare");
+    let listed = serde_json::json!({ "installed": [{ "path": bare.display().to_string() }] });
+    let fs = FakeFileSystem::new()
+        .with_file(lister.join("installed.json"), listed.to_string())
+        .with_file(
+            bare.join(".mcp.json"),
+            r#"{ "mcpServers": { "lister-server": { "command": "x" } } }"#,
+        );
+    let core = Core::with_extra_definitions(
+        fake::ports(fs, env()),
+        &[("plugin-lister.toml", PLUGIN_LISTER)],
+    )
+    .unwrap();
+    let snapshot = core.scan(&ScanOptions::default()).unwrap();
+    let inventory = core.resolve(&snapshot, &Context::default());
+
+    let server = inventory
+        .items
+        .iter()
+        .find(|item| item.agent == "plugin-lister" && item.name == "lister-server")
+        .unwrap();
+    let plugin = server.entries[0].plugin.as_ref().unwrap();
+    assert_eq!(
+        (plugin.id.as_str(), plugin.name.as_str()),
+        ("plugins/bare", "plugins/bare")
+    );
+}
+
+#[test]
 fn a_manifest_s_mcp_servers_file_adds_its_servers_to_the_plugin_s_mcp_json() {
     let fs = with_listed(
         with_home(vscode()),

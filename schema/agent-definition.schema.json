@@ -2063,6 +2063,11 @@
                 "null"
               ]
             },
+            "folder_fallback": {
+              "description": "Whether a plugin that neither its item nor its manifest names is\nnamed by its folder, as VS Code names an agent plugin. Without it,\nthe plugin is named by its id, as its `[[plugins]]` says.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "json-plugin-list"
@@ -2459,6 +2464,17 @@
         "file": {
           "description": "A `/`-separated path relative to the plugin's folder.",
           "type": "string"
+        },
+        "dialect": {
+          "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "key_path": {
           "description": "The key path of the string, one key per segment.",
