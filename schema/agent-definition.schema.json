@@ -2815,6 +2815,17 @@
               "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
               "$ref": "#/$defs/SkillFallback"
             },
+            "no_description": {
+              "description": "What the Agent does with a frontmatter whose `description` is\nmissing, empty or null: `skip` alone, or left out when the Agent\nloads such a skill. A frontmatter read line by line without a\n`description` line is skipped either way.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SkillFallback"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "unlisted": {
               "description": "Why the Agent leaves a skill it loads out of the skills it lists to\nits model, if it does: the user can still run such a skill, which\nkeeps its State with a note. None by default.",
               "type": "array",
@@ -3181,6 +3192,17 @@
         "no_name": {
           "description": "What the Agent does with a frontmatter without a `name`, when\n`name_from` is `frontmatter`.",
           "$ref": "#/$defs/SkillFallback"
+        },
+        "no_description": {
+          "description": "What the Agent does with a frontmatter whose `description` is\nmissing, empty or null: `skip` alone, or left out when the Agent\nloads such a skill. A frontmatter read line by line without a\n`description` line is skipped either way.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SkillFallback"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "unlisted": {
           "description": "Why the Agent leaves a skill it loads out of the skills it lists to\nits model, if it does: the user can still run such a skill, which\nkeeps its State with a note. None by default.",

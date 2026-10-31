@@ -3338,6 +3338,11 @@ pub(crate) struct SkillFolder {
     /// What the Agent does with a frontmatter without a `name`, when
     /// `name_from` is `frontmatter`.
     pub no_name: SkillFallback,
+    /// What the Agent does with a frontmatter whose `description` is
+    /// missing, empty or null: `skip` alone, or left out when the Agent
+    /// loads such a skill. A frontmatter read line by line without a
+    /// `description` line is skipped either way.
+    pub no_description: Option<SkillFallback>,
     /// Why the Agent leaves a skill it loads out of the skills it lists to
     /// its model, if it does: the user can still run such a skill, which
     /// keeps its State with a note. None by default.
@@ -3512,7 +3517,8 @@ pub(crate) enum SkillDefect {
     MalformedFrontmatter,
     /// Its frontmatter has no `name`, which the Agent names it by.
     NoName,
-    /// Its frontmatter, read line by line, has no `description`.
+    /// Its frontmatter has no `description`, or an empty one: read line by
+    /// line, or by an Agent whose `no_description` says so.
     NoDescription,
     /// Its folder has a name the Agent keeps for itself.
     Reserved,
@@ -3557,6 +3563,15 @@ impl Validate for SkillFolder {
         if self.no_frontmatter.reads_again() || self.no_name.reads_again() {
             return Err(
                 "only malformed_frontmatter can be quote-values or line-by-line: they read a frontmatter again".into(),
+            );
+        }
+        if self
+            .no_description
+            .is_some_and(|fallback| fallback != SkillFallback::Skip)
+        {
+            return Err(
+                "no_description can only be skip: no Agent is known to load such a skill another way"
+                    .into(),
             );
         }
         if let Some(name) = self

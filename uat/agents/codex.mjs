@@ -203,6 +203,9 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     unclosed: "name: cd-throwaway-fm-unclosed\ndescription: d-fm: x",
     number: "name: 123\ndescription: d-fm-number: x\n---",
     noname: "description: d-fm: x\n---",
+    nodesc: "name: cd-throwaway-fm-nodesc\n---",
+    emptydesc: "name: cd-throwaway-fm-emptydesc\ndescription: \"\"\n---",
+    nulldesc: "name: cd-throwaway-fm-nulldesc\ndescription:\n---",
   };
   for (const [name, frontmatter] of Object.entries(frontmatters)) {
     write(path.join(user, `cd-throwaway-fm-${name}`, "SKILL.md"), `---\n${frontmatter}\nbody\n`);
@@ -217,6 +220,8 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     [...prompt.replaceAll("\\n", "\n").matchAll(/^- (.*?): (d-fm.*?) \(file: r\d+\/cd-throwaway-fm-([a-z]+)\/SKILL\.md\)$/gm)].map(([, name, description, folder]) => [folder, `${name}: ${description}`]),
   );
   const readOf = (...folders) => Object.fromEntries(folders.map((folder) => [folder, read[folder] ?? null]));
+  // Each `cd-throwaway-fm-<case>` folder whose `SKILL.md` the prompt names, whatever its description.
+  const filed = [...new Set([...prompt.matchAll(/\/cd-throwaway-fm-([a-z]+)\/SKILL\.md/g)].map(([, folder]) => folder))];
 
   await p.check("locations[project-agents-skills]", "`.agents\\skills` is read in a Project Codex does not trust", async () => {
     return same(listed.includes("cd-throwaway-agents"), true);
@@ -252,6 +257,11 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
   // Found beside #299, and `no_name = "folder-name"` since #466.
   await p.check("items.skill", "a frontmatter without a `name` names the skill after its folder, with its description", async () => {
     return same(readOf("noname"), { noname: "cd-throwaway-fm-noname: d-fm: x" });
+  });
+  // #467: `no_description = "skip"`.
+  await p.check("items.skill", "a frontmatter without a `description`, or with an empty or null one, skips the skill", async () => {
+    const cases = ["noname", "nodesc", "emptydesc", "nulldesc"];
+    return same(Object.fromEntries(cases.map((folder) => [folder, filed.includes(folder)])), { noname: true, nodesc: false, emptydesc: false, nulldesc: false });
   });
   await p.check("items.skill.disable[0]", "a rule's path matches the `SKILL.md` in any case, with either slash, with or without `\\\\?\\`", async () => {
     const file = path.join(user, "a", "cd-throwaway-depth2", "SKILL.md");

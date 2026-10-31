@@ -4171,6 +4171,25 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
+    fn a_skill_without_a_description_can_only_be_skipped() {
+        let anchor = r#"{ block = "home", root = "state" }"#;
+        let skill_format = |fallback: &str| {
+            let format =
+                SKILL_FORMAT.replace(" }", &format!(r#", no_description = "{fallback}" }}"#));
+            with_skills(anchor, &format, CHECKS)
+        };
+        let text = skill_format("skip");
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for refused in ["quote-values", "line-by-line", "folder-name"] {
+            let error = error(&skill_format(refused));
+            assert!(
+                error.contains("no_description can only be skip"),
+                "{refused}: {error}"
+            );
+        }
+    }
+
+    #[test]
     fn a_reserved_skill_name_is_one_folder_name() {
         let format = SKILL_FORMAT.replace(" }", r#", reserved = ["a/b"] }"#);
         let text = with_skills(r#"{ block = "home", root = "state" }"#, &format, CHECKS);
