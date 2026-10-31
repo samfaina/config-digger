@@ -736,7 +736,8 @@ pub(crate) struct PluginsDefinition {
     pub superseded_marker: Option<String>,
     /// Where a plugin's name is, or a list of places tried in turn, such as
     /// an extension's `display_name`, then its `name`. When the plugin's
-    /// folder holds none, its name is its id up to `id_separator`.
+    /// folder holds none, its name is its folder's when its registry's
+    /// `folder_fallback` says so, or else its id up to `id_separator`.
     pub name: Option<PluginNames>,
     /// The text that ends a plugin's name in its id, such as the `@` before
     /// a marketplace. Without it, a plugin with no name is named by its id.
@@ -781,11 +782,23 @@ pub(crate) struct PluginsDefinition {
 }
 
 /// Where a plugin's name is: one place, or several tried in turn.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(untagged)]
+// Deserialised by hand, so that a place's own error, such as an unknown
+// dialect, is the one reported.
+#[derive(Debug, JsonSchema)]
+#[schemars(untagged)]
 pub(crate) enum PluginNames {
     One(PluginName),
     Several(Vec<PluginName>),
+}
+
+impl<'de> Deserialize<'de> for PluginNames {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let names = match toml::Value::deserialize(deserializer)? {
+            places @ toml::Value::Array(_) => Vec::deserialize(places).map(PluginNames::Several),
+            place => PluginName::deserialize(place).map(PluginNames::One),
+        };
+        names.map_err(serde::de::Error::custom)
+    }
 }
 
 impl PluginNames {
@@ -804,6 +817,8 @@ impl PluginNames {
 pub(crate) struct PluginName {
     /// A `/`-separated path relative to the plugin's folder.
     pub file: String,
+    /// The dialect the Agent reads the file in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
     /// The key path of the string, one key per segment.
     pub key_path: Vec<String>,
     /// The key paths of fields that make the Agent reject the file whole
@@ -812,6 +827,13 @@ pub(crate) struct PluginName {
     /// file names no plugin, and the next place is tried.
     #[serde(default)]
     pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
+}
+
+impl PluginName {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
 }
 
 /// The plugins of another list that a list's plugins take the place of.
@@ -5676,6 +5698,37 @@ uninstall = \"agent plugin uninstall",
             "{}",
             error(&text)
         );
+    }
+
+    #[test]
+    fn a_plugin_list_s_folder_fallback_and_a_name_s_dialect_are_well_formed() {
+        let list = |fallback: &str, dialect: &str| {
+            with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "json-plugin-list", anchor = {{ block = "machine", path = "~/.agent/plugins/installed.json" }}, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = {fallback} }}
+name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
+                ),
+            )
+        };
+        let text = list("true", r#""jsonc""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for fallback in [r#""""#, r#""folder""#, "1"] {
+            let text = list(fallback, r#""jsonc""#);
+            assert!(
+                error(&text).contains("invalid type"),
+                "{fallback}: {}",
+                error(&text)
+            );
+        }
+        for dialect in [r#""""#, r#""json5""#, "true"] {
+            let text = list("true", dialect);
+            let message = error(&text);
+            assert!(
+                message.contains("unknown variant") || message.contains("invalid type"),
+                "{dialect}: {message}"
+            );
+        }
     }
 
     #[test]

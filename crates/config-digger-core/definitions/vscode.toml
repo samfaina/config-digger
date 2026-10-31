@@ -112,15 +112,18 @@ workspace_files = true
 # here that `installed.json` does not list is not read [test]. A plugin's
 # id is its folder below this one, so two marketplaces' plugins of one
 # name stay apart. A plugin is named by its manifest's `name`, or else by
-# its folder; its name is read in the four manifest places, though VS Code
-# 1.129.1 to 1.141.0 read no manifest in `.github\plugin` (see
-# `plugin-manifest-mcp`), and how VS Code names a plugin was not tested.
+# its folder (`folder_fallback`); its name is read in the four manifest
+# places, though VS Code 1.129.1 to 1.141.0 read no manifest in
+# `.github\plugin` (see `plugin-manifest-mcp`). VS Code 1.143.1 reads the
+# manifest with its JSONC parser, which takes comments and trailing commas,
+# and names a plugin by its `name`, or else by its folder [binary], so the
+# names are read as `jsonc`; no probe has tested the name VS Code shows.
 # VS Code uninstalls one in the Extensions view. `chat.pluginLocations` in the user's settings
 # adds plugins by their path [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
-registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri" }
-name = [{ file = "plugin.json", key_path = ["name"] }, { file = ".github/plugin/plugin.json", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", key_path = ["name"] }, { file = ".plugin/plugin.json", key_path = ["name"] }]
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true }
+name = [{ file = "plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".github/plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }]
 
 # The extensions that ship with each Installation, in its commit folder's
 # `resources\app\extensions`, such as GitHub Copilot Chat in `copilot`

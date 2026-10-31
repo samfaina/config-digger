@@ -4008,7 +4008,7 @@ impl Scanner<'_> {
             let names = plugins.name.iter().flat_map(PluginNames::places);
             let named = record.name.clone().or_else(|| {
                 names.into_iter().find_map(|name| {
-                    let document = self.plugin_json(&folder, &name.file)?;
+                    let document = self.plugin_json(&folder, &name.file, &name.format())?;
                     let rejects = &name.rejected_unless_path_object_or_list;
                     if blocks::rejected_at(&document, rejects).is_some() {
                         return None;
@@ -4018,8 +4018,7 @@ impl Scanner<'_> {
             });
             named_by_plugin.push(named.is_some());
             let name = named.unwrap_or_else(|| {
-                // A plugin a list names by its folder's path goes by the folder.
-                if let PluginRegistry::JsonPluginList(_) = &plugins.registry
+                if plugins.registry.folder_fallback()
                     && let Some(name) = folder.file_name()
                 {
                     return name.to_string_lossy().into_owned();
@@ -4102,7 +4101,7 @@ impl Scanner<'_> {
     /// The id and version that the file `replaces` names gives the plugin
     /// in `folder`, `None` when it gives no id.
     fn compared(&mut self, replaces: &Replaces, folder: &Path) -> Option<Compared> {
-        let document = self.plugin_json(folder, &replaces.file)?;
+        let document = self.plugin_json(folder, &replaces.file, &JsonFormat::STRICT)?;
         let parts = replaces
             .id
             .iter()
@@ -4118,13 +4117,18 @@ impl Scanner<'_> {
     }
 
     /// The JSON document of the file `file` of the plugin in `folder`,
-    /// `None` when it is missing or does not parse.
-    fn plugin_json(&mut self, folder: &Path, file: &str) -> Option<serde_json::Value> {
+    /// read as `format`, `None` when it is missing or does not parse.
+    fn plugin_json(
+        &mut self,
+        folder: &Path,
+        file: &str,
+        format: &JsonFormat,
+    ) -> Option<serde_json::Value> {
         let text = self
             .reader
             .peek(&blocks::join_relative(folder, file))
             .ok()??;
-        JsonFormat::STRICT.parse(text).ok()
+        format.parse(text).ok()
     }
 
     /// Records each name that plugins of `found`, one list of the Agent
