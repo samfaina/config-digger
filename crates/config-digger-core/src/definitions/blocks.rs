@@ -5148,6 +5148,8 @@ pub(crate) enum Malformed {
     Reference,
     /// Its name holds a character this rule does not allow.
     Name(NameChars),
+    /// Its name is one of these, which the Agent refuses.
+    RefusedName(Vec<String>),
 }
 
 /// Checks an Entry against the minimal shape its Agent requires. Keys the
@@ -5206,7 +5208,8 @@ impl Conform for Shape {
 /// it does not pass, in this order: `one_of`; each field of `required`, in
 /// its order, then the other fields of `values` and `prefixes`, each field
 /// checked for being held, then against `values`, then `prefixes`;
-/// `forbidden`; `types`; `refused_chars`; `no_references`; then `name`.
+/// `forbidden`; `types`; `refused_chars`; `no_references`; `name`; then
+/// `refused_names`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
@@ -5237,6 +5240,10 @@ pub(crate) struct FieldShape {
     /// The characters the Entry's name may hold.
     #[serde(default)]
     pub name: Option<NameChars>,
+    /// The names the Entry may not have, matched exactly and with case,
+    /// such as `constructor`.
+    #[serde(default)]
+    pub refused_names: Vec<String>,
     /// The type of each field, when the Entry holds it.
     #[serde(default)]
     pub types: BTreeMap<String, FieldType>,
@@ -5292,6 +5299,9 @@ impl Validate for FieldShape {
         {
             return Err(format!("a shape field `{field}` must not be empty"));
         }
+        if self.refused_names.iter().any(String::is_empty) {
+            return Err("a shape's refused name must not be empty".into());
+        }
         if let Some(field) = self
             .required
             .iter()
@@ -5309,7 +5319,8 @@ impl Validate for FieldShape {
             && self.prefixes.is_empty()
             && self.refused_chars.is_none()
             && !self.no_references
-            && self.name.is_none();
+            && self.name.is_none()
+            && self.refused_names.is_empty();
         if checks_nothing {
             return Err("a shape needs one_of or types, or another of its checks".into());
         }
@@ -5451,8 +5462,15 @@ impl Conform for FieldShape {
     }
 
     fn misnamed(&self, name: &str) -> Option<Malformed> {
-        let rule = self.name?;
-        (!rule.allows(name)).then_some(Malformed::Name(rule))
+        if let Some(rule) = self.name
+            && !rule.allows(name)
+        {
+            return Some(Malformed::Name(rule));
+        }
+        self.refused_names
+            .iter()
+            .any(|refused| refused == name)
+            .then(|| Malformed::RefusedName(self.refused_names.clone()))
     }
 
     fn still_competes(&self) -> bool {
