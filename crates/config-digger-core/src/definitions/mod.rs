@@ -827,12 +827,38 @@ pub(crate) struct PluginName {
     /// file names no plugin, and the next place is tried.
     #[serde(default)]
     pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
+    /// What the Agent does with the file when it does not parse:
+    /// `reads_around_error` takes the name from what parses on both sides
+    /// of the error, as VS Code reads a manifest through
+    /// `node-jsonc-parser`, the reaction of the location that reads the
+    /// same file. Without it, a file that does not parse names no plugin,
+    /// and the next place is tried.
+    pub on_read_failure: Option<ReadFailureReaction>,
 }
 
 impl PluginName {
     /// How the file is parsed.
     pub fn format(&self) -> JsonFormat {
         JsonFormat::of(self.dialect)
+    }
+
+    /// Whether the name is read from what parses around an error in the
+    /// file.
+    pub fn reads_around_error(&self) -> bool {
+        self.on_read_failure == Some(ReadFailureReaction::ReadsAroundError)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        blocks::validate_relative(&self.file)?;
+        blocks::validate_key_path(&self.key_path)?;
+        blocks::validate_rejected(&self.rejected_unless_path_object_or_list)?;
+        match self.on_read_failure {
+            None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
+            Some(_) => Err(format!(
+                "a plugin's name in `{}` reacts to a file that does not parse with `reads_around_error` only",
+                self.file
+            )),
+        }
     }
 }
 
@@ -887,9 +913,7 @@ impl PluginsDefinition {
             blocks::validate_relative(marker)?;
         }
         for name in self.name.iter().flat_map(PluginNames::places) {
-            blocks::validate_relative(&name.file)?;
-            blocks::validate_key_path(&name.key_path)?;
-            blocks::validate_rejected(&name.rejected_unless_path_object_or_list)?;
+            name.validate()?;
         }
         if self.id_separator.as_ref().is_some_and(String::is_empty) {
             return Err("id_separator must not be empty".into());
@@ -5564,6 +5588,32 @@ on_read_failure = \"reads_next_path\"",
             "{}",
             error(&text)
         );
+    }
+
+    /// `with_plugins` whose plugins are named in `plugin.json`, a file that
+    /// does not parse met with `reaction`.
+    fn named_reacting(reaction: &str) -> String {
+        with_plugins("").replace(
+            "uninstall = \"agent plugin uninstall",
+            &format!(
+                "name = {{ file = \"plugin.json\", dialect = \"jsonc\", key_path = [\"name\"], on_read_failure = \"{reaction}\" }}\nuninstall = \"agent plugin uninstall"
+            ),
+        )
+    }
+
+    #[test]
+    fn a_plugin_s_name_reacts_to_a_file_that_does_not_parse_by_reading_around_the_error_only() {
+        let around = named_reacting("reads_around_error");
+        assert!(around.contains("on_read_failure = \"reads_around_error\" }"));
+        assert!(parse("test.toml", &around).is_ok(), "{}", error(&around));
+        for reaction in ["reads_next_path", "ignores_file", "unknown", "fails_plugin"] {
+            let text = named_reacting(reaction);
+            assert!(
+                error(&text).contains("with `reads_around_error` only"),
+                "{reaction}: {}",
+                error(&text)
+            );
+        }
     }
 
     #[test]

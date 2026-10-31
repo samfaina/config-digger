@@ -259,6 +259,39 @@ Write-TestFile "$kit\.claude-plugin\plugin.json" @"
 }
 "@
 
+# VS Code as the fake backend sees it, with the same folders: VS Code has
+# run, and its agent plugin cd-throwaway-vsplugin has a
+# .claude-plugin\plugin.json with `,,` after its `mcpServers`, which VS Code
+# takes for the manifest over the root's plugin.json and reads around the
+# error: the file it names starts, the root's does not. Step 31.1 starts the
+# app with both variables set to them.
+Write-TestFile "$Root\appdata\Code\User\settings.json" "{}`n"
+$vsPlugin = "$Root\claude-code-home\.vscode\agent-plugins\cd-throwaway.invalid\cd-throwaway\cd-throwaway-vsplugin"
+Write-TestFile "$vsPlugin\.claude-plugin\plugin.json" @"
+{ "name": "cd-throwaway-vsplugin", "mcpServers": "./servers.json",, "version": "1.0.0" }
+"@
+Write-TestFile "$vsPlugin\plugin.json" @"
+{ "name": "cd-throwaway-vsplugin-root", "mcpServers": "./root.json" }
+"@
+Write-TestFile "$vsPlugin\servers.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-vsplugin-server": { "command": "npx", "args": ["-y", "cd-throwaway-vsplugin-server"] }
+  }
+}
+"@
+Write-TestFile "$vsPlugin\root.json" @"
+{
+  "mcpServers": {
+    "cd-throwaway-vsplugin-root": { "command": "npx", "args": ["-y", "cd-throwaway-vsplugin-root"] }
+  }
+}
+"@
+$vsPluginUri = ([System.Uri]$vsPlugin).AbsoluteUri
+Write-TestFile "$Root\claude-code-home\.vscode\agent-plugins\installed.json" @"
+{ "version": 1, "installed": [{ "pluginUri": "$vsPluginUri", "marketplace": "https://cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin.git", "name": "cd-throwaway-vsplugin" }] }
+"@
+
 # With -VsCode, VS Code's files as they would be in an %APPDATA% of their
 # own, vscode-appdata, which the app reads when started with APPDATA set to
 # it: the default profile, a profile Work with its own mcp.json, and a

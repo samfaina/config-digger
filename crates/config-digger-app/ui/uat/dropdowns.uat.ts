@@ -119,7 +119,8 @@ uatStep("2.2", async ({ page, open, check, leave }) => {
     await expect(panel(page)).toBeHidden();
   });
   await check("Cada flecha carga el Project al que pasa, como un clic: tras Flecha arriba, la lista de Items muestra «cd-throwaway-project».", async () => {
-    await expect(page.locator(".item-row .item-name", { hasText: /^cd-throwaway-project$/ })).toBeVisible();
+    // Claude Code's and VS Code's, which both read the Project's `.mcp.json`.
+    await expect(page.locator(".item-row .item-name", { hasText: /^cd-throwaway-project$/ }).first()).toBeVisible();
   });
 });
 

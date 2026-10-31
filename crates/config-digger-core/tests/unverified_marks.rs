@@ -388,6 +388,11 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "locations[synced-plugin-skills]",
             "named as an installed plugin's are.",
         ),
+        (
+            "vscode.toml",
+            "plugins[agent-plugins]",
+            "leaves no `name` before or after it",
+        ),
     ] {
         let mark = marks
             .iter()
@@ -397,6 +402,7 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             .unwrap_or_else(|| panic!("no mark at {file} {location}: {marks:#?}"));
         let text = match file {
             "claude-desktop.toml" => include_str!("../definitions/claude-desktop.toml"),
+            "vscode.toml" => include_str!("../definitions/vscode.toml"),
             _ => include_str!("../definitions/claude-code.toml"),
         };
         let line = text.lines().nth(mark.line - 1).unwrap();

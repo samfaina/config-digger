@@ -4042,7 +4042,12 @@ impl Scanner<'_> {
             let names = plugins.name.iter().flat_map(PluginNames::places);
             let named = record.name.clone().or_else(|| {
                 names.into_iter().find_map(|name| {
-                    let document = self.plugin_json(&folder, &name.file, &name.format())?;
+                    let document = self.plugin_json(
+                        &folder,
+                        &name.file,
+                        &name.format(),
+                        name.reads_around_error(),
+                    )?;
                     let rejects = &name.rejected_unless_path_object_or_list;
                     if blocks::rejected_at(&document, rejects).is_some() {
                         return None;
@@ -4135,7 +4140,7 @@ impl Scanner<'_> {
     /// The id and version that the file `replaces` names gives the plugin
     /// in `folder`, `None` when it gives no id.
     fn compared(&mut self, replaces: &Replaces, folder: &Path) -> Option<Compared> {
-        let document = self.plugin_json(folder, &replaces.file, &JsonFormat::STRICT)?;
+        let document = self.plugin_json(folder, &replaces.file, &JsonFormat::STRICT, false)?;
         let parts = replaces
             .id
             .iter()
@@ -4151,17 +4156,23 @@ impl Scanner<'_> {
     }
 
     /// The JSON document of the file `file` of the plugin in `folder`,
-    /// read as `format`, `None` when it is missing or does not parse.
+    /// read as `format`, `None` when it is missing or does not parse. With
+    /// `around_error`, a file that does not parse gives what parses on both
+    /// sides of its error.
     fn plugin_json(
         &mut self,
         folder: &Path,
         file: &str,
         format: &JsonFormat,
+        around_error: bool,
     ) -> Option<serde_json::Value> {
         let text = self
             .reader
             .peek(&blocks::join_relative(folder, file))
             .ok()??;
+        if around_error {
+            return format.kept_around_error(text);
+        }
         format.parse(text).ok()
     }
 
