@@ -625,8 +625,9 @@ sources = [
 # of its `.mcp.json` or of the file its manifest's `mcpServers` names, is
 # held by `plugin.<plugin URI>.<name>`, the `file:` URI of the plugin's
 # folder and the server's name, and turns off alone [test]: Disable writes
-# that pair, so `plugin_entries` is on. A plugin's skill is not held in
-# `chat.disabledPromptFiles.skill` that way, as far as a probe has tested.
+# that pair, so `plugin_entries` is on. Whether VS Code holds a plugin's
+# skill in `chat.disabledPromptFiles.skill` has not been tested, and
+# Disable is not offered for one.
 [[items.mcp.disable]]
 block = "json-item-list"
 switch = { anchor = { block = "project-storage", path = "state.vscdb" }, key_path = ["mcp.enablement", "{name}"], named_by = "0", store_class = "sqlite" }

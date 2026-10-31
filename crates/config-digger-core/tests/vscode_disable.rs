@@ -1180,8 +1180,7 @@ fn review_kit() -> PathBuf {
 fn plan_on_plugin_server(action: Action, text: &str) -> Result<Plan, Error> {
     let mcp_json = review_kit().join(".mcp.json");
     let fs = with_home(vscode()).with_file(&mcp_json, text);
-    let linear = format!(r"{}#mcpServers.linear", mcp_json.display());
-    plan(&core(&fs), &context(None), action, &[&linear])
+    plan(&core(&fs), &context(None), action, &[&plugin_linear()])
 }
 
 /// Each file a plan writes and the edits it makes there.
@@ -1208,6 +1207,13 @@ fn a_server_read_around_the_error_of_a_plugin_mcp_json_takes_the_answers_of_one_
             .err()
             .expect("Remove is refused");
         assert_eq!(code(error.code), "blocked");
+        assert!(
+            error.message.contains(
+                "uninstall the plugin github.com/acme/review-market/plugins/review-kit in VS Code"
+            ),
+            "{}",
+            error.message
+        );
         error.message
     };
     assert_eq!(remove(&broken), remove(parses));
@@ -1229,10 +1235,21 @@ fn plugin_linear() -> String {
 }
 
 #[test]
-fn disable_of_a_plugin_s_server_without_a_project_pairs_its_plugin_id_with_false_in_the_profile_s_store()
+fn disable_of_a_plugin_s_server_without_a_project_pairs_its_switch_id_with_false_in_the_profile_s_store()
  {
     let fs = with_home(vscode());
     let core = core(&fs);
+    let before = inventory(&core, &context(None));
+    let disable = serde_json::to_value(&item(&before, "linear").entries[0].disable).unwrap();
+    assert_eq!(disable["status"], "offered", "{disable}");
+    assert_eq!(
+        disable["sentence"],
+        format!(
+            "Disable adds `{}` to `mcp.enablement` in {}.",
+            review_kit_switch_id("linear"),
+            profile_store().display()
+        )
+    );
 
     let plan = plan(&core, &context(None), Action::Disable, &[&plugin_linear()]).unwrap();
     assert_eq!(plan.preview().files[0].path, profile_store());
@@ -1247,7 +1264,7 @@ fn disable_of_a_plugin_s_server_without_a_project_pairs_its_plugin_id_with_false
 }
 
 #[test]
-fn disable_of_a_plugin_s_server_in_a_project_pairs_its_plugin_id_with_false_in_the_workspace_s_store()
+fn disable_of_a_plugin_s_server_in_a_project_pairs_its_switch_id_with_false_in_the_workspace_s_store()
  {
     let fs = with_project(with_home(vscode()), "app");
     let core = core(&fs);
@@ -1291,7 +1308,7 @@ fn enable_takes_a_plugin_s_server_s_pair_out_of_the_workspace_s_store_and_the_pr
 }
 
 #[test]
-fn disable_of_a_server_of_the_file_a_plugin_s_manifest_names_pairs_its_plugin_id_with_false() {
+fn disable_of_a_server_of_the_file_a_plugin_s_manifest_names_pairs_its_switch_id_with_false() {
     let servers = review_kit().join("servers.json");
     let fs = with_home(vscode())
         .with_file(

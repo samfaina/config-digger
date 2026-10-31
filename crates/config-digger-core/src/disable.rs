@@ -552,8 +552,11 @@ pub(crate) fn choose(
                     project.map(|project| project.key),
                 )
                 && mechanism.disable_offered()
-                && (mechanism.switch().plugins() == in_plugin
-                    || in_plugin && mechanism.holds_plugin_entries())
+                && if in_plugin {
+                    mechanism.switch().plugins() || mechanism.holds_plugin_entries()
+                } else {
+                    !mechanism.switch().plugins()
+                }
         })
         .collect();
     switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));

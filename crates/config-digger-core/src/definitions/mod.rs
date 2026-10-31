@@ -2585,13 +2585,13 @@ impl AgentDefinition {
                 };
                 self.validate_home_root(&mechanism.switch().anchor)
                     .map_err(context)?;
+                let covered: Vec<&str> = match mechanism.locations() {
+                    [] => declared.iter().copied().collect(),
+                    listed => listed.iter().map(String::as_str).collect(),
+                };
                 for name in mechanism.when().iter().filter_map(Condition::gate) {
                     let Some(gate) = self.feature_gate(name) else {
                         return Err(context(format!("undeclared feature gate `{name}`")));
-                    };
-                    let covered: Vec<&str> = match mechanism.locations() {
-                        [] => declared.iter().copied().collect(),
-                        listed => listed.iter().map(String::as_str).collect(),
                     };
                     if let Some(id) = covered
                         .iter()
@@ -2602,23 +2602,20 @@ impl AgentDefinition {
                         )));
                     }
                 }
-                if mechanism.holds_plugin_entries() {
-                    let covered: Vec<&str> = match mechanism.locations() {
-                        [] => declared.iter().copied().collect(),
-                        listed => listed.iter().map(String::as_str).collect(),
-                    };
-                    if let Some(id) = covered.iter().find(|id| {
-                        let location = self.location(id);
-                        location.anchor.plugin().is_some()
-                            && !location
-                                .switch_id
-                                .as_ref()
-                                .is_some_and(|switch_id| switch_id.contains(PLUGIN_URI))
-                    }) {
-                        return Err(context(format!(
-                            "plugin_entries needs each location in plugins it covers to have a `switch_id` naming its plugin with `{PLUGIN_URI}`, not `{id}`"
-                        )));
-                    }
+                let names_no_plugin = |id: &&&str| {
+                    let location = self.location(id);
+                    location.anchor.plugin().is_some()
+                        && !location
+                            .switch_id
+                            .as_ref()
+                            .is_some_and(|switch_id| switch_id.contains(PLUGIN_URI))
+                };
+                if mechanism.holds_plugin_entries()
+                    && let Some(id) = covered.iter().find(names_no_plugin)
+                {
+                    return Err(context(format!(
+                        "plugin_entries needs each location in plugins it covers to have a `switch_id` naming its plugin with `{PLUGIN_URI}`, not `{id}`"
+                    )));
                 }
                 if mechanism.switch().plugins() {
                     if mechanism.locations().is_empty() {
@@ -5121,7 +5118,8 @@ locations = {locations}
     /// whose servers are Disabled through an item list holding plugin
     /// Entries, whose key path holds `keys` after its first key.
     fn with_plugin_entries(id: &str, keys: &str) -> String {
-        with_plugins(&format!(
+        let template = "name_template = \"plugin:{plugin}:{name}\"\n";
+        let text = with_plugins(&format!(
             r#"
 [[items.mcp.disable]]
 block = "json-item-list"
@@ -5133,14 +5131,9 @@ disabled_item = ["{{name}}", false]
 reason = "disabled_natively"
 plugin_entries = true
 "#
-        ))
-        .replace(
-            "name_template = \"plugin:{plugin}:{name}\"
-",
-            &format!("name_template = \"plugin:{{plugin}}:{{name}}\"
-switch_id = \"{id}\"
-"),
-        )
+        ));
+        assert!(text.contains(template), "`plugin-mcp` has no `{template}`");
+        text.replace(template, &format!("{template}switch_id = \"{id}\"\n"))
     }
 
     #[test]
