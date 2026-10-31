@@ -40,8 +40,8 @@ notes = ["cloud_connectors_not_on_disk"]
 
 # Each MSIX package installs to its own folder under `WindowsApps`, whose
 # manifest gives its version [disk]. A user who is not an administrator
-# cannot list `WindowsApps`, but can read a package's folder once Windows
-# names it for the package's family [test]. A package's app reads the homes
+# cannot list `WindowsApps`, but can read a package's folder [disk], which
+# Windows names for the package's family [docs]. A package's app reads the homes
 # of its lookup order, its `LocalCache` laid over the classic folder, and the
 # third-party home.
 [[installations]]

@@ -9074,7 +9074,7 @@ impl InstallationFolder {
             InstallationFolder::Glob(glob) => {
                 paths::expand_glob(glob, ports.fs.as_ref(), ports.env.as_ref())
             }
-            InstallationFolder::Block(FolderSource::MsixPackage(block)) => block.folders(ports),
+            InstallationFolder::Block(block) => block.folders(ports),
         }
     }
 }
@@ -9094,6 +9094,23 @@ impl Validate for FolderSource {
     }
 }
 
+impl FolderSource {
+    /// The folders it finds on this machine, sorted.
+    fn folders(&self, ports: &Ports) -> Vec<PathBuf> {
+        match self {
+            FolderSource::MsixPackage(block) => block.folders(ports),
+        }
+    }
+}
+
+/// A package family name, `<name>_<publisher id>`: the name in letters,
+/// digits, `.` and `-`, and the 13 lower-case letters and digits of the
+/// publisher id.
+const PACKAGE_FAMILY: &str = r"^[A-Za-z0-9.-]+_[0-9a-z]{13}$";
+
+static PACKAGE_FAMILY_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(PACKAGE_FAMILY).expect("the package family regex compiles"));
+
 /// The install folder of each MSIX package of a package family installed
 /// for the current user, as Windows names it, such as
 /// `C:\Program Files\WindowsApps\Claude_<version>_x64__pzs8sxrjxfjjc`.
@@ -9108,26 +9125,13 @@ pub(crate) struct MsixPackage {
     /// The package family name, `<name>_<publisher id>`, such as
     /// `Claude_pzs8sxrjxfjjc`: the publisher id keeps out a package of the
     /// same name from another publisher.
-    #[schemars(regex(pattern = r"^[A-Za-z0-9.-]+_[0-9a-z]{13}$"))]
+    #[schemars(regex(pattern = PACKAGE_FAMILY))]
     pub family: String,
 }
 
 impl Validate for MsixPackage {
     fn validate(&self) -> Result<(), String> {
-        let well_formed = self
-            .family
-            .rsplit_once('_')
-            .is_some_and(|(name, publisher)| {
-                !name.is_empty()
-                    && name
-                        .chars()
-                        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
-                    && publisher.len() == 13
-                    && publisher
-                        .chars()
-                        .all(|c| c.is_ascii_digit() || c.is_ascii_lowercase())
-            });
-        if !well_formed {
+        if !PACKAGE_FAMILY_REGEX.is_match(&self.family) {
             return Err(format!(
                 "package family `{}` must be `<name>_<publisher id>`, such as `Claude_pzs8sxrjxfjjc`",
                 self.family
@@ -9144,6 +9148,11 @@ impl MsixPackage {
             Ok(mut folders) => {
                 folders.sort();
                 folders
+            }
+            // Off Windows, there is no Windows to ask.
+            Err(error) if error.kind() == std::io::ErrorKind::Unsupported => {
+                tracing::debug!(family = %self.family, %error, "cannot ask Windows for a package family's packages");
+                Vec::new()
             }
             Err(error) => {
                 tracing::warn!(family = %self.family, %error, "cannot ask Windows for a package family's packages");

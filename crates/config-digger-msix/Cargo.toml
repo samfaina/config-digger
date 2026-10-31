@@ -10,8 +10,7 @@ publish = false
 [target.'cfg(windows)'.dependencies]
 windows-sys.workspace = true
 
-# Not the workspace's lints: its `unsafe_code = "forbid"` would refuse the
-# Win32 calls, whose unsafe code stays in this crate, as the `junction`
-# crate keeps the core's.
+# Not the workspace's lints, whose only one, `unsafe_code = "forbid"`, would
+# refuse the Win32 calls: their unsafe code stays in this crate (ADR 0012).
 [lints.rust]
 unsafe_op_in_unsafe_fn = "deny"

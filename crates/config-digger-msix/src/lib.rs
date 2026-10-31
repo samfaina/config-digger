@@ -2,7 +2,7 @@
 //! documented package API, which needs no elevation: never by listing
 //! `C:\Program Files\WindowsApps`, which only an administrator can list.
 //! The unsafe code the Win32 calls take stays in this crate, since the core
-//! forbids it. Windows only.
+//! forbids it (ADR 0012). Windows only.
 
 #![cfg(windows)]
 
@@ -20,17 +20,6 @@ use windows_sys::Win32::Storage::Packaging::Appx::{
 /// fills them.
 const ATTEMPTS: usize = 3;
 
-/// The install folder of each package of the package family `family`, such
-/// as `Claude_pzs8sxrjxfjjc`, installed for the current user, in the order
-/// Windows gives them: none when the family has none installed. An error
-/// when Windows cannot be asked.
-pub fn family_folders(family: &str) -> io::Result<Vec<PathBuf>> {
-    full_names(family)?
-        .iter()
-        .map(|full_name| package_path(full_name))
-        .collect()
-}
-
 /// `text` as a null-terminated UTF-16 string.
 fn wide(text: &str) -> Vec<u16> {
     text.encode_utf16().chain([0]).collect()
@@ -40,8 +29,11 @@ fn error(code: WIN32_ERROR) -> io::Error {
     io::Error::from_raw_os_error(code as i32)
 }
 
-/// The full names of the family's packages, each null-terminated.
-fn full_names(family: &str) -> io::Result<Vec<Vec<u16>>> {
+/// The full name of each package of the package family `family`, such as
+/// `Claude_pzs8sxrjxfjjc`, installed for the current user, such as
+/// `Claude_4.29.0.0_x64__pzs8sxrjxfjjc`, in the order Windows gives them:
+/// none when the family has none installed.
+pub fn full_names(family: &str) -> io::Result<Vec<String>> {
     let family = wide(family);
     for _ in 0..ATTEMPTS {
         let mut count = 0u32;
@@ -80,11 +72,14 @@ fn full_names(family: &str) -> io::Result<Vec<Vec<u16>>> {
             // The buffer holds the full names one after another, each
             // ended by a null.
             ERROR_SUCCESS => {
-                return Ok(buffer
-                    .split_inclusive(|&c| c == 0)
+                return buffer
+                    .split(|&c| c == 0)
                     .take(count as usize)
-                    .map(<[u16]>::to_vec)
-                    .collect());
+                    .map(|name| {
+                        String::from_utf16(name)
+                            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+                    })
+                    .collect();
             }
             ERROR_INSUFFICIENT_BUFFER => continue,
             code => return Err(error(code)),
@@ -93,9 +88,10 @@ fn full_names(family: &str) -> io::Result<Vec<Vec<u16>>> {
     Err(error(ERROR_INSUFFICIENT_BUFFER))
 }
 
-/// The install folder of the package with the null-terminated full name
-/// `full_name`.
-fn package_path(full_name: &[u16]) -> io::Result<PathBuf> {
+/// The install folder of the package with the full name `full_name`, such
+/// as `C:\Program Files\WindowsApps\Claude_4.29.0.0_x64__pzs8sxrjxfjjc`.
+pub fn package_folder(full_name: &str) -> io::Result<PathBuf> {
+    let full_name = wide(full_name);
     let mut length = 0u32;
     // SAFETY: `full_name` is null-terminated, and a null buffer with a
     // length of 0 asks only for its size, which no path fits in.
@@ -120,10 +116,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_family_with_no_package_installed_has_no_folders() {
+    fn a_family_with_no_package_installed_has_no_full_names() {
         assert_eq!(
-            family_folders("ConfigDigger.NoSuchPackage_0000000000000").unwrap(),
-            Vec::<PathBuf>::new()
+            full_names("ConfigDigger.NoSuchPackage_0000000000000").unwrap(),
+            Vec::<String>::new()
         );
+    }
+
+    #[test]
+    fn a_package_that_is_not_installed_has_no_folder() {
+        assert!(package_folder("ConfigDigger.NoSuchPackage_1.0.0.0_x64__0000000000000").is_err());
     }
 }

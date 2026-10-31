@@ -727,9 +727,21 @@ impl Environment for RealEnvironment {
         None
     }
 
+    /// A package whose folder Windows cannot give is left out, so that it
+    /// hides none of the family's other packages.
     #[cfg(windows)]
     fn package_folders(&self, family: &str) -> io::Result<Vec<PathBuf>> {
-        config_digger_msix::family_folders(family)
+        let folders = config_digger_msix::full_names(family)?
+            .into_iter()
+            .filter_map(|full_name| {
+                config_digger_msix::package_folder(&full_name)
+                    .inspect_err(|error| {
+                        tracing::warn!(package = %full_name, %error, "cannot ask Windows for a package's folder");
+                    })
+                    .ok()
+            })
+            .collect();
+        Ok(folders)
     }
 
     #[cfg(not(windows))]

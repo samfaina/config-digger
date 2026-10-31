@@ -267,8 +267,7 @@ impl FakeFileSystem {
     /// is for a user who is not an administrator. The folders and files
     /// below it can still be read by their paths.
     pub fn denying_listing_of(self, path: impl AsRef<Path>) -> Self {
-        let path = path.as_ref().to_string_lossy().to_lowercase();
-        self.files().unlistable.insert(path);
+        self.files().unlistable.insert(path_key(path.as_ref()));
         self
     }
 
@@ -583,10 +582,7 @@ impl FileSystem for FakeFileSystem {
         if files.real_path(&followed).is_none() {
             return Err(io::ErrorKind::NotFound.into());
         }
-        if files
-            .unlistable
-            .contains(&followed.to_string_lossy().to_lowercase())
-        {
+        if files.unlistable.contains(&path_key(&followed)) {
             return Err(io::ErrorKind::PermissionDenied.into());
         }
         let mut children: Vec<PathBuf> = Vec::new();
