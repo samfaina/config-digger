@@ -223,6 +223,49 @@ fn skill_folders_are_found_up_to_6_folders_below_a_root() {
     assert!(!has_item(&inventory, "seven"));
 }
 
+#[test]
+fn every_root_names_a_skill_without_a_name_after_its_folder() {
+    let web = project(r"mono\apps\web");
+    let roots = [
+        web.join(r".codex\skills"),
+        web.join(r".agents\skills"),
+        Path::new(CODEX).join("skills"),
+        Path::new(HOME).join(r".agents\skills"),
+        Path::new(CODEX).join(r"skills\.system"),
+        Path::new(PROGRAM_DATA).join(r"OpenAI\Codex\skills"),
+    ];
+    let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
+    let nameless = "---\ndescription: Does it.\n---\n";
+    let fs = roots
+        .iter()
+        .enumerate()
+        .fold(monorepo(true), |fs, (index, root)| {
+            fs.with_file(skill(root, &format!("s{index}")), nameless)
+        })
+        .with_file(
+            pets.parent()
+                .unwrap()
+                .join(".codex-remote-plugin-install.json"),
+            r#"{"schema_version":1,"remote_plugin_id":"plugins~work-pets"}"#,
+        )
+        .with_file(skill(&pets.join("skills"), "create-pet"), nameless);
+
+    let inventory = inventory_at(&fs, &web);
+
+    let names = (0..roots.len())
+        .map(|index| format!("s{index}"))
+        .chain(["work-pets:create-pet".to_owned()]);
+    for name in names {
+        let skill = item(&inventory, &name);
+        assert_eq!(states(skill), ["effective"], "{name}");
+        assert_eq!(
+            entry_json(&skill.entries[0])["config"]["description"],
+            "Does it.",
+            "{name}"
+        );
+    }
+}
+
 /// The folder of the version `version` of the plugin `name` Codex installed
 /// from the marketplace `marketplace`.
 /// The user's `config.toml` tables that turn on the plugins `ids`, as Codex
@@ -348,11 +391,31 @@ fn a_value_ending_in_a_colon_is_read_quoted_when_it_holds_a_colon_and_space() {
 }
 
 #[test]
-fn a_frontmatter_without_a_name_line_is_invalid() {
-    let inventory = with_skill_md("---\ndescription: Use when: x\n---\n");
+fn a_frontmatter_without_a_name_or_with_an_empty_one_names_the_skill_after_its_folder() {
+    for text in [
+        "---\ndescription: Use when: x\n---\n",
+        "---\nname: \"\"\ndescription: Use when: x\n---\n",
+    ] {
+        let inventory = with_skill_md(text);
 
-    for sentence in invalid_reasons(&inventory) {
-        assert!(sentence.contains("has no `name`"), "{sentence}");
+        for name in ["folder", "linear:folder"] {
+            let skill = item(&inventory, name);
+            assert_eq!(states(skill), ["effective"], "{name} in {text:?}");
+            let entry = entry_json(&skill.entries[0]);
+            assert_eq!(
+                entry["config"]["description"], "Use when: x",
+                "{name} in {text:?}"
+            );
+            assert_eq!(
+                entry["notes"],
+                json!([{
+                    "code": "skill_fallback",
+                    "switch": null,
+                    "sentence": "Codex still loads this skill, as `folder`, its folder's name: its SKILL.md frontmatter has no `name`."
+                }]),
+                "{name} in {text:?}"
+            );
+        }
     }
 }
 
