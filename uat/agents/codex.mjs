@@ -249,7 +249,7 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
   await p.check("items.skill", "`name: 123` names the skill `123`", async () => {
     return same(readOf("number"), { number: "123: d-fm-number: x" });
   });
-  // Found beside #299: `no_name = "skip"` says otherwise.
+  // Found beside #299, and `no_name = "folder-name"` since #466.
   await p.check("items.skill", "a frontmatter without a `name` names the skill after its folder, with its description", async () => {
     return same(readOf("noname"), { noname: "cd-throwaway-fm-noname: d-fm: x" });
   });
