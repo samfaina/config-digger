@@ -260,6 +260,50 @@ fn every_codex_skill_location_names_a_skill_without_a_name_after_its_folder() {
     }
 }
 
+#[test]
+fn every_codex_skill_location_skips_a_skill_without_a_description() {
+    let web = project(r"mono\apps\web");
+    let roots = skill_roots(&web);
+    let pets = plugin("openai-curated-remote", "work-pets", "0.1.6");
+    let linear = plugin("openai-curated", "linear", "1.0.0");
+    for text in [
+        "---\nname: review\n---\n",
+        "---\nname: review\ndescription: \"\"\n---\n",
+        "---\nname: review\ndescription:\n---\n",
+    ] {
+        let fs = roots
+            .iter()
+            .enumerate()
+            .fold(monorepo(false), |fs, (index, root)| {
+                fs.with_file(skill(root, &format!("s{index}")), text)
+            })
+            .with_file(user_config(), on(&["linear@openai-curated"]))
+            .with_file(skill(&linear.join("skills"), "review"), text);
+        let fs =
+            installed_remotely(fs, &pets).with_file(skill(&pets.join("skills"), "review"), text);
+
+        let inventory = inventory_at(&fs, &web);
+
+        let reviews: Vec<&Item> = codex_items(&inventory)
+            .filter(|item| item.name == "review")
+            .collect();
+        assert_eq!(reviews.len(), roots.len(), "{text:?}");
+        let plugins = [
+            item(&inventory, "linear:review"),
+            item(&inventory, "work-pets:review"),
+        ];
+        for skill in reviews.into_iter().chain(plugins) {
+            assert_eq!(states(skill), ["invalid"], "{} in {text:?}", skill.name);
+            assert_eq!(
+                skill.entries[0].reason.as_ref().unwrap().sentence,
+                "Codex skips this skill: its SKILL.md frontmatter has no `description`.",
+                "{} in {text:?}",
+                skill.name
+            );
+        }
+    }
+}
+
 /// The folder of the version `version` of the plugin `name` Codex installed
 /// from the marketplace `marketplace`.
 /// The user's `config.toml` tables that turn on the plugins `ids`, as Codex
@@ -421,6 +465,18 @@ fn a_frontmatter_without_a_name_or_with_an_empty_one_names_the_skill_after_its_f
                 "{name} in {text:?}"
             );
         }
+    }
+}
+
+#[test]
+fn a_frontmatter_without_a_name_or_a_description_skips_the_skill_for_its_description() {
+    let inventory = with_skill_md("---\nlicense: MIT\n---\n");
+
+    for sentence in invalid_reasons(&inventory) {
+        assert_eq!(
+            sentence,
+            "Codex skips this skill: its SKILL.md frontmatter has no `description`."
+        );
     }
 }
 

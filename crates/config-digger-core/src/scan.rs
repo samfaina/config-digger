@@ -10,8 +10,8 @@ use crate::definitions::blocks::{
     Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
     NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
     PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
-    SettingsSource, SkillDefect, SkillFolder, SkillList, Spelling, StoreClass, Unlisted,
-    is_entry_key,
+    SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList, Spelling, StoreClass,
+    Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -5640,11 +5640,14 @@ fn read_skill(
     let mut config = serde_json::Map::new();
     let mut found = None;
     let mut named = None;
+    let mut undescribed = false;
     let frontmatter = skill::frontmatter(text, format.malformed_frontmatter);
     let unlisted = skill::unlisted(text, &frontmatter, &format.unlisted);
     match frontmatter {
         Ok(frontmatter) => {
             let keys = frontmatter.keys;
+            undescribed = format.no_description == Some(SkillFallback::Skip)
+                && keys.get("description").is_none_or(String::is_empty);
             for key in ["name", "description"] {
                 if let Some(value) = keys.get(key) {
                     config.insert(key.to_owned(), value.clone().into());
@@ -5672,6 +5675,13 @@ fn read_skill(
             }
             (NameFrom::Folder, _) => folder.to_owned(),
         };
+        // The Agent names a skill before it skips it for its description,
+        // so that this defect wins over a name it falls back from.
+        if undescribed
+            && defect.is_none_or(|defect| format.fallback(defect) == SkillFallback::FolderName)
+        {
+            defect = Some(SkillDefect::NoDescription);
+        }
         if format.is_reserved(folder) {
             defect = Some(SkillDefect::Reserved);
         } else if let Some(breaks) = breaks {
