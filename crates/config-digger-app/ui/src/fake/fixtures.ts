@@ -502,6 +502,38 @@ export const fixtures: Fixtures = {
             ]
           },
           {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
             "agent": "cursor",
             "agent_name": "Cursor",
             "home": "default",
@@ -2455,6 +2487,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -2528,6 +2567,126 @@ export const fixtures: Fixtures = {
                 },
                 "caveats": [],
                 "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -2650,6 +2809,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -2731,6 +2897,25 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
           {
             "agent": "cursor",
             "agent_name": "Cursor",
@@ -3274,6 +3459,38 @@ export const fixtures: Fixtures = {
             ]
           },
           {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
             "agent": "cursor",
             "agent_name": "Cursor",
             "home": "default",
@@ -5072,7 +5289,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -5124,6 +5349,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -5183,7 +5415,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -5298,6 +5538,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -5366,7 +5613,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -5418,6 +5673,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -5595,7 +5857,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -5706,6 +5976,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -5759,6 +6036,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -5832,6 +6116,303 @@ export const fixtures: Fixtures = {
                 },
                 "caveats": [],
                 "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-project",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-project"
+                ],
+                "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+                "scope": "workspace-folder",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "untrusted_folder",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: VS Code uses it only once you trust E:\\cd-throwaway\\project, which it asks about when the Project opens. config-digger never trusts a folder."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-project",
+                    "--token",
+                    "••••"
+                  ]
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-many-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-shape-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-synced-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-synced-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-project-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "scope": "workspace-folder",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-project-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-project-skill` out of E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-many-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-shape-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-synced-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-synced-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -5975,6 +6556,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -6028,6 +6616,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -6109,6 +6704,25 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
           {
             "agent": "cursor",
             "agent_name": "Cursor",
@@ -6652,6 +7266,38 @@ export const fixtures: Fixtures = {
             ]
           },
           {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
             "agent": "cursor",
             "agent_name": "Cursor",
             "home": "default",
@@ -6913,7 +7559,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -8503,7 +9157,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -8614,7 +9276,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -8734,7 +9404,15 @@ export const fixtures: Fixtures = {
                   "status": "offered"
                 },
                 "caveats": [],
-                "also_read_by": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -8845,6 +9523,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -8918,6 +9603,215 @@ export const fixtures: Fixtures = {
                 },
                 "caveats": [],
                 "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-extra",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-extra"
+                ],
+                "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+                "scope": "workspace-folder",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "untrusted_folder",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: VS Code uses it only once you trust E:\\cd-throwaway\\project-extra, which it asks about when the Project opens. config-digger never trusts a folder."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-extra"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-many-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-shape-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-synced-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-synced-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home default): Blocked."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
                 "copied_from": null
               }
             ],
@@ -9040,6 +9934,13 @@ export const fixtures: Fixtures = {
                     "home": "default",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
                   }
                 ],
                 "copied_from": null
@@ -9121,6 +10022,25 @@ export const fixtures: Fixtures = {
           }
         ],
         "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
           {
             "agent": "cursor",
             "agent_name": "Cursor",
@@ -10671,7 +11591,40 @@ export const fixtures: Fixtures = {
           "max": "1.141.0"
         },
         "home_variables": [],
-        "homes": []
+        "homes": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ]
       },
       {
         "id": "cursor",
@@ -12259,7 +13212,40 @@ export const fixtures: Fixtures = {
             "max": "1.141.0"
           },
           "home_variables": [],
-          "homes": []
+          "homes": [
+            {
+              "agent": "vscode",
+              "agent_name": "VS Code",
+              "home": "default",
+              "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+              "source": {
+                "kind": "default"
+              },
+              "hidden": false,
+              "not_read": null,
+              "mirror": null,
+              "no_configuration": null,
+              "scopes": [
+                "workspace-folder",
+                "workspace",
+                "user",
+                "plugin",
+                "extension",
+                "discovered"
+              ],
+              "installations": [],
+              "out_of_range": false,
+              "last_ran": null,
+              "entries": 2,
+              "notes": [
+                {
+                  "code": "no_installation_found",
+                  "installation": null,
+                  "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+                }
+              ]
+            }
+          ]
         },
         {
           "id": "cursor",
@@ -12390,7 +13376,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-6f6",
+      "id": "20261001-120000-e94",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -12416,7 +13402,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-592",
+      "id": "20261001-120000-97e",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -12439,10 +13425,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e"
     },
     {
-      "id": "20261001-120000-6ba",
+      "id": "20261001-120000-9fc",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -12470,7 +13456,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-6f6",
+        "id": "20261001-120000-e94",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -12919,7 +13905,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -12939,7 +13925,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -12958,7 +13944,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -12967,7 +13953,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-592",
+        "id": "20261001-120000-97e",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -12990,7 +13976,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e"
       },
       "project": null,
       "changes": [
@@ -13416,7 +14402,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -13454,16 +14440,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -13478,7 +14464,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-6ba",
+        "id": "20261001-120000-9fc",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -13926,7 +14912,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -13946,7 +14932,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -13959,10 +14945,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-6ba",
+          "operation": "20261001-120000-9fc",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml"
         }
       ]
     },
@@ -13970,10 +14956,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-6f6",
+          "operation": "20261001-120000-e94",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json"
         }
       ]
     }
@@ -16092,6 +17078,17 @@ export const fixtures: Fixtures = {
               "after": "removed"
             },
             {
+              "agent": "vscode",
+              "agent_name": "VS Code",
+              "home": "default",
+              "item": "cd-throwaway-user-skill",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+              "project": null,
+              "before": "effective",
+              "after": "removed"
+            },
+            {
               "agent": "cursor",
               "agent_name": "Cursor",
               "home": "default",
@@ -16107,6 +17104,11 @@ export const fixtures: Fixtures = {
           "info": [
             {
               "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+              "sentence": "VS Code couldn't read E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json, so its States after this change may differ."
+            },
+            {
+              "code": "read_failure",
               "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
               "sentence": "Cursor couldn't read E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json, so its States after this change may differ."
             },
@@ -16114,6 +17116,11 @@ export const fixtures: Fixtures = {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Code\\User",
+              "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
             },
             {
               "code": "no_installation_found",
@@ -17420,10 +18427,26 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project",
               "before": "effective",
               "after": "removed"
+            },
+            {
+              "agent": "vscode",
+              "agent_name": "VS Code",
+              "home": "default",
+              "item": "cd-throwaway-project",
+              "path": "E:\\cd-throwaway\\project\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "blocked",
+              "after": "removed"
             }
           ],
           "effective": [],
           "info": [
+            {
+              "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+              "sentence": "VS Code couldn't read E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json, so its States after this change may differ."
+            },
             {
               "code": "read_failure",
               "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
@@ -17433,6 +18456,11 @@ export const fixtures: Fixtures = {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Code\\User",
+              "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [
@@ -17673,6 +18701,17 @@ export const fixtures: Fixtures = {
               "after": "removed"
             },
             {
+              "agent": "vscode",
+              "agent_name": "VS Code",
+              "home": "default",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "removed"
+            },
+            {
               "agent": "cursor",
               "agent_name": "Cursor",
               "home": "default",
@@ -17688,6 +18727,11 @@ export const fixtures: Fixtures = {
           "info": [
             {
               "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+              "sentence": "VS Code couldn't read E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json, so its States after this change may differ."
+            },
+            {
+              "code": "read_failure",
               "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
               "sentence": "Cursor couldn't read E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json, so its States after this change may differ."
             },
@@ -17700,6 +18744,11 @@ export const fixtures: Fixtures = {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Code\\User",
+              "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
             },
             {
               "code": "no_installation_found",
@@ -18073,14 +19122,35 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project-extra",
               "before": "blocked",
               "after": "removed"
+            },
+            {
+              "agent": "vscode",
+              "agent_name": "VS Code",
+              "home": "default",
+              "item": "cd-throwaway-extra",
+              "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "blocked",
+              "after": "removed"
             }
           ],
           "effective": [],
           "info": [
             {
+              "code": "read_failure",
+              "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+              "sentence": "VS Code couldn't read E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json, so its States after this change may differ."
+            },
+            {
               "code": "no_installation_found",
               "path": "E:\\cd-throwaway\\claude-code-home",
               "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Code\\User",
+              "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
             }
           ],
           "files": [
@@ -18568,14 +19638,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-6f6"
+        "operation": "20261001-120000-e94"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-6f6 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-6f6",
+          "title": "Undo 20261001-120000-e94 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-e94",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -18631,15 +19701,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-6f6"
+        "operation": "20261001-120000-e94"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-6f6 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-e94 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-6f6",
+          "backup_of": "20261001-120000-e94",
           "project": null,
           "changes": [],
           "effective": [],
@@ -18647,11 +19717,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6f6",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-6f6 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-e94 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -18660,15 +19730,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-592"
+        "operation": "20261001-120000-97e"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-592 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-97e \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-592",
+          "backup_of": "20261001-120000-97e",
           "project": null,
           "changes": [],
           "effective": [],
@@ -18676,10 +19746,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-592",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-592 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-97e can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -18688,14 +19758,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-6ba"
+        "operation": "20261001-120000-9fc"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-6ba \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-6ba",
+          "title": "Undo 20261001-120000-9fc \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-9fc",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -19170,15 +20240,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-6ba"
+        "operation": "20261001-120000-9fc"
       },
       "preview": {
         "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-6ba \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-9fc \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-6ba",
+          "backup_of": "20261001-120000-9fc",
           "project": null,
           "changes": [],
           "effective": [],
@@ -19186,10 +20256,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-6ba can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-9fc can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -19199,11 +20269,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-6ba",
+      "operation": "20261001-120000-9fc",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-6ba",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-6ba: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-9fc: verified.",
       "hints": []
     }
   },
@@ -19251,8 +20321,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "b24ba7e",
-    "date": "2026-10-30",
+    "commit": "fceb4ca",
+    "date": "2026-10-31",
     "platform": "Windows x64",
     "pages": [
       {

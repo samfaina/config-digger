@@ -112,18 +112,32 @@ workspace_files = true
 # here that `installed.json` does not list is not read [test]. A plugin's
 # id is its folder below this one, so two marketplaces' plugins of one
 # name stay apart. A plugin is named by its manifest's `name`, or else by
-# its folder (`folder_fallback`); its name is read in the four manifest
-# places, though VS Code 1.129.1 to 1.141.0 read no manifest in
-# `.github\plugin` (see `plugin-manifest-mcp`). VS Code 1.143.1 reads the
-# manifest with its JSONC parser, which takes comments and trailing commas,
-# and names a plugin by its `name`, or else by its folder [binary], so the
-# names are read as `jsonc`; no probe has tested the name VS Code shows.
-# VS Code uninstalls one in the Extensions view. `chat.pluginLocations` in the user's settings
-# adds plugins by their path [binary]; config-digger does not read it.
+# its folder (`folder_fallback`). Its manifest is the one its servers come
+# from (see `plugin-manifest-mcp`): the first that exists of
+# `.plugin\plugin.json`, `.claude-plugin\plugin.json` and `plugin.json`
+# [test], then `.github\plugin\plugin.json`, which only VS Code 1.143.1
+# takes for a manifest [binary]. VS Code reads the manifest with its JSONC
+# parser, which takes comments and trailing commas, and reads one that does
+# not parse around its error, as `plugin-mcp` reads a `.mcp.json`: a
+# plugin whose `.claude-plugin\plugin.json` does not parse is named by the
+# `name` before the error, though its `plugin.json` parses, and one whose
+# `plugin.json` does not parse by its `.claude-plugin\plugin.json` [test].
+# So each place is read as `jsonc`, around its errors. VS Code names a
+# plugin a marketplace lists by its name in that list, which its item in
+# `installed.json` matches, not by its manifest's `name` [test];
+# config-digger reads the manifest (see `release-gate.md`). VS Code uninstalls one in the Extensions view.
+# `chat.pluginLocations` in the user's settings adds plugins by their path
+# [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
+unverified = "A manifest whose error leaves no `name` before or after it is taken to pass the name on to the next manifest, as one with no `name` does; in VS Code's code, the plugin is then named by its marketplace when what parses is an object, and by the next manifest when it is not. A probe check of a manifest broken before its `name` would test it."
 registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true }
-name = [{ file = "plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".github/plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }, { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"] }]
+name = [
+  { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
+  { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
+  { file = "plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
+  { file = ".github/plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
+]
 
 # The extensions that ship with each Installation, in its commit folder's
 # `resources\app\extensions`, such as GitHub Copilot Chat in `copilot`
@@ -353,7 +367,13 @@ on_read_failure = "reads_around_error"
 # `.plugin` [test]. A manifest in `.github\plugin` is not read: its
 # `mcpServers` adds nothing [test], though VS Code 1.143.1 reads it
 # [test]. VS Code takes the first of `.plugin`, `.claude-plugin` and the
-# root for the manifest [binary]. Of a server the two files both name, VS Code starts
+# root that exists for the manifest, the one the plugin's name comes from
+# (see `agent-plugins`), and reads it around its error when it does not
+# parse: of a plugin whose `.claude-plugin\plugin.json` does not parse and
+# whose `plugin.json` does, the file the broken manifest names before its
+# error starts, the root's does not; of one whose `plugin.json` does not
+# parse, the file its `.claude-plugin\plugin.json` names starts [test].
+# Of a server the two files both name, VS Code starts
 # the `.mcp.json`'s only, the named file's never [test], so the
 # `.mcp.json`'s ranks first. An inline object of servers in `mcpServers`
 # takes the place of the `.mcp.json`, whose servers do not start, and a
@@ -371,7 +391,7 @@ switch_id = "plugin.{plugin_uri}.{name}"
 scope = "plugin"
 provenance = "plugin"
 store_class = "plain"
-on_read_failure = "unknown"
+on_read_failure = "reads_around_error"
 
 # The configurations of other apps VS Code discovers, each only while its
 # source is on in `chat.mcp.discovery.enabled`, and every source is off by
