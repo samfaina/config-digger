@@ -123,9 +123,9 @@ workspace_files = true
 # `name` before the error, though its `plugin.json` parses, and one whose
 # `plugin.json` does not parse by its `.claude-plugin\plugin.json` [test].
 # So each place is read as `jsonc`, around its errors. VS Code names a
-# plugin a marketplace lists by its name in that list, not by its
-# manifest's `name` [test]; config-digger reads the manifest (see
-# `release-gate.md`). VS Code uninstalls one in the Extensions view.
+# plugin a marketplace lists by its name in that list, which its item in
+# `installed.json` matches, not by its manifest's `name` [test];
+# config-digger reads the manifest (see `release-gate.md`). VS Code uninstalls one in the Extensions view.
 # `chat.pluginLocations` in the user's settings adds plugins by their path
 # [binary]; config-digger does not read it.
 [[plugins]]

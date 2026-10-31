@@ -529,11 +529,17 @@ if (runs("broken-manifest")) {
   });
   const listed = marketplace(plugins, [["listed", { "plugin.json": manifest("listed-manifest"), ".mcp.json": dotMcp("listed-dot") }]]).listed;
   skill(path.join(listed, "skills", "cd-throwaway-sk"), ["description: probe"]);
-  // Each item names the plugin as VS Code's install writes it, by the name
-  // it read in the plugin's manifests: 1.129.1 loads a plugin only when the
-  // name it reads matches its item's [binary].
+  // 1.129.1 and 1.135.0 load such a plugin only when the name they read in
+  // its manifests matches its item's [binary], so there each item names the
+  // plugin as VS Code's install writes it, by that name: the plugin loading
+  // shows which manifest named it. 1.141.0 and later name it from its
+  // manifests whatever its item says [binary], so there the item gives a
+  // name no manifest does.
   const installed = json(path.join(plugins, "installed.json"));
-  for (const tag of ["rb", "cb"]) installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: `https://cd-throwaway.invalid/cd-throwaway/${tag}.git`, name: `cd-throwaway-${tag}-claude` });
+  for (const tag of ["rb", "cb"]) {
+    const name = fromMinor(141) ? `cd-throwaway-${tag}-item` : `cd-throwaway-${tag}-claude`;
+    installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: `https://cd-throwaway.invalid/cd-throwaway/${tag}.git`, name });
+  }
   write(path.join(plugins, "installed.json"), installed);
   const seen = await launch(dir, fresh("proj", dir));
   // The name VS Code gives each plugin, from the command of its skill:
@@ -547,7 +553,7 @@ if (runs("broken-manifest")) {
   await p.check("locations[plugin-manifest-mcp]", "VS Code reads a `.claude-plugin\\plugin.json` that does not parse around its error, over a `plugin.json` that parses: the plugin's name and the file its `mcpServers` names come from the broken manifest, beside the `.mcp.json`", async () =>
     same(plugin("cb"), { names: ["cd-throwaway-cb-claude"], servers: ["cb-claude", "cb-dot"] }),
   );
-  await p.check("plugins[agent-plugins]", "VS Code names a plugin a marketplace lists by the name in that list, not by its manifest's `name`", async () =>
+  await p.check("plugins[agent-plugins]", "VS Code names a plugin a marketplace lists by the name in that list, which its `installed.json` item matches, not by its manifest's `name`", async () =>
     same(plugin("listed").names, ["cd-throwaway-listed"]),
   );
 }

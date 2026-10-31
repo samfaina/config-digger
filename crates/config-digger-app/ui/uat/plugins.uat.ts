@@ -76,6 +76,10 @@ uatStep("31.1", async ({ page, open, check }) => {
   });
 
   const notice = page.getByRole("status").filter({ hasText: "couldn't be read" });
+  await check("El aviso encima de los Items dice «1 location couldn't be read.».", async () => {
+    await expect(notice).toContainText("1 location couldn't be read.");
+  });
+
   await notice.getByRole("button", { name: "View" }).click();
   const card = page.locator(".entry-card.failure");
   await check(

@@ -2077,7 +2077,7 @@
             "Cierra config-digger si está abierto.",
             "Ejecuta en PowerShell la orden «Abrir config-digger con el perfil de prueba de VS Code».",
             "En el panel Agents, elige VS Code.",
-            "Busca cd-throwaway-vsplugin en la lista Items.",
+            "Busca cd-throwaway-vsplugin-server en la lista Items.",
             "En el aviso encima de los Items, pulsa View.",
             "Lee la tarjeta de Read failure del fichero.",
             "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
@@ -2093,6 +2093,7 @@
             "El Item «cd-throwaway-vsplugin-server» sale «Effective».",
             "Bajo su nombre sale «plugin · E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server».",
             "No sale ningún Item «cd-throwaway-vsplugin-root».",
+            "El aviso encima de los Items dice «1 location couldn't be read.».",
             "La tarjeta de Read failure dice «VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).».",
             "La tarjeta dice también «VS Code reads what is around the error, and config-digger lists what it keeps.»."
           ],
