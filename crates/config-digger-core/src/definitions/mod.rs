@@ -4230,7 +4230,7 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
                 r#"{{ block = "skill-folder", name_from = "frontmatter", no_frontmatter = "{no_frontmatter}", malformed_frontmatter = "{malformed}", no_name = "{no_name}" }}"#
             )
         };
-        for reading in ["quote-values", "line-by-line"] {
+        for reading in ["quote-values", "line-by-line", "keep-values"] {
             let text = with_skills(anchor, &skill_format("skip", reading, "skip"), CHECKS);
             assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
             for refused in [
@@ -4239,13 +4239,34 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
             ] {
                 let text = with_skills(anchor, &refused, CHECKS);
                 assert!(
-                    error(&text)
-                        .contains("only malformed_frontmatter can be quote-values or line-by-line"),
+                    error(&text).contains(
+                        "only malformed_frontmatter can be quote-values, line-by-line or keep-values"
+                    ),
                     "{}",
                     error(&text)
                 );
             }
         }
+    }
+
+    #[test]
+    fn an_agent_that_keeps_a_malformed_frontmatter_s_values_cannot_leave_it_unlisted_as_one_it_cannot_parse()
+     {
+        let anchor = r#"{ block = "home", root = "state" }"#;
+        let format = |malformed: &str| {
+            format!(
+                r#"{{ block = "skill-folder", name_from = "folder", no_frontmatter = "folder-name", malformed_frontmatter = "{malformed}", no_name = "folder-name", unlisted = ["no-description", "malformed-frontmatter"] }}"#
+            )
+        };
+        let text = with_skills(anchor, &format("folder-name"), CHECKS);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_skills(anchor, &format("keep-values"), CHECKS);
+        assert!(
+            error(&text)
+                .contains("an Agent that keeps the values of a malformed frontmatter parses it"),
+            "{}",
+            error(&text)
+        );
     }
 
     #[test]

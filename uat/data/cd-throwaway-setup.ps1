@@ -12,7 +12,7 @@
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NameRule  adds Claude Code skills whose folder names break its name rule
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -PlainString  adds a Project whose Claude Code settings hold plain-string MCP lists
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -CodexLayer   adds a git Project whose git-versioned Codex layer declares a server
-#   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex skills whose frontmatter is not YAML
+#   .\uat\data\cd-throwaway-setup.ps1 -Reset -Frontmatter  adds Codex, Gemini CLI and VS Code skills whose frontmatter is not YAML
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -DesktopOverlay  adds a Claude Desktop package beside a classic folder in desktop-appdata
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -NestedSkills  adds Claude Code skills in a .claude\skills deeper in the Project
 #   .\uat\data\cd-throwaway-setup.ps1 -Reset -InstalledSynced  adds an installed plugin of the synced plugin's name to the synced home
@@ -506,8 +506,9 @@ env = { CD_THROWAWAY_TOKEN = "not-a-real-secret" }
 # description holds `: `, which Codex reads quoted, and one with a stray
 # line, which it skips. And a Gemini CLI home, gemini-home, whose skills
 # Gemini CLI reads line by line: the same two, which it loads, and one with
-# no `name` line, which it skips. The default data has none, so that no
-# other step counts them.
+# no `name` line, which it skips. And two VS Code skills in the Project's
+# .github\skills. The default data has none, so that no other step counts
+# them.
 if ($Frontmatter) {
     $gemini = "$Root\gemini-home\.gemini"
     Write-TestFile "$gemini\settings.json" "{}"
@@ -527,6 +528,22 @@ description: Throwaway skill for testing config-digger. Does nothing.
     Write-TestFile "$gemini\skills\cd-throwaway-fm-gemini-noname\SKILL.md" @"
 ---
 description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+
+    # VS Code reads these with its own parser, which keeps the values it
+    # can read: the description holding `: `, and none from a `[` that
+    # never closes. Only VS Code reads a Project's .github\skills, and only
+    # with -VsCode does it know the Project.
+    $vscodeSkills = "$Root\project\.github\skills"
+    Write-TestFile "$vscodeSkills\cd-throwaway-fm-vscode-colon\SKILL.md" @"
+---
+description: Throwaway skill for testing config-digger. Use when: never.
+---
+"@
+    Write-TestFile "$vscodeSkills\cd-throwaway-fm-vscode-unclosed\SKILL.md" @"
+---
+description: [unclosed
 ---
 "@
 

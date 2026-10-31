@@ -2865,7 +2865,7 @@
               "$ref": "#/$defs/SkillFallback"
             },
             "malformed_frontmatter": {
-              "description": "What the Agent does with a frontmatter that is not YAML it reads:\nbesides `skip` and `folder-name`, it may read it another way,\n`quote-values` or `line-by-line`, and skip only a skill that way\nfails.",
+              "description": "What the Agent does with a frontmatter that is not YAML it reads:\nbesides `skip` and `folder-name`, it may read it another way,\n`quote-values`, `line-by-line` or `keep-values`, and skip only a\nskill that way fails.",
               "$ref": "#/$defs/SkillFallback"
             },
             "no_name": {
@@ -3147,11 +3147,16 @@
           "description": "For a malformed frontmatter alone: it reads `name` and\n`description` line by line, as Gemini CLI does, whenever YAML would\nfail or give either of them as no string. A line holding `name:`,\nafter any blanks, gives the name, quotes kept, and a later one wins;\none holding `description:` gives the description, joined with each\nfollowing indented line. Without a `name` line the frontmatter has\nno `name`, and without a `description` line the skill is skipped.\nAn unclosed frontmatter is no frontmatter.",
           "type": "string",
           "const": "line-by-line"
+        },
+        {
+          "description": "It reads every frontmatter with its own parser, which never fails,\nkeeping each value it can read, as VS Code does: a collection that\nnever closes takes in the lines after it, a line that is no key ends\nthe frontmatter, a second `: ` on a line is part of the value, a\nquote that never closes takes in the rest, and of a key given twice\nthe first wins. A scalar is a string whatever it holds, an empty\n`description` is none, and only the value `true`, quoted or not, is\nthe boolean. A frontmatter that never closes runs to the end of the\nfile. The skill always loads.",
+          "type": "string",
+          "const": "keep-values"
         }
       ]
     },
     "Unlisted": {
-      "description": "Why an Agent leaves a skill out of the skills it lists to its model,\nbecause of the skill's own `SKILL.md`. config-digger tells of\n`no-description` and `disable-model-invocation` only for a `SKILL.md`\nwith no frontmatter or with one it reads as YAML.",
+      "description": "Why an Agent leaves a skill out of the skills it lists to its model,\nbecause of the skill's own `SKILL.md`. config-digger tells of\n`no-description` and `disable-model-invocation` only for a `SKILL.md`\nwith no frontmatter, with one it reads as YAML, or with one it reads as\n`keep-values` says.",
       "oneOf": [
         {
           "description": "It has no `description`: no frontmatter, or one without the key.",
@@ -3243,7 +3248,7 @@
           "$ref": "#/$defs/SkillFallback"
         },
         "malformed_frontmatter": {
-          "description": "What the Agent does with a frontmatter that is not YAML it reads:\nbesides `skip` and `folder-name`, it may read it another way,\n`quote-values` or `line-by-line`, and skip only a skill that way\nfails.",
+          "description": "What the Agent does with a frontmatter that is not YAML it reads:\nbesides `skip` and `folder-name`, it may read it another way,\n`quote-values`, `line-by-line` or `keep-values`, and skip only a\nskill that way fails.",
           "$ref": "#/$defs/SkillFallback"
         },
         "no_name": {
