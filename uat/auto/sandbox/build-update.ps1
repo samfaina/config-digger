@@ -105,7 +105,7 @@ try {
     }
     $a = [regex]::Escape($versionA)
     Raise "$tree\Cargo.toml" "^version = `"$a`"" "version = `"$VersionB`"" 1
-    Raise "$tree\Cargo.lock" "(name = `"(config-digger-app|config-digger-cli|config-digger-core|xtask)`"\r?\nversion = )`"$a`"" "`$1`"$VersionB`"" -1
+    Raise "$tree\Cargo.lock" "(name = `"(config-digger-app|config-digger-cli|config-digger-core|config-digger-msix|xtask)`"\r?\nversion = )`"$a`"" "`$1`"$VersionB`"" -1
     Raise "$ui\package.json" "`"version`": `"$a`"" "`"version`": `"$VersionB`"" 1
     Raise "$ui\package-lock.json" "`"version`": `"$a`"" "`"version`": `"$VersionB`"" 2
     Build $VersionB

@@ -818,43 +818,151 @@ fn every_home_notes_that_cloud_connectors_are_not_on_disk() {
     );
 }
 
+/// The folder that holds every package's install folder, which a user who
+/// is not an administrator cannot list.
+const WINDOWS_APPS: &str = r"C:\Program Files\WindowsApps";
+
 /// The Store package's install folder, as Windows names it.
 const PACKAGE: &str = r"C:\Program Files\WindowsApps\Claude_2.16120.0.0_x64__pzs8sxrjxfjjc";
 
-/// The Store package's data folder and its install folder, whose manifest
-/// gives its version.
-fn installed_store() -> FakeFileSystem {
-    store()
-        .with_file(
-            PathBuf::from(PACKAGE).join("AppxManifest.xml"),
+/// `fs` with a package's install folder at `folder`, whose manifest gives
+/// its version `version`, and, when `app` holds, its app.
+fn with_package_files(
+    fs: FakeFileSystem,
+    folder: &str,
+    version: &str,
+    app: bool,
+) -> FakeFileSystem {
+    let fs = fs.with_file(
+        PathBuf::from(folder).join("AppxManifest.xml"),
+        format!(
             r#"<?xml version="1.0" encoding="utf-8"?>
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10">
-  <Identity Name="Claude" Publisher="CN=Anthropic" Version="2.16120.0.0" ProcessorArchitecture="x64" />
+  <Identity Name="Claude" Publisher="CN=Anthropic" Version="{version}" ProcessorArchitecture="x64" />
 </Package>
-"#,
-        )
-        .with_file(
-            PathBuf::from(PACKAGE).join(r"app\claude.exe"),
-            fake::executable(Some([2, 16120, 0, 0])),
-        )
+"#
+        ),
+    );
+    if !app {
+        return fs;
+    }
+    let parts: Vec<u16> = version
+        .split('.')
+        .map(|part| part.parse().unwrap())
+        .collect();
+    fs.with_file(
+        PathBuf::from(folder).join(r"app\claude.exe"),
+        fake::executable(Some([parts[0], parts[1], parts[2], parts[3]])),
+    )
+}
+
+/// The Store package's data folder and its install folder, whose manifest
+/// gives its version, in a `WindowsApps` that cannot be listed.
+fn installed_store() -> FakeFileSystem {
+    with_package_files(store(), PACKAGE, "2.16120.0.0", true).denying_listing_of(WINDOWS_APPS)
 }
 
 fn with_program_files(env: FakeEnvironment) -> FakeEnvironment {
     env.with_var("ProgramFiles", r"C:\Program Files")
 }
 
+/// `env` where Windows says the Store package is installed in `PACKAGE`.
+fn with_store_package(env: FakeEnvironment) -> FakeEnvironment {
+    with_program_files(env).with_package(STORE_FAMILY, PACKAGE)
+}
+
+/// The id, executable and version of each Installation the home `id`
+/// shows.
+fn installations_of(inventory: &Inventory, id: &str) -> Vec<(String, PathBuf, Option<String>)> {
+    home(inventory, id)
+        .installations
+        .iter()
+        .map(|installation| {
+            (
+                installation.id.clone(),
+                installation.path.clone(),
+                installation.version.clone(),
+            )
+        })
+        .collect()
+}
+
 #[test]
 fn a_package_s_version_comes_from_its_manifest() {
+    let inventory = inventory_with(&installed_store(), with_store_package(env()));
+
+    assert_eq!(
+        installations_of(&inventory, "msix"),
+        [(
+            "msix".to_owned(),
+            PathBuf::from(PACKAGE).join(r"app\claude.exe"),
+            Some("2.16120.0.0".to_owned())
+        )]
+    );
+    assert!(!home(&inventory, "msix").installations[0].out_of_range);
+}
+
+#[test]
+fn a_package_signed_as_anthropic_pbc_is_found_from_its_family() {
+    let package = r"C:\Program Files\WindowsApps\AnthropicPBC.Claude_4.29.0.0_x64__fnn82j28hfe8t";
+    let fs = with_package_files(msix_of(ANTHROPIC_PBC_FAMILY), package, "4.29.0.0", true)
+        .denying_listing_of(WINDOWS_APPS);
+    let env = with_program_files(env()).with_package(ANTHROPIC_PBC_FAMILY, package);
+
+    let inventory = inventory_with(&fs, env);
+
+    assert_eq!(
+        installations_of(&inventory, "msix-anthropicpbc"),
+        [(
+            "msix-anthropicpbc".to_owned(),
+            PathBuf::from(package).join(r"app\claude.exe"),
+            Some("4.29.0.0".to_owned())
+        )]
+    );
+}
+
+#[test]
+fn a_package_folder_windows_does_not_name_is_no_installation() {
     let inventory = inventory_with(&installed_store(), with_program_files(env()));
 
-    let installations = &home(&inventory, "msix").installations;
-    assert_eq!(installations.len(), 1, "{installations:?}");
+    assert_eq!(installations_of(&inventory, "msix"), []);
+}
+
+#[test]
+fn a_package_of_the_family_without_the_app_is_skipped_and_two_with_it_are_two() {
+    let update = r"C:\Program Files\WindowsApps\Claude_2.16200.0.0_x64__pzs8sxrjxfjjc";
+    let resources =
+        r"C:\Program Files\WindowsApps\Claude_2.16120.0.0_neutral_split.scale-200_pzs8sxrjxfjjc";
+    let fs = with_package_files(installed_store(), update, "2.16200.0.0", true);
+    let fs = with_package_files(fs, resources, "2.16120.0.0", false);
+    let env = with_store_package(env())
+        .with_package(STORE_FAMILY, resources)
+        .with_package(STORE_FAMILY, update);
+
+    let inventory = inventory_with(&fs, env);
+
+    let versions: Vec<Option<String>> = installations_of(&inventory, "msix")
+        .into_iter()
+        .map(|(_, _, version)| version)
+        .collect();
     assert_eq!(
-        installations[0].path,
-        PathBuf::from(PACKAGE).join(r"app\claude.exe")
+        versions,
+        [
+            Some("2.16120.0.0".to_owned()),
+            Some("2.16200.0.0".to_owned())
+        ]
     );
-    assert_eq!(installations[0].version.as_deref(), Some("2.16120.0.0"));
-    assert!(!installations[0].out_of_range);
+}
+
+#[test]
+fn a_package_of_another_publisher_is_not_claude_desktop() {
+    let package = r"C:\Program Files\WindowsApps\Claude_9.0.0.0_x64__abcdefghjkmnp";
+    let fs = with_package_files(store(), package, "9.0.0.0", true).denying_listing_of(WINDOWS_APPS);
+    let env = with_program_files(env()).with_package("Claude_abcdefghjkmnp", package);
+
+    let inventory = inventory_with(&fs, env);
+
+    assert_eq!(installations_of(&inventory, "msix"), []);
 }
 
 fn process(pid: u32, path: &str) -> RunningProcess {
@@ -868,7 +976,7 @@ fn process(pid: u32, path: &str) -> RunningProcess {
 
 /// The running-agent warning of a Remove of `selector` while `running` run.
 fn running_warning(running: &[RunningProcess], selector: &str) -> Option<String> {
-    let mut ports = fake::ports(installed_store(), with_program_files(env()));
+    let mut ports = fake::ports(installed_store(), with_store_package(env()));
     ports.processes = Box::new(
         running
             .iter()

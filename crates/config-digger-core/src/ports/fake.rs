@@ -66,6 +66,8 @@ struct FakeFiles {
     rewrites: Vec<(PathBuf, Vec<u8>)>,
     /// The lowercased paths of the files whose reads are denied.
     denied: BTreeSet<String>,
+    /// The lowercased paths of the folders whose listings are denied.
+    unlistable: BTreeSet<String>,
     /// Files and folders someone other than an administrator can change.
     not_admin_owned: Vec<PathBuf>,
     /// The `ItemTable` of each SQLite store, by the store's path as
@@ -258,6 +260,15 @@ impl FakeFileSystem {
     pub fn denying_reads_of(self, path: impl AsRef<Path>) -> Self {
         let path = path.as_ref().to_string_lossy().to_lowercase();
         self.files().denied.insert(path);
+        self
+    }
+
+    /// Every listing of the folder at `path` is denied, as `WindowsApps`
+    /// is for a user who is not an administrator. The folders and files
+    /// below it can still be read by their paths.
+    pub fn denying_listing_of(self, path: impl AsRef<Path>) -> Self {
+        let path = path.as_ref().to_string_lossy().to_lowercase();
+        self.files().unlistable.insert(path);
         self
     }
 
@@ -571,6 +582,12 @@ impl FileSystem for FakeFileSystem {
         }
         if files.real_path(&followed).is_none() {
             return Err(io::ErrorKind::NotFound.into());
+        }
+        if files
+            .unlistable
+            .contains(&followed.to_string_lossy().to_lowercase())
+        {
+            return Err(io::ErrorKind::PermissionDenied.into());
         }
         let mut children: Vec<PathBuf> = Vec::new();
         let links = files.links.iter().map(|link| &link.at);
@@ -898,6 +915,9 @@ pub struct FakeEnvironment {
     home: Option<PathBuf>,
     vars: BTreeMap<String, String>,
     registry: BTreeMap<(Hive, String, String), RegistryData>,
+    /// The install folders of the packages installed for the user, by
+    /// package family, in the order they were declared.
+    packages: BTreeMap<String, Vec<PathBuf>>,
 }
 
 impl FakeEnvironment {
@@ -939,6 +959,17 @@ impl FakeEnvironment {
             .insert((hive, key.to_owned(), name.to_owned()), data);
         self
     }
+
+    /// A package of the package family `family`, such as
+    /// `Claude_pzs8sxrjxfjjc`, installed for the user in `folder`. A family
+    /// can hold several, such as a resource package beside the main one.
+    pub fn with_package(mut self, family: &str, folder: impl Into<PathBuf>) -> Self {
+        self.packages
+            .entry(family.to_owned())
+            .or_default()
+            .push(folder.into());
+        self
+    }
 }
 
 impl Environment for FakeEnvironment {
@@ -968,6 +999,10 @@ impl Environment for FakeEnvironment {
             .map(|((_, _, name), data)| (name.clone(), data.clone()))
             .collect();
         (!values.is_empty()).then_some(values)
+    }
+
+    fn package_folders(&self, family: &str) -> io::Result<Vec<PathBuf>> {
+        Ok(self.packages.get(family).cloned().unwrap_or_default())
     }
 }
 

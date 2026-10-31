@@ -195,6 +195,13 @@ pub trait Environment: Send + Sync {
     /// Every value directly under `hive\key`, by name, in no particular
     /// order; `None` when the key does not exist.
     fn registry_values(&self, hive: Hive, key: &str) -> Option<Vec<(String, RegistryData)>>;
+
+    /// The install folders of the MSIX packages of the package family
+    /// `family`, such as `Claude_pzs8sxrjxfjjc`, installed for the current
+    /// user, as Windows names them without `WindowsApps` being listed: none
+    /// when the family has no package installed. An error when Windows
+    /// cannot be asked, as off Windows.
+    fn package_folders(&self, family: &str) -> io::Result<Vec<PathBuf>>;
 }
 
 /// The current time, and waiting.

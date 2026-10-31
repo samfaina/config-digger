@@ -726,6 +726,16 @@ impl Environment for RealEnvironment {
     fn registry_values(&self, _hive: Hive, _key: &str) -> Option<Vec<(String, RegistryData)>> {
         None
     }
+
+    #[cfg(windows)]
+    fn package_folders(&self, family: &str) -> io::Result<Vec<PathBuf>> {
+        config_digger_msix::family_folders(family)
+    }
+
+    #[cfg(not(windows))]
+    fn package_folders(&self, _family: &str) -> io::Result<Vec<PathBuf>> {
+        Err(io::ErrorKind::Unsupported.into())
+    }
 }
 
 pub struct RealClock;
