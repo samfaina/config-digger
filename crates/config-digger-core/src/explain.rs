@@ -7,8 +7,8 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, SettingIs, SkillDefect,
-    Unlisted, UnseenServers,
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, RefusedChars, SettingIs,
+    SkillDefect, Unlisted, UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
@@ -1968,6 +1968,9 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
         }
         Malformed::WrongPrefix(field, prefix) => format!("`{field}` must start with `{prefix}`"),
         Malformed::Forbidden(field) => format!("it must not hold `{field}`"),
+        Malformed::RefusedChars(RefusedChars::ControlOrFormat) => {
+            "no key or value may hold a control or invisible formatting character".to_owned()
+        }
         Malformed::Reference => "no value may hold a `${VAR}` reference".to_owned(),
         Malformed::Name(NameChars::LettersDigitsDashUnderscore) => {
             "its name may hold only letters, digits, `-` and `_`".to_owned()
