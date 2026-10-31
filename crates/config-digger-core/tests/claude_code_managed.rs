@@ -583,17 +583,19 @@ fn a_managed_server_may_not_be_named_after_one_of_seven_object_property_names() 
 
 #[test]
 fn a_managed_server_named_after_an_object_property_does_not_compete_by_name() {
-    let checks = managed_checks(
-        json!({ "constructor": remote() }),
-        json!({ "mcpServers": { "constructor": { "command": "my-tool" } } }),
-    );
     assert_eq!(
-        checks
-            .iter()
-            .map(|(_, state, _)| state.as_str())
-            .collect::<Vec<_>>(),
-        ["effective", "invalid"],
-        "{checks:?}"
+        managed_checks(
+            json!({ "constructor": remote() }),
+            json!({ "mcpServers": { "constructor": { "command": "my-tool" } } }),
+        ),
+        [
+            check("constructor", "effective", ""),
+            check(
+                "constructor",
+                "invalid",
+                "Claude Code skips this Entry: its name must not be `constructor`, `prototype`, `__proto__`, `__defineGetter__`, `__defineSetter__`, `__lookupGetter__` or `__lookupSetter__`."
+            ),
+        ]
     );
 }
 

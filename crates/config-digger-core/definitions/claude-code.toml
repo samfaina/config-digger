@@ -322,7 +322,7 @@ id = "managed-settings-mcp"
 unverified = [
   { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
   "Every character the rule against control and invisible formatting characters refuses is taken from the 2.1.312 binary, with config-digger's Unicode tables; none was tested.",
-  "The seven server names Claude Code refuses are read from the 2.1.312 binary; none was tested.",
+  "The seven server names Claude Code refuses, and that it takes the other `Object.prototype` names such as `toString`, are read from the 2.1.312 binary; none was tested.",
 ]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }
