@@ -1886,7 +1886,7 @@
           ]
         },
         "name": {
-          "description": "Where a plugin's name is, or a list of places tried in turn, such as\nan extension's `display_name`, then its `name`. When the plugin's\nfolder holds none, its name is its id up to `id_separator`.",
+          "description": "Where a plugin's name is, or a list of places tried in turn, such as\nan extension's `display_name`, then its `name`. When the plugin's\nfolder holds none, its name is its folder's when its registry's\n`folder_fallback` says so, or else its id up to `id_separator`.",
           "anyOf": [
             {
               "$ref": "#/$defs/PluginNames"

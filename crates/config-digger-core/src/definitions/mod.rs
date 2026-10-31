@@ -736,7 +736,8 @@ pub(crate) struct PluginsDefinition {
     pub superseded_marker: Option<String>,
     /// Where a plugin's name is, or a list of places tried in turn, such as
     /// an extension's `display_name`, then its `name`. When the plugin's
-    /// folder holds none, its name is its id up to `id_separator`.
+    /// folder holds none, its name is its folder's when its registry's
+    /// `folder_fallback` says so, or else its id up to `id_separator`.
     pub name: Option<PluginNames>,
     /// The text that ends a plugin's name in its id, such as the `@` before
     /// a marketplace. Without it, a plugin with no name is named by its id.
@@ -826,6 +827,13 @@ pub(crate) struct PluginName {
     /// file names no plugin, and the next place is tried.
     #[serde(default)]
     pub rejected_unless_path_object_or_list: Vec<Vec<String>>,
+}
+
+impl PluginName {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
 }
 
 /// The plugins of another list that a list's plugins take the place of.

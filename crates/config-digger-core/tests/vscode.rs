@@ -1217,36 +1217,44 @@ fn a_listed_plugin_is_named_by_a_manifest_with_comments_and_trailing_commas_wher
     };
     let servers =
         |name: &str| format!(r#"{{ "mcpServers": {{ "{name}": {{ "command": "x" }} }} }}"#);
-    let places = [
-        ("root", "plugin.json"),
-        ("github", ".github/plugin/plugin.json"),
-        ("claude", ".claude-plugin/plugin.json"),
-        ("open", ".plugin/plugin.json"),
-    ];
-    let files: Vec<[String; 2]> = places
-        .iter()
-        .map(|(folder, _)| {
-            [
-                manifest(&format!("named-{folder}")),
-                servers(&format!("s-{folder}")),
-            ]
-        })
+    let (root, github, claude, open) = (
+        manifest("named-root"),
+        manifest("named-github"),
+        manifest("named-claude"),
+        manifest("named-open"),
+    );
+    let servers: Vec<String> = ["s-root", "s-github", "s-claude", "s-open"]
+        .into_iter()
+        .map(servers)
         .collect();
-    let listed: Vec<(&str, [(&str, &str); 2])> = places
-        .iter()
-        .zip(&files)
-        .map(|((folder, file), [manifest, servers])| {
+    let fs = with_listed(
+        with_home(vscode()),
+        &[
             (
-                *folder,
-                [(*file, manifest.as_str()), (".mcp.json", servers.as_str())],
-            )
-        })
-        .collect();
-    let listed: Vec<(&str, &[(&str, &str)])> = listed
-        .iter()
-        .map(|(folder, files)| (*folder, files.as_slice()))
-        .collect();
-    let inventory = inventory(&with_listed(with_home(vscode()), &listed));
+                "root",
+                &[("plugin.json", &root), (".mcp.json", &servers[0])],
+            ),
+            (
+                "github",
+                &[
+                    (".github/plugin/plugin.json", &github),
+                    (".mcp.json", &servers[1]),
+                ],
+            ),
+            (
+                "claude",
+                &[
+                    (".claude-plugin/plugin.json", &claude),
+                    (".mcp.json", &servers[2]),
+                ],
+            ),
+            (
+                "open",
+                &[(".plugin/plugin.json", &open), (".mcp.json", &servers[3])],
+            ),
+        ],
+    );
+    let inventory = inventory(&fs);
 
     let names: Vec<String> = ["s-root", "s-github", "s-claude", "s-open"]
         .into_iter()

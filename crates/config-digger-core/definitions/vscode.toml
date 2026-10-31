@@ -114,10 +114,10 @@ workspace_files = true
 # name stay apart. A plugin is named by its manifest's `name`, or else by
 # its folder (`folder_fallback`); its name is read in the four manifest
 # places, though VS Code 1.129.1 to 1.141.0 read no manifest in
-# `.github\plugin` (see `plugin-manifest-mcp`), and how VS Code names a
-# plugin was not tested. VS Code 1.143.1 reads the manifest with its JSONC
-# parser, which takes comments and trailing commas, and names a plugin by
-# its `name` [binary], so the names are read as `jsonc`.
+# `.github\plugin` (see `plugin-manifest-mcp`). VS Code 1.143.1 reads the
+# manifest with its JSONC parser, which takes comments and trailing commas,
+# and names a plugin by its `name`, or else by its folder [binary], so the
+# names are read as `jsonc`; no probe has tested the name VS Code shows.
 # VS Code uninstalls one in the Extensions view. `chat.pluginLocations` in the user's settings
 # adds plugins by their path [binary]; config-digger does not read it.
 [[plugins]]
