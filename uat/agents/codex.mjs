@@ -203,6 +203,9 @@ const trusted = (folder, level = "trusted") => `[projects.'${folder.toLowerCase(
     unclosed: "name: cd-throwaway-fm-unclosed\ndescription: d-fm: x",
     number: "name: 123\ndescription: d-fm-number: x\n---",
     noname: "description: d-fm: x\n---",
+    nodesc: "name: cd-throwaway-fm-nodesc\n---",
+    emptydesc: "name: cd-throwaway-fm-emptydesc\ndescription: \"\"\n---",
+    nulldesc: "name: cd-throwaway-fm-nulldesc\ndescription:\n---",
   };
   for (const [name, frontmatter] of Object.entries(frontmatters)) {
     write(path.join(user, `cd-throwaway-fm-${name}`, "SKILL.md"), `---\n${frontmatter}\nbody\n`);

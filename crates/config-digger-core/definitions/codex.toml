@@ -533,8 +533,9 @@ on_read_failure = "ignores_file"
 # `description` [source, test], and so do an empty `name` and a plugin's
 # skill, `<plugin>:<folder>` [source], as `no_name = "folder-name"` says
 # (#466). One without a `description`, or with an empty or null one, skips
-# the skill [source, test], as `no_description = "skip"` says, one without
-# a `name` either too, after naming it [source] (#467).
+# the skill [source, test], and so do a plugin's such skill and one without
+# a `name` either, after naming it [source], as `no_description = "skip"`
+# says (#467).
 [items.skill]
 precedence = ["project-skills", "project-agents-skills", "user-skills", "agents-skills", "system-skills", "admin-skills", "plugin-skills", "remote-plugin-skills"]
 competition = { block = "never" }
