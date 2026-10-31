@@ -313,16 +313,23 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # `__defineGetter__`, `__defineSetter__`, `__lookupGetter__` and
 # `__lookupSetter__`, matched exactly and with case [binary], a rule the docs
 # do not state. Claude Code walks no deeper than five levels of nesting
-# [binary]; config-digger checks every depth, and every string for the
-# characters before any for a reference. A dropped entry competes with no server by name: a user server of
-# its name loads, beside an entry with a command or at an `http://` URL, in
-# `managed-settings.json` or the HKLM value [test].
+# [binary]; config-digger checks every depth. Of the checks an entry fails,
+# Claude Code reports the first, in this order [binary], which the `fields`
+# shape follows: the name; `command`, `args`, `env` and `headersHelper`;
+# `type`, a missing one included; a `url` that is a string starting with
+# `https://`; one walk of the keys and strings in the order the entry holds
+# them, a string checked for the characters, then for a reference; then a
+# missing `url` or a field of the wrong type. A dropped entry competes with
+# no server by name: a user server of its name loads, beside an entry with
+# a command or at an `http://` URL, in `managed-settings.json` or the HKLM
+# value [test].
 [[locations]]
 id = "managed-settings-mcp"
 unverified = [
   { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
   "Every character the rule against control and invisible formatting characters refuses is taken from the 2.1.312 binary, with config-digger's Unicode tables; none was tested.",
   "The seven server names Claude Code refuses, and that it takes the other `Object.prototype` names such as `toString`, are read from the 2.1.312 binary; none was tested.",
+  "Which check Claude Code reports for an entry that fails several, the name first, then `command`, `args`, `env` and `headersHelper`, `type`, an `https:` `url`, the walk of the keys and strings, then a missing `url` or a field of the wrong type, is read from the 2.1.312 binary; it was not tested.",
 ]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
 format = { block = "json", dialect = "strict" }

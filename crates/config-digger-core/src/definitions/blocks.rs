@@ -5159,7 +5159,7 @@ pub(crate) trait Conform {
     fn malformed(&self, value: &Value) -> Option<Malformed>;
 
     /// Why the name `name` does not conform, if it does not. An Entry's
-    /// name is checked after its value.
+    /// name is checked before its value.
     fn misnamed(&self, name: &str) -> Option<Malformed>;
 
     /// Whether an Entry that does not conform still competes by name, as
@@ -5205,11 +5205,14 @@ impl Conform for Shape {
 /// An object that holds at least one of some fields, each field it holds
 /// being of the type the Agent reads. It may also need some fields, each
 /// one, and limit what some of them hold. The Entry fails the first check
-/// it does not pass, in this order: `one_of`; each field of `required`, in
-/// its order, then the other fields of `values` and `prefixes`, each field
-/// checked for being held, then against `values`, then `prefixes`;
-/// `forbidden`; `types`; `refused_chars`; `no_references`; `name`; then
-/// `refused_names`.
+/// it does not pass, in this order: `name`, then `refused_names`, on its
+/// name; then on its value, `forbidden`, in its order; `values`, a field
+/// the Entry does not hold failing it; `prefixes`, checked only on a
+/// string; one walk of the keys and strings the value holds, at any depth,
+/// in the order it holds them, each key checked against `refused_chars`
+/// and each string against `refused_chars`, then `no_references`;
+/// `required`, in its order; `one_of`; then `types`. `values`, `prefixes`
+/// and `types` check their fields in the order of the fields' names.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
@@ -5219,11 +5222,12 @@ pub(crate) struct FieldShape {
     /// The Entry must hold each of these, such as `type` and `url`.
     #[serde(default)]
     pub required: Vec<String>,
-    /// For a field, the strings it may hold, when the Entry holds it.
+    /// For a field, the strings it may hold. An Entry that does not hold
+    /// the field fails it too.
     #[serde(default)]
     pub values: BTreeMap<String, Vec<String>>,
     /// For a field, the prefix its string must start with, when the Entry
-    /// holds it, such as `https://` for `url`.
+    /// holds it as a string, such as `https://` for `url`.
     #[serde(default)]
     pub prefixes: BTreeMap<String, String>,
     /// The Entry must hold none of these, such as `command`.
@@ -5367,55 +5371,33 @@ impl RefusedChars {
     }
 }
 
-/// Whether a string of `value`, at any depth, passes `test`, or, with
-/// `keys`, a key of one of its objects does.
-fn any_string(value: &Value, keys: bool, test: &dyn Fn(&str) -> bool) -> bool {
-    match value {
-        Value::String(text) => test(text),
-        Value::Array(items) => items.iter().any(|item| any_string(item, keys, test)),
-        Value::Object(object) => object
-            .iter()
-            .any(|(key, value)| (keys && test(key)) || any_string(value, keys, test)),
-        _ => false,
-    }
-}
-
-/// Whether a key or a string of `value`, at any depth, holds a character
-/// `refused` refuses.
-fn holds_refused(value: &Value, refused: RefusedChars) -> bool {
-    any_string(value, true, &|text| refused.refuses(text))
-}
-
-/// Whether a string of `value`, at any depth, holds a `${...}` reference.
-fn holds_reference(value: &Value) -> bool {
-    any_string(value, false, &|text| {
-        text.split_once("${")
-            .is_some_and(|(_, rest)| rest.contains('}'))
-    })
+/// Whether `text` holds a `${...}` reference.
+fn holds_reference(text: &str) -> bool {
+    text.split_once("${")
+        .is_some_and(|(_, rest)| rest.contains('}'))
 }
 
 impl FieldShape {
-    /// Why the field `field`, holding `value`, fails `required`, `values` or
-    /// `prefixes`, if it does.
-    fn field_malformed(&self, field: &String, value: Option<&Value>) -> Option<Malformed> {
-        let Some(value) = value else {
-            return self
-                .required
-                .contains(field)
-                .then(|| Malformed::Missing(vec![field.clone()]));
+    /// Why a key or a string of `value`, at any depth, fails
+    /// `refused_chars` or `no_references`, the first to fail in the order
+    /// the value holds them. A key is checked for the characters only, and
+    /// a string for the characters, then for a reference.
+    fn walk_malformed(&self, value: &Value) -> Option<Malformed> {
+        let chars_malformed = |text: &str| {
+            self.refused_chars
+                .filter(|refused| refused.refuses(text))
+                .map(Malformed::RefusedChars)
         };
-        if let Some(allowed) = self.values.get(field)
-            && !value
-                .as_str()
-                .is_some_and(|value| allowed.iter().any(|allowed| allowed == value))
-        {
-            return Some(Malformed::NotOneOf(field.clone(), allowed.clone()));
+        match value {
+            Value::String(text) => chars_malformed(text).or_else(|| {
+                (self.no_references && holds_reference(text)).then_some(Malformed::Reference)
+            }),
+            Value::Array(items) => items.iter().find_map(|item| self.walk_malformed(item)),
+            Value::Object(object) => object.iter().find_map(|(key, value)| {
+                chars_malformed(key).or_else(|| self.walk_malformed(value))
+            }),
+            _ => None,
         }
-        let prefix = self.prefixes.get(field)?;
-        (!value
-            .as_str()
-            .is_some_and(|value| value.starts_with(prefix.as_str())))
-        .then(|| Malformed::WrongPrefix(field.clone(), prefix.clone()))
     }
 }
 
@@ -5424,22 +5406,6 @@ impl Conform for FieldShape {
         let Value::Object(object) = value else {
             return Some(Malformed::NotAnObject);
         };
-        if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
-            return Some(Malformed::Missing(self.one_of.clone()));
-        }
-        let other_limited = self
-            .values
-            .keys()
-            .chain(self.prefixes.keys())
-            .filter(|field| !self.required.contains(field));
-        if let Some(malformed) = self
-            .required
-            .iter()
-            .chain(other_limited)
-            .find_map(|field| self.field_malformed(field, object.get(field)))
-        {
-            return Some(malformed);
-        }
         if let Some(field) = self
             .forbidden
             .iter()
@@ -5447,18 +5413,39 @@ impl Conform for FieldShape {
         {
             return Some(Malformed::Forbidden(field.clone()));
         }
-        if let Some(malformed) = self.types.iter().find_map(|(field, &kind)| {
-            let value = object.get(field)?;
-            (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
+        if let Some((field, allowed)) = self.values.iter().find(|(field, allowed)| {
+            !object
+                .get(*field)
+                .and_then(Value::as_str)
+                .is_some_and(|value| allowed.iter().any(|allowed| allowed == value))
         }) {
+            return Some(Malformed::NotOneOf(field.clone(), allowed.clone()));
+        }
+        if let Some((field, prefix)) = self.prefixes.iter().find(|(field, prefix)| {
+            object
+                .get(*field)
+                .and_then(Value::as_str)
+                .is_some_and(|value| !value.starts_with(prefix.as_str()))
+        }) {
+            return Some(Malformed::WrongPrefix(field.clone(), prefix.clone()));
+        }
+        if let Some(malformed) = self.walk_malformed(value) {
             return Some(malformed);
         }
-        if let Some(refused) = self.refused_chars
-            && holds_refused(value, refused)
+        if let Some(field) = self
+            .required
+            .iter()
+            .find(|field| !object.contains_key(*field))
         {
-            return Some(Malformed::RefusedChars(refused));
+            return Some(Malformed::Missing(vec![field.clone()]));
         }
-        (self.no_references && holds_reference(value)).then_some(Malformed::Reference)
+        if !self.one_of.is_empty() && !self.one_of.iter().any(|field| object.contains_key(field)) {
+            return Some(Malformed::Missing(self.one_of.clone()));
+        }
+        self.types.iter().find_map(|(field, &kind)| {
+            let value = object.get(field)?;
+            (!kind.holds(value)).then(|| Malformed::WrongType(field.clone(), kind))
+        })
     }
 
     fn misnamed(&self, name: &str) -> Option<Malformed> {

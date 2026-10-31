@@ -381,7 +381,7 @@ fn managed_servers_that_run_a_command_or_use_plain_http_are_invalid() {
             check(
                 "local",
                 "invalid",
-                "Claude Code skips this Entry: `type` must be one of `http`, `sse` or `streamable-http`."
+                "Claude Code skips this Entry: it must not hold `command`."
             ),
             check(
                 "plain",
@@ -413,18 +413,17 @@ fn fails(sentence: &str) -> Vec<(String, String, String)> {
 
 #[test]
 fn a_managed_server_needs_a_remote_type() {
-    let type_ = "`type` must be one of `http`, `sse` or `streamable-http`";
     for failing in [
         json!({ "url": "https://mcp.corp.example/a" }),
         json!({ "type": "stdio", "url": "https://mcp.corp.example/a" }),
         json!({ "type": "ws", "url": "https://mcp.corp.example/a" }),
+        json!({ "type": 1, "url": "https://mcp.corp.example/a" }),
     ] {
-        let sentence = if failing.get("type").is_none() {
-            "it needs `type`"
-        } else {
-            type_
-        };
-        assert_eq!(beside_a_passing_server(failing), fails(sentence));
+        assert_eq!(
+            beside_a_passing_server(failing.clone()),
+            fails("`type` must be one of `http`, `sse` or `streamable-http`"),
+            "{failing}"
+        );
     }
     for type_ in ["http", "sse", "streamable-http"] {
         let checks =
@@ -438,6 +437,10 @@ fn a_managed_server_needs_an_https_url() {
     assert_eq!(
         beside_a_passing_server(json!({ "type": "http" })),
         fails("it needs `url`")
+    );
+    assert_eq!(
+        beside_a_passing_server(json!({ "type": "http", "url": ["https://mcp.corp.example/a"] })),
+        fails("`url` must be a string")
     );
     for url in [
         "http://mcp.corp.example/a",
@@ -600,17 +603,20 @@ fn a_managed_server_named_after_an_object_property_does_not_compete_by_name() {
 }
 
 #[test]
-fn a_managed_server_with_a_refused_name_and_a_failing_value_fails_the_value_check() {
+fn a_managed_server_with_a_refused_name_and_a_failing_value_fails_the_name_check() {
     assert_eq!(
         managed_checks(
-            json!({ "constructor": { "type": "http", "url": "http://mcp.corp.example/a" } }),
+            json!({ "constructor": { "type": "http", "url": "http://mcp.corp.example/a" }, "wiki": remote() }),
             json!({})
         ),
-        [check(
-            "constructor",
-            "invalid",
-            "Claude Code skips this Entry: `url` must start with `https://`."
-        )]
+        [
+            check(
+                "constructor",
+                "invalid",
+                "Claude Code skips this Entry: its name must not be `constructor`, `prototype`, `__proto__`, `__defineGetter__`, `__defineSetter__`, `__lookupGetter__` or `__lookupSetter__`."
+            ),
+            check("wiki", "effective", ""),
+        ]
     );
 }
 
@@ -623,7 +629,35 @@ fn a_managed_server_failing_several_checks_fails_the_first() {
         ),
         (
             json!({ "type": "http", "url": "http://mcp.corp.example/a", "command": "npx" }),
-            "`url` must start with `https://`",
+            "it must not hold `command`",
+        ),
+        (
+            json!({ "type": "stdio", "url": "https://mcp.corp.example/a", "args": ["-y"] }),
+            "it must not hold `args`",
+        ),
+        (
+            json!({ "url": "http://mcp.corp.example/a" }),
+            "`type` must be one of `http`, `sse` or `streamable-http`",
+        ),
+        (
+            json!({ "url": "https://mcp.corp.example/a", "command": "npx" }),
+            "it must not hold `command`",
+        ),
+        (
+            json!({ "type": "http", "url": "https://${HOST}/a", "headers": { "X-A": "a\u{7}b" } }),
+            "no value may hold a `${VAR}` reference",
+        ),
+        (
+            json!({ "type": "http", "url": "https://mcp.corp.example/\u{202E}a", "headers": { "X-A": "${TOKEN}" } }),
+            "no key or value may hold a control or invisible formatting character",
+        ),
+        (
+            json!({ "type": "http", "headers": { "X-\u{200B}A": "b" } }),
+            "no key or value may hold a control or invisible formatting character",
+        ),
+        (
+            json!({ "type": "http", "url": 443, "headers": { "X-A": "${TOKEN}" } }),
+            "no value may hold a `${VAR}` reference",
         ),
         (
             json!({ "type": "http", "url": "https://mcp.corp.example/a", "env": { "A": "${B}" } }),
@@ -636,15 +670,26 @@ fn a_managed_server_failing_several_checks_fails_the_first() {
             "{failing}"
         );
     }
-    let misnamed = |server: Value| {
-        managed_checks(json!({ "corp search": server }), json!({}))[0]
-            .2
-            .clone()
-    };
-    assert_eq!(
-        misnamed(json!({ "type": "http", "url": "https://${HOST}/a" })),
-        "Claude Code skips this Entry: no value may hold a `${VAR}` reference."
-    );
+    for failing in [
+        json!({ "type": "http", "url": "https://mcp.corp.example/a", "command": "npx" }),
+        json!({ "type": "http", "url": "https://${HOST}/a" }),
+    ] {
+        assert_eq!(
+            managed_checks(
+                json!({ "corp search": failing, "wiki": remote() }),
+                json!({})
+            ),
+            [
+                check(
+                    "corp search",
+                    "invalid",
+                    "Claude Code skips this Entry: its name may hold only letters, digits, `-` and `_`."
+                ),
+                check("wiki", "effective", ""),
+            ],
+            "{failing}"
+        );
+    }
 }
 
 #[test]
@@ -661,7 +706,7 @@ fn a_user_server_named_as_an_invalid_managed_one_stays_effective() {
             check(
                 "notes",
                 "invalid",
-                "Claude Code skips this Entry: `type` must be one of `http`, `sse` or `streamable-http`."
+                "Claude Code skips this Entry: it must not hold `command`."
             ),
         ]
     );
