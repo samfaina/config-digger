@@ -3516,7 +3516,7 @@
       "description": "The minimal shape of the Entries of a location.",
       "oneOf": [
         {
-          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `name`, then `refused_names`, on its\nname; then on its value, `forbidden`, in its order; `values`, a field\nthe Entry does not hold failing it; `prefixes`, checked only on a\nstring; one walk of the keys and strings the value holds, at any depth,\nin the order it holds them, each key checked against `refused_chars`\nand each string against `refused_chars`, then `no_references`;\n`required`, in its order; `one_of`; then `types`.",
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `name`, then `refused_names`, on its\nname; then on its value, `forbidden`, in its order; `values`, a field\nthe Entry does not hold failing it; `prefixes`, checked only on a\nstring; one walk of the keys and strings the value holds, at any depth,\nin the order it holds them, each key checked against `refused_chars`\nand each string against `refused_chars`, then `no_references`;\n`required`, in its order; `one_of`; then `types`. `values`, `prefixes`\nand `types` check their fields in the order of the fields' names.",
           "type": "object",
           "properties": {
             "one_of": {
@@ -3536,7 +3536,7 @@
               "default": []
             },
             "values": {
-              "description": "For a field, the strings it may hold, when the Entry holds it.",
+              "description": "For a field, the strings it may hold. An Entry that does not hold\nthe field fails it too.",
               "type": "object",
               "properties": {
                 "unverified": {
@@ -3552,7 +3552,7 @@
               "default": {}
             },
             "prefixes": {
-              "description": "For a field, the prefix its string must start with, when the Entry\nholds it, such as `https://` for `url`.",
+              "description": "For a field, the prefix its string must start with, when the Entry\nholds it as a string, such as `https://` for `url`.",
               "type": "object",
               "properties": {
                 "unverified": {

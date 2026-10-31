@@ -5211,7 +5211,8 @@ impl Conform for Shape {
 /// string; one walk of the keys and strings the value holds, at any depth,
 /// in the order it holds them, each key checked against `refused_chars`
 /// and each string against `refused_chars`, then `no_references`;
-/// `required`, in its order; `one_of`; then `types`.
+/// `required`, in its order; `one_of`; then `types`. `values`, `prefixes`
+/// and `types` check their fields in the order of the fields' names.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
@@ -5221,11 +5222,12 @@ pub(crate) struct FieldShape {
     /// The Entry must hold each of these, such as `type` and `url`.
     #[serde(default)]
     pub required: Vec<String>,
-    /// For a field, the strings it may hold, when the Entry holds it.
+    /// For a field, the strings it may hold. An Entry that does not hold
+    /// the field fails it too.
     #[serde(default)]
     pub values: BTreeMap<String, Vec<String>>,
     /// For a field, the prefix its string must start with, when the Entry
-    /// holds it, such as `https://` for `url`.
+    /// holds it as a string, such as `https://` for `url`.
     #[serde(default)]
     pub prefixes: BTreeMap<String, String>,
     /// The Entry must hold none of these, such as `command`.
@@ -5381,19 +5383,19 @@ impl FieldShape {
     /// the value holds them. A key is checked for the characters only, and
     /// a string for the characters, then for a reference.
     fn walk_malformed(&self, value: &Value) -> Option<Malformed> {
-        let refused = |text: &str| {
+        let chars_malformed = |text: &str| {
             self.refused_chars
                 .filter(|refused| refused.refuses(text))
                 .map(Malformed::RefusedChars)
         };
         match value {
-            Value::String(text) => refused(text).or_else(|| {
+            Value::String(text) => chars_malformed(text).or_else(|| {
                 (self.no_references && holds_reference(text)).then_some(Malformed::Reference)
             }),
             Value::Array(items) => items.iter().find_map(|item| self.walk_malformed(item)),
-            Value::Object(object) => object
-                .iter()
-                .find_map(|(key, value)| refused(key).or_else(|| self.walk_malformed(value))),
+            Value::Object(object) => object.iter().find_map(|(key, value)| {
+                chars_malformed(key).or_else(|| self.walk_malformed(value))
+            }),
             _ => None,
         }
     }

@@ -371,6 +371,11 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "locations[managed-settings-mcp]",
             "seven server names",
         ),
+        (
+            "claude-code.toml",
+            "locations[managed-settings-mcp]",
+            "fails several",
+        ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         ("claude-code.toml", "account.off", "interactive session"),
         (
