@@ -587,8 +587,8 @@ pub(crate) fn resolve(
                         let reason = match closed {
                             Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
                             Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
-                            Closed::NotSignedIn(unreadable) => {
-                                explain::not_signed_in(agent_name, account(), unreadable.as_deref())
+                            Closed::NotSignedIn(signed_in) => {
+                                explain::not_signed_in(agent_name, account(), &signed_in)
                             }
                             Closed::OffAccount(off) => {
                                 explain::off_account(agent_name, account(), &off)
@@ -2760,9 +2760,8 @@ enum Closed<'d> {
     Gate(&'d str, bool),
     /// The setting that does not have the value it needs.
     Setting(&'d SettingIs),
-    /// The Agent home is signed in to no account, or, when config-digger
-    /// cannot read the file at this path that names it, taken to be.
-    NotSignedIn(Option<PathBuf>),
+    /// The Agent home is signed in to no account, as this says why.
+    NotSignedIn(SignedIn),
     /// What takes the Agent off the account it is signed in to.
     OffAccount(OffBy),
     /// The Entry is in another folder than that of the account the Agent
@@ -2822,12 +2821,10 @@ fn account_closed<'d>(
     project: Option<&str>,
 ) -> Option<Closed<'d>> {
     let Some(account) = snapshot.account_of(entry, project) else {
-        return Some(Closed::NotSignedIn(None));
+        return Some(Closed::NotSignedIn(SignedIn::ToNone));
     };
-    let ours = match &account.signed_in {
-        SignedIn::To(folder) => folder,
-        SignedIn::ToNone => return Some(Closed::NotSignedIn(None)),
-        SignedIn::Unreadable(path) => return Some(Closed::NotSignedIn(Some(path.clone()))),
+    let SignedIn::To(ours) = &account.signed_in else {
+        return Some(Closed::NotSignedIn(account.signed_in.clone()));
     };
     if let OnAccount::No(off) = &account.on_account {
         return Some(Closed::OffAccount(off.clone()));

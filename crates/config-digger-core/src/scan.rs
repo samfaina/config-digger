@@ -514,6 +514,12 @@ pub(crate) enum SignedIn {
     ToNone,
     /// The file that names it, at this path, cannot be read or parsed.
     Unreadable(PathBuf),
+    /// No account: the file names one, but the home keeps no credentials
+    /// for it at this path, so the Agent is signed out.
+    WithoutCredentials(PathBuf),
+    /// No account yet: the home keeps credentials at this path, but no file
+    /// names the account, which the Agent fetches at its next start online.
+    Unnamed(PathBuf),
 }
 
 /// Whether an Agent runs on its Signed-in account in a context.
@@ -2306,15 +2312,25 @@ fn read_accounts(
             Ok(Some(text)) => JsonFormat::STRICT.parse(text).map(Some).map_err(|_| ()),
             Err(_) => Err(()),
         };
-        let signed_in = match document {
-            Ok(document) => document
-                .and_then(|document| {
-                    account.folder_of(|key_path| {
-                        Some(lookup(&document, key_path)?.as_str()?.to_owned())
-                    })
-                })
-                .map_or(SignedIn::ToNone, SignedIn::To),
-            Err(()) => SignedIn::Unreadable(path),
+        let named = document.map(|document| {
+            document.and_then(|document| {
+                account
+                    .folder_of(|key_path| Some(lookup(&document, key_path)?.as_str()?.to_owned()))
+            })
+        });
+        // The credentials file is checked for existence only, never read.
+        let credentials = account.credentials.as_ref().map(|anchor| {
+            let path = anchor
+                .path(&home.roots, None)
+                .expect("validation puts the credentials in a file of the Agent home");
+            (reader.fs.exists(&path), path)
+        });
+        let signed_in = match (named, credentials) {
+            (Err(()), _) => SignedIn::Unreadable(path),
+            (Ok(Some(folder)), None | Some((true, _))) => SignedIn::To(folder),
+            (Ok(Some(_)), Some((false, credentials))) => SignedIn::WithoutCredentials(credentials),
+            (Ok(None), Some((true, credentials))) => SignedIn::Unnamed(credentials),
+            (Ok(None), None | Some((false, _))) => SignedIn::ToNone,
         };
         let on_account = |project: Option<&Path>, reader: &mut Reader| match &account.off {
             Some(off) => on_account(off, home, project, settings, reader, ports),

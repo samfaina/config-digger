@@ -20,7 +20,7 @@ describe("what the header button adds", () => {
 });
 
 describe("the Add Agent home dialog", () => {
-  const EMPTY = String.raw`No configuration found for Claude Code in E:\cd-throwaway\codex-home: none of .claude.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries.`;
+  const EMPTY = String.raw`No configuration found for Claude Code in E:\cd-throwaway\codex-home: none of .claude.json, .claude\.credentials.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries.`;
 
   function check(overrides: Partial<HomeCheck> = {}): HomeCheck {
     return {

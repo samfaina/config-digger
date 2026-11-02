@@ -511,6 +511,7 @@ fn a_feature_gate_caveat_shows_in_the_entry_detail_and_not_in_the_list() {
     });
     let harness = Harness::new()
         .with_file(".claude.json", &state.to_string())
+        .with_file(".claude/.credentials.json", "not-a-real-secret")
         .with_file(
             ".claude/skills/synced/org1_acct1/pdf/SKILL.md",
             "---

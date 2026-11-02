@@ -210,15 +210,53 @@ Write-TestFile "$Root\claude-code-profile\.claude.json" @"
 }
 "@
 
-# A Claude Code home signed in to a claude.ai account, with a plugin synced
-# from it, which Claude Code keeps in the account's folder and names by its
+# A Claude Code home signed in to a claude.ai account, `oauthAccount` naming
+# it and `.credentials.json` keeping its tokens, with a plugin synced from
+# it, which Claude Code keeps in the account's folder and names by its
 # manifest, and the plugin sync gate cached on, on 2 Oct 2026 at 07:40 UTC.
+# config-digger checks only that `.credentials.json` exists.
 Write-TestFile "$Root\claude-code-synced-home\.claude.json" @"
 {
   "oauthAccount": { "organizationUuid": "cd-org", "accountUuid": "cd-acct" },
   "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
   "cachedGrowthBookFeaturesAt": 1790926800000
 }
+"@
+$credentials = @"
+{ "claudeAiOauth": { "accessToken": "not-a-real-secret", "refreshToken": "not-a-real-secret" } }
+"@
+Write-TestFile "$Root\claude-code-synced-home\.claude\.credentials.json" $credentials
+
+# A Claude Code home signed out: `oauthAccount` names the account, but the
+# home keeps no `.credentials.json`, so Claude Code reads none of the skills
+# synced in the account's folder. Step 32.1 walks it.
+Write-TestFile "$Root\claude-code-logout-home\.claude.json" @"
+{
+  "oauthAccount": { "organizationUuid": "cd-org", "accountUuid": "cd-acct" }
+}
+"@
+Write-TestFile "$Root\claude-code-logout-home\.claude\skills\synced\cd-org_cd-acct\cd-throwaway-logout-skill\SKILL.md" @"
+---
+name: cd-throwaway-logout-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+
+# A Claude Code home with `.credentials.json` and no `oauthAccount`: Claude
+# Code reads none of its synced skills until it fetches the account at its
+# next start online. Step 32.2 walks it.
+Write-TestFile "$Root\claude-code-unnamed-home\.claude.json" @"
+{
+  "cachedGrowthBookFeatures": { "tengu_claudeai_plugins_sync_enabled": true },
+  "cachedGrowthBookFeaturesAt": 1790926800000
+}
+"@
+Write-TestFile "$Root\claude-code-unnamed-home\.claude\.credentials.json" $credentials
+Write-TestFile "$Root\claude-code-unnamed-home\.claude\skills\synced\cd-org_cd-acct\cd-throwaway-unnamed-skill\SKILL.md" @"
+---
+name: cd-throwaway-unnamed-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
 "@
 $synced = "$Root\claude-code-synced-home\.claude\plugins\synced\cd-org_cd-acct"
 Write-TestFile "$synced\manifest.json" @"

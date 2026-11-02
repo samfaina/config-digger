@@ -32,18 +32,22 @@ fn with_skill(fs: FakeFileSystem, folder: impl AsRef<Path>, text: &str) -> FakeF
     fs.with_file(folder.as_ref().join("SKILL.md"), text.to_owned())
 }
 
-/// `state` signed in to the claude.ai account whose synced skills and
-/// plugins are in `synced\org1_acct1`.
-fn signed_in(state: &Value) -> String {
+/// A Claude Code home whose `~/.claude.json` is `state`, signed in to the
+/// claude.ai account whose synced skills and plugins are in
+/// `synced\org1_acct1`: `oauthAccount` names it and `.credentials.json`
+/// keeps its tokens.
+fn signed_in(state: &Value) -> FakeFileSystem {
     let mut state = state.clone();
     state["oauthAccount"] = json!({ "organizationUuid": "org1", "accountUuid": "acct1" });
-    state.to_string()
+    FakeFileSystem::new()
+        .with_file(in_home(".claude.json"), state.to_string())
+        .with_file(in_home(r".claude\.credentials.json"), "not-a-real-secret")
 }
 
 /// A Claude Code home whose `~/.claude.json` is `state`, signed in, with a
 /// skill `pdf` synced from claude.ai and a personal skill `deploy`.
 fn claude_home(state: &Value) -> FakeFileSystem {
-    let fs = FakeFileSystem::new().with_file(in_home(".claude.json"), signed_in(state));
+    let fs = signed_in(state);
     let fs = with_skill(
         fs,
         in_home(r".claude\skills\synced\org1_acct1\pdf"),
@@ -702,8 +706,7 @@ const PLUGIN_SYNC_GATE: &str = "tengu_claudeai_plugins_sync_enabled";
 /// the server `docs`.
 fn synced_plugin_home(state: &Value) -> FakeFileSystem {
     let plugin = in_home(r".claude\plugins\synced\org1_acct1\demo~g3");
-    let fs = FakeFileSystem::new()
-        .with_file(in_home(".claude.json"), signed_in(state))
+    let fs = signed_in(state)
         .with_file(
             plugin.join(r".claude-plugin\plugin.json"),
             json!({ "name": "demo" }).to_string(),

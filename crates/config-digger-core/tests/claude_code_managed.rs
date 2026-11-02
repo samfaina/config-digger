@@ -1321,14 +1321,17 @@ fn a_disabled_project_server_that_is_not_approved_would_be_blocked_once_enabled(
     );
 }
 
-/// A Claude Code home signed in to a claude.ai account, with the skill
+/// A Claude Code home signed in to a claude.ai account, `oauthAccount`
+/// naming it and `.credentials.json` keeping its tokens, with the skill
 /// `pdf` synced from it.
 fn synced_home() -> FakeFileSystem {
     let account = json!({ "organizationUuid": "org1", "accountUuid": "acct1" });
-    claude_home(&json!({ "oauthAccount": account })).with_file(
-        in_home(r".claude\skills\synced\org1_acct1\pdf\SKILL.md"),
-        "---\nname: pdf\ndescription: The pdf skill.\n---\n",
-    )
+    claude_home(&json!({ "oauthAccount": account }))
+        .with_file(in_home(r".claude\.credentials.json"), "not-a-real-secret")
+        .with_file(
+            in_home(r".claude\skills\synced\org1_acct1\pdf\SKILL.md"),
+            "---\nname: pdf\ndescription: The pdf skill.\n---\n",
+        )
 }
 
 #[test]

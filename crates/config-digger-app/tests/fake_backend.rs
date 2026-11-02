@@ -175,11 +175,13 @@ fn every_screen_has_what_it_shows() {
             .any(|home| home.ends_with("claude-desktop-home")),
         "{homes:?}"
     );
-    // Claude Code's homes whose last parts fill a tile in the smallest window.
+    // Claude Code's homes whose last parts fill a tile in the smallest
+    // window, and the one signed out of its claude.ai account.
     for last in [
         "claude-code-shape-home",
         "claude-code-synced-home",
         "claude-code-many-home",
+        "claude-code-logout-home",
     ] {
         assert!(
             homes.iter().any(|home| home.ends_with(last)),

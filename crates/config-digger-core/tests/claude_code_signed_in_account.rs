@@ -34,8 +34,16 @@ fn with_oauth_account(fs: FakeFileSystem, account: Value) -> FakeFileSystem {
     fs.with_file(in_home(".claude.json"), state.to_string())
 }
 
-/// Signed in to the account whose folder is [`ACCOUNT`].
-fn signed_in(fs: FakeFileSystem) -> FakeFileSystem {
+/// Where Claude Code keeps its claude.ai tokens on Windows.
+const CREDENTIALS: &str = r".claude\.credentials.json";
+
+/// The home's `.credentials.json`, whose contents config-digger never reads.
+fn with_credentials(fs: FakeFileSystem) -> FakeFileSystem {
+    fs.with_file(in_home(CREDENTIALS), "not-a-real-secret")
+}
+
+/// `oauthAccount` naming the account whose folder is [`ACCOUNT`].
+fn naming_the_account(fs: FakeFileSystem) -> FakeFileSystem {
     with_oauth_account(
         fs,
         json!({
@@ -44,6 +52,12 @@ fn signed_in(fs: FakeFileSystem) -> FakeFileSystem {
             "emailAddress": "someone@example.com",
         }),
     )
+}
+
+/// Signed in to the account whose folder is [`ACCOUNT`]: `oauthAccount`
+/// names it and the home keeps its credentials.
+fn signed_in(fs: FakeFileSystem) -> FakeFileSystem {
+    with_credentials(naming_the_account(fs))
 }
 
 /// The synced skill `pdf` in the account folder `account`.
@@ -512,6 +526,154 @@ fn a_higher_settings_files_variable_replaces_a_lower_ones() {
         synced_states(&fs, home_env(), &Context::default()),
         all("unread", "off_account")
     );
+}
+
+/// The account's synced skill `pdf` and synced plugin `ours`, with
+/// `oauthAccount` and the credentials as `fs` holds them.
+fn with_synced(fs: FakeFileSystem) -> FakeFileSystem {
+    with_synced_plugin(with_synced_skill(fs, ACCOUNT, "pdf"), ACCOUNT, "ours")
+}
+
+#[test]
+fn an_account_named_without_its_credentials_is_signed_out() {
+    let fs = with_synced(naming_the_account(FakeFileSystem::new()));
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(states(&inventory, &SYNCED), all("unread", "not_signed_in"));
+    assert_eq!(
+        entry(&inventory, "anthropic-skills:pdf")["reason"]["sentence"],
+        r"Claude Code keeps no sign-in credentials at C:\Users\fixture\.claude\.credentials.json, so it is signed out of its claude.ai account, and reads this only for the account it is signed in to."
+    );
+}
+
+#[test]
+fn the_credentials_file_counts_by_existing_and_is_never_read() {
+    let named = || with_synced(naming_the_account(FakeFileSystem::new()));
+    let folder = named().with_folder(in_home(CREDENTIALS));
+    let denied = with_credentials(named()).denying_reads_of(in_home(CREDENTIALS));
+    let read = with_credentials(named());
+
+    for (fs, what) in [(folder, "a folder"), (denied, "denied"), (read, "a file")] {
+        assert_eq!(
+            states(&inventory(&fs), &SYNCED),
+            all("effective", ""),
+            "{what}"
+        );
+        assert_eq!(fs.reads_of(in_home(CREDENTIALS)), 0, "{what}");
+    }
+}
+
+/// An Agent whose `account` declares no credentials file, as where the
+/// Agent keeps its tokens outside the home: the file naming the account
+/// decides alone.
+const NO_CREDENTIALS: &str = r#"
+format_version = 1
+
+[agent]
+id = "test-agent"
+name = "Test Agent"
+
+[account]
+name = "example.com"
+anchor = { block = "home", root = "state" }
+ids = { org = ["account", "org"], user = ["account", "user"] }
+folder = "{org}_{user}"
+
+[[homes]]
+id = "default"
+folder = { block = "path", path = "~" }
+roots.state = ".test.json"
+roots.synced = ".test/synced"
+
+[[scopes]]
+id = "user"
+
+[[locations]]
+id = "synced-skills"
+when = [{ block = "signed-in-account" }]
+anchor = { block = "home", root = "synced" }
+format = { block = "skill-folder", depth = 2, name_from = "frontmatter", no_frontmatter = "folder-name", malformed_frontmatter = "folder-name", no_name = "skip" }
+kind = "skill"
+scope = "user"
+provenance = "cloud-mirror"
+store_class = "plain"
+on_read_failure = "ignores_file"
+
+[items.skill]
+precedence = ["synced-skills"]
+competition = { block = "exact-name" }
+checks = ["frontmatter", "disable", "precedence"]
+"#;
+
+#[test]
+fn without_a_credentials_file_in_its_definition_the_file_naming_the_account_decides_alone() {
+    // The home as `account` names the account, with a synced skill in the
+    // folder of `org-a_user-a` and one in that of `org-b_user-b`.
+    let home = |account: Value| {
+        FakeFileSystem::new()
+            .with_file(
+                in_home(".test.json"),
+                json!({ "account": account }).to_string(),
+            )
+            .with_file(
+                in_home(r".test\synced\org-a_user-a\notes\SKILL.md"),
+                skill_md("test-notes"),
+            )
+            .with_file(
+                in_home(r".test\synced\org-b_user-b\docs\SKILL.md"),
+                skill_md("test-docs"),
+            )
+    };
+    let states_of = |fs: FakeFileSystem| {
+        let core = Core::with_extra_definitions(
+            fake::ports(fs, home_env()),
+            &[("test-agent.toml", NO_CREDENTIALS)],
+        )
+        .unwrap();
+        let snapshot = core.scan(&ScanOptions::default()).unwrap();
+        states(
+            &core.resolve(&snapshot, &Context::default()),
+            &["test-notes", "test-docs"],
+        )
+    };
+
+    assert_eq!(
+        states_of(home(json!({ "org": "org-a", "user": "user-a" }))),
+        pairs(&[("effective", ""), ("unread", "other_account")])
+    );
+    assert_eq!(
+        states_of(home(json!({ "org": "org-a" }))),
+        pairs(&[("unread", "not_signed_in"), ("unread", "not_signed_in")])
+    );
+}
+
+#[test]
+fn credentials_with_no_account_named_are_signed_in_to_none_until_the_next_start_online() {
+    let unnamed = [
+        Value::Null,
+        json!({ "organizationUuid": "org-a" }),
+        json!({ "organizationUuid": "org-a", "accountUuid": "" }),
+    ];
+    for account in unnamed {
+        let fs = with_synced(with_credentials(with_oauth_account(
+            FakeFileSystem::new(),
+            account.clone(),
+        )));
+
+        let inventory = inventory(&fs);
+
+        assert_eq!(
+            states(&inventory, &SYNCED),
+            all("unread", "not_signed_in"),
+            "{account}"
+        );
+        assert_eq!(
+            entry(&inventory, "anthropic-skills:pdf")["reason"]["sentence"],
+            r"Claude Code keeps sign-in credentials at C:\Users\fixture\.claude\.credentials.json, but names no claude.ai account: it fetches the account at its next start online, and until then reads this for none.",
+            "{account}"
+        );
+    }
 }
 
 #[test]

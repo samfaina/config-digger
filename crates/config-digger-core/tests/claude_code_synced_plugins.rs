@@ -37,6 +37,7 @@ fn synced_home() -> FakeFileSystem {
             in_home(".claude.json"),
             json!({ "oauthAccount": account, "cachedGrowthBookFeatures": gates }).to_string(),
         )
+        .with_file(in_home(r".claude\.credentials.json"), "not-a-real-secret")
         .with_file(
             in_account(r"demo~g3\.claude-plugin\plugin.json"),
             json!({ "name": "demo", "version": "1.2.0" }).to_string(),

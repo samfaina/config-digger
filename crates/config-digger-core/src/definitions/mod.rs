@@ -510,6 +510,12 @@ pub(crate) struct AccountDefinition {
     /// The name of the account's folder, made of its ids, each `{<name>}`,
     /// such as `{organization}_{account}`.
     pub folder: String,
+    /// The file of the Agent home that keeps the account's sign-in
+    /// credentials, such as Claude Code's `.credentials.json`. config-digger
+    /// checks only that it exists, and never reads it: without it, the home
+    /// is signed in to no account. Omitted where the Agent keeps them
+    /// outside the home, and then the file naming the account decides alone.
+    pub credentials: Option<Anchor>,
     /// What takes the Agent off the account. Without it, nothing does.
     pub off: Option<blocks::OffAccount>,
 }
@@ -558,6 +564,14 @@ impl AccountDefinition {
         }
         if self.folder.contains(['/', '\\']) || self.folder.trim().is_empty() {
             return Err("folder is the name of one folder".into());
+        }
+        if let Some(credentials) = &self.credentials {
+            let context = |e: String| format!("credentials {e}");
+            credentials.validate().map_err(context)?;
+            credentials.one_file().map_err(context)?;
+            if credentials.in_project() || credentials.home_root().is_none() {
+                return Err(context("must lie in the Agent home".into()));
+            }
         }
         if let Some(off) = &self.off {
             off.validate().map_err(|e| format!("off: {e}"))?;
@@ -1781,6 +1795,9 @@ impl AgentDefinition {
             let context = |e: String| format!("account: {e}");
             account.validate().map_err(context)?;
             self.validate_home_root(&account.anchor).map_err(context)?;
+            if let Some(anchor) = &account.credentials {
+                self.validate_home_root(anchor).map_err(context)?;
+            }
             for anchor in account.off.iter().flat_map(|off| off.anchors()) {
                 self.validate_setting(anchor).map_err(context)?;
             }
@@ -4025,6 +4042,36 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
                 &format!("anchor = {anchor}"),
                 1,
             ));
+            assert!(error(&text).contains(message), "{anchor}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn an_accounts_credentials_lie_in_one_file_of_the_agent_home() {
+        let credentials = |anchor: &str| {
+            with_account(&ACCOUNT.replacen(
+                "folder = \"{org}_{user}\"\n",
+                &format!("folder = \"{{org}}_{{user}}\"\ncredentials = {anchor}\n"),
+                1,
+            ))
+        };
+        let text = credentials(r#"{ block = "home", root = "state", path = "tokens.json" }"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (anchor, message) in [
+            (
+                r#"{ block = "project", path = ".test/tokens.json" }"#,
+                "credentials must lie in the Agent home",
+            ),
+            (
+                r#"{ block = "machine", path = "C:/Test/tokens.json" }"#,
+                "credentials must lie in the Agent home",
+            ),
+            (
+                r#"{ block = "home", root = "tokens" }"#,
+                "declares no root `tokens`",
+            ),
+        ] {
+            let text = credentials(anchor);
             assert!(error(&text).contains(message), "{anchor}: {}", error(&text));
         }
     }
