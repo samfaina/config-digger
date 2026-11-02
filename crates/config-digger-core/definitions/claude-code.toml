@@ -196,9 +196,9 @@ registries = [
 # folder [docs].
 #
 # A linked git worktree. A plugin installed at project scope from the main
-# checkout also loads in its linked worktrees, made with `--worktree` or
-# `git worktree add` [docs, test], inside the main checkout or outside it
-# [test]. Its record's `projectPath` is the folder it was installed from:
+# checkout also loads in its linked worktrees, made with `--worktree`
+# [docs] or `git worktree add` [docs, test], inside the main checkout or
+# outside it [test]. Its record's `projectPath` is the folder it was installed from:
 # the main checkout's, or a worktree's when installed there, and a plugin
 # installed from a worktree loads in the main checkout and in the other
 # worktrees too [test]; so it does between the checkouts of a bare repo, of
@@ -290,7 +290,7 @@ id = "synced"
 unverified = [
   "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
   "An installed plugin of a synced plugin's name that is off, by `enabledPlugins` or forced off by the managed settings, or that no settings file names, is taken to leave the synced one loaded.",
-  "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone.",
+  "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone, and in each other checkout of its repository `project_reach` reads it in.",
   "An installed plugin of a synced plugin's name that fails to load, its manifest failing, is taken to keep the synced one out still.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
 ]

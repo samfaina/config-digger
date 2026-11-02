@@ -4118,7 +4118,7 @@ impl Scanner<'_> {
             self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
         if plugins.registry.project_reach() == ProjectReach::Checkouts {
-            self.add_other_checkouts(&mut found);
+            self.copy_to_other_checkouts(&mut found);
         }
         found
     }
@@ -4127,7 +4127,7 @@ impl Scanner<'_> {
     /// checkout of a git repository, the plugin bound to the root of each
     /// other checkout of that repository among the Projects, unless `found`
     /// already binds a plugin of its id there.
-    fn add_other_checkouts(&self, found: &mut Vec<ScannedPlugin>) {
+    fn copy_to_other_checkouts(&self, found: &mut Vec<ScannedPlugin>) {
         let checkouts: Vec<(&str, String)> = self
             .projects
             .list
@@ -4138,7 +4138,7 @@ impl Scanner<'_> {
                 Some((project.key.as_str(), paths::key(&common)))
             })
             .collect();
-        let mut more: Vec<ScannedPlugin> = Vec::new();
+        let mut copies: Vec<ScannedPlugin> = Vec::new();
         for plugin in found.iter() {
             let Some((own, common)) = checkouts
                 .iter()
@@ -4153,15 +4153,15 @@ impl Scanner<'_> {
                 let bound = |known: &ScannedPlugin| {
                     known.id == plugin.id && known.project.as_deref() == Some(*other)
                 };
-                if !found.iter().chain(&more).any(bound) {
-                    more.push(ScannedPlugin {
+                if !found.iter().chain(&copies).any(bound) {
+                    copies.push(ScannedPlugin {
                         project: Some((*other).to_owned()),
                         ..plugin.clone()
                     });
                 }
             }
         }
-        found.extend(more);
+        found.extend(copies);
     }
 
     /// Leaves out of `plugins`, read for one Agent home, each plugin that
