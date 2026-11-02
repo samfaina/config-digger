@@ -4464,3 +4464,26 @@ fn projects_list_names_each_project_s_last_opened_home_hidden_or_not() {
     assert_eq!(opened["home"], "profile");
     assert_eq!(opened["hidden"], true);
 }
+
+#[test]
+fn projects_list_notes_a_home_folder_project_whose_nested_skills_folders_are_not_read() {
+    // Claude Code records the user's home folder as a Project, in no git
+    // work tree.
+    let harness = Harness::new();
+    let cwd = harness.cwd().display().to_string();
+    let state = json!({ "projects": { cwd.replace('\\', "/"): {} } });
+    let harness = harness.with_cwd_file(".claude.json", &state.to_string());
+    let home = harness.root.path().display().to_string();
+    let env = [("USERPROFILE", home.as_str()), ("HOME", home.as_str())];
+
+    let text = harness.run_with_env(&["projects", "list", "--wide"], &env);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout.contains(&format!(
+            "{cwd}\n    Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.\n"
+        )),
+        "{}",
+        text.stdout
+    );
+}

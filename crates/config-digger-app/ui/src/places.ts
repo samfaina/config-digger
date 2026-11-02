@@ -30,6 +30,8 @@ export type ProjectRow = {
   tags: PlaceTag[];
   /** Such as "3 Project Entries". */
   entries: string;
+  /** What to know about it for an Agent, such as folders below it config-digger does not read. */
+  notes: string[];
   offer: ListOffer;
 };
 
@@ -83,6 +85,7 @@ export function projectSections(places: Places, search = ""): ProjectSections {
       : "Folder",
     tags: tags(project),
     entries: counted(project.entries, "Project Entry", "Project Entries"),
+    notes: project.notes.map((note) => note.sentence),
     offer: removableProject(project) ? "remove_from_list" : "hide",
   });
   const missingRow = (project: Project): MissingRow => {

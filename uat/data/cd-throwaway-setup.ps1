@@ -136,6 +136,23 @@ Write-TestFile "$Root\project-extra\.mcp.json" @"
 }
 "@
 
+# A Project no registry knows, in no git repo, with a skill in a
+# .claude\skills deeper in it, which config-digger reads as in a git repo, and
+# a skill as deep below claude-code-home, which config-digger does not read
+# while that folder is the user's: step 28.2 adds both as Projects by hand.
+Write-TestFile "$Root\project-outside-git\apps\web\.claude\skills\cd-throwaway-outside-git-skill\SKILL.md" @"
+---
+name: cd-throwaway-outside-git-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+Write-TestFile "$Root\claude-code-home\apps\web\.claude\skills\cd-throwaway-home-nested-skill\SKILL.md" @"
+---
+name: cd-throwaway-home-nested-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+
 # Codex home: Disable writes enabled = false here, which the Undo tests use.
 Write-TestFile "$Root\codex-home\config.toml" @"
 [mcp_servers.cd-throwaway-codex]
@@ -391,8 +408,9 @@ description: Throwaway skill for testing config-digger. Does nothing.
 
 # With -NestedSkills, skills in a .claude\skills deeper in the Project, which
 # Claude Code loads once it works on a file under apps\web: one of its own
-# name, and one with the name of the Project's own skill. config-digger reads
-# them only in a git repo, so the Project becomes one.
+# name, and one with the name of the Project's own skill. The Project becomes
+# a git repo, so that step 28.1 walks them in one; step 28.2 walks a skill
+# outside one.
 if ($NestedSkills) {
     foreach ($name in "cd-throwaway-nested-skill", "cd-throwaway-project-skill") {
         Write-TestFile "$Root\project\apps\web\.claude\skills\$name\SKILL.md" @"

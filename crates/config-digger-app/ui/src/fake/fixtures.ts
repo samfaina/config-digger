@@ -11,6 +11,24 @@ export const fixtures: Fixtures = {
         "project": null,
         "projects": [
           {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
             "path": "E:\\cd-throwaway\\many\\project-01",
             "missing": false,
             "workspace_file": false,
@@ -21,7 +39,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-02",
@@ -34,7 +53,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-03",
@@ -47,7 +67,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-04",
@@ -60,7 +81,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-05",
@@ -73,7 +95,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-06",
@@ -86,7 +109,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-07",
@@ -99,7 +123,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-08",
@@ -112,7 +137,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-09",
@@ -125,7 +151,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-10",
@@ -138,7 +165,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-11",
@@ -151,7 +179,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-12",
@@ -164,7 +193,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-13",
@@ -177,7 +207,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-14",
@@ -190,7 +221,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-15",
@@ -203,7 +235,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-16",
@@ -216,7 +249,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-17",
@@ -229,7 +263,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-18",
@@ -242,7 +277,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-19",
@@ -255,7 +291,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-20",
@@ -268,7 +305,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-21",
@@ -281,7 +319,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-22",
@@ -294,7 +333,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-23",
@@ -307,7 +347,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-24",
@@ -320,7 +361,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-25",
@@ -333,7 +375,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-26",
@@ -346,7 +389,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-27",
@@ -359,7 +403,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-28",
@@ -372,7 +417,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-29",
@@ -385,7 +431,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-30",
@@ -398,7 +445,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-gone",
@@ -411,7 +459,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 12,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
@@ -424,7 +473,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project",
@@ -437,7 +487,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 3,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-extra",
@@ -448,7 +499,8 @@ export const fixtures: Fixtures = {
             "added": true,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-gone",
@@ -461,7 +513,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -2968,6 +3021,24 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project",
         "projects": [
           {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
             "path": "E:\\cd-throwaway\\many\\project-01",
             "missing": false,
             "workspace_file": false,
@@ -2978,7 +3049,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-02",
@@ -2991,7 +3063,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-03",
@@ -3004,7 +3077,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-04",
@@ -3017,7 +3091,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-05",
@@ -3030,7 +3105,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-06",
@@ -3043,7 +3119,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-07",
@@ -3056,7 +3133,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-08",
@@ -3069,7 +3147,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-09",
@@ -3082,7 +3161,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-10",
@@ -3095,7 +3175,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-11",
@@ -3108,7 +3189,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-12",
@@ -3121,7 +3203,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-13",
@@ -3134,7 +3217,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-14",
@@ -3147,7 +3231,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-15",
@@ -3160,7 +3245,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-16",
@@ -3173,7 +3259,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-17",
@@ -3186,7 +3273,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-18",
@@ -3199,7 +3287,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-19",
@@ -3212,7 +3301,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-20",
@@ -3225,7 +3315,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-21",
@@ -3238,7 +3329,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-22",
@@ -3251,7 +3343,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-23",
@@ -3264,7 +3357,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-24",
@@ -3277,7 +3371,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-25",
@@ -3290,7 +3385,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-26",
@@ -3303,7 +3399,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-27",
@@ -3316,7 +3413,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-28",
@@ -3329,7 +3427,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-29",
@@ -3342,7 +3441,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-30",
@@ -3355,7 +3455,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-gone",
@@ -3368,7 +3469,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 12,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
@@ -3381,7 +3483,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project",
@@ -3394,7 +3497,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 3,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-extra",
@@ -3405,7 +3509,8 @@ export const fixtures: Fixtures = {
             "added": true,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-gone",
@@ -3418,7 +3523,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -6775,6 +6881,24 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra",
         "projects": [
           {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
             "path": "E:\\cd-throwaway\\many\\project-01",
             "missing": false,
             "workspace_file": false,
@@ -6785,7 +6909,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-02",
@@ -6798,7 +6923,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-03",
@@ -6811,7 +6937,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-04",
@@ -6824,7 +6951,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-05",
@@ -6837,7 +6965,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-06",
@@ -6850,7 +6979,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-07",
@@ -6863,7 +6993,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-08",
@@ -6876,7 +7007,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-09",
@@ -6889,7 +7021,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-10",
@@ -6902,7 +7035,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-11",
@@ -6915,7 +7049,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-12",
@@ -6928,7 +7063,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-13",
@@ -6941,7 +7077,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-14",
@@ -6954,7 +7091,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-15",
@@ -6967,7 +7105,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-16",
@@ -6980,7 +7119,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-17",
@@ -6993,7 +7133,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-18",
@@ -7006,7 +7147,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-19",
@@ -7019,7 +7161,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-20",
@@ -7032,7 +7175,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-21",
@@ -7045,7 +7189,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-22",
@@ -7058,7 +7203,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-23",
@@ -7071,7 +7217,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-24",
@@ -7084,7 +7231,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-25",
@@ -7097,7 +7245,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-26",
@@ -7110,7 +7259,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-27",
@@ -7123,7 +7273,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-28",
@@ -7136,7 +7287,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-29",
@@ -7149,7 +7301,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-30",
@@ -7162,7 +7315,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\many\\project-gone",
@@ -7175,7 +7329,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 12,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
@@ -7188,7 +7343,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 0,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project",
@@ -7201,7 +7357,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 3,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-extra",
@@ -7212,7 +7369,8 @@ export const fixtures: Fixtures = {
             "added": true,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           },
           {
             "path": "E:\\cd-throwaway\\project-gone",
@@ -7225,7 +7383,8 @@ export const fixtures: Fixtures = {
             "added": false,
             "hidden": false,
             "entries": 1,
-            "last_opened": []
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -10091,6 +10250,24 @@ export const fixtures: Fixtures = {
     "read_at": "2026-10-01T12:00:00Z",
     "projects": [
       {
+        "path": "E:\\cd-throwaway\\claude-code-home",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [],
+        "added": true,
+        "hidden": false,
+        "entries": 1,
+        "last_opened": [],
+        "notes": [
+          {
+            "agent": "claude-code",
+            "code": "walk_down_left_out",
+            "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+          }
+        ]
+      },
+      {
         "path": "E:\\cd-throwaway\\many\\project-01",
         "missing": false,
         "workspace_file": false,
@@ -10101,7 +10278,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-02",
@@ -10114,7 +10292,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-03",
@@ -10127,7 +10306,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-04",
@@ -10140,7 +10320,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-05",
@@ -10153,7 +10334,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-06",
@@ -10166,7 +10348,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-07",
@@ -10179,7 +10362,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-08",
@@ -10192,7 +10376,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-09",
@@ -10205,7 +10390,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-10",
@@ -10218,7 +10404,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-11",
@@ -10231,7 +10418,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-12",
@@ -10244,7 +10432,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-13",
@@ -10257,7 +10446,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-14",
@@ -10270,7 +10460,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-15",
@@ -10283,7 +10474,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-16",
@@ -10296,7 +10488,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-17",
@@ -10309,7 +10502,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-18",
@@ -10322,7 +10516,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-19",
@@ -10335,7 +10530,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-20",
@@ -10348,7 +10544,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-21",
@@ -10361,7 +10558,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-22",
@@ -10374,7 +10572,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-23",
@@ -10387,7 +10586,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-24",
@@ -10400,7 +10600,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-25",
@@ -10413,7 +10614,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-26",
@@ -10426,7 +10628,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-27",
@@ -10439,7 +10642,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-28",
@@ -10452,7 +10656,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-29",
@@ -10465,7 +10670,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-30",
@@ -10478,7 +10684,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\many\\project-gone",
@@ -10491,7 +10698,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 12,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
@@ -10504,7 +10712,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\project",
@@ -10517,7 +10726,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 3,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\project-deleted",
@@ -10530,7 +10740,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\project-extra",
@@ -10541,7 +10752,8 @@ export const fixtures: Fixtures = {
         "added": true,
         "hidden": false,
         "entries": 1,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\project-gone",
@@ -10554,7 +10766,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": false,
         "entries": 1,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       },
       {
         "path": "E:\\cd-throwaway\\project-hide",
@@ -10567,7 +10780,8 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": true,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       }
     ],
     "leftovers": [
@@ -11748,12 +11962,31 @@ export const fixtures: Fixtures = {
         "added": false,
         "hidden": true,
         "entries": 0,
-        "last_opened": []
+        "last_opened": [],
+        "notes": []
       }
     },
     "places": {
       "read_at": "2026-10-01T12:00:00Z",
       "projects": [
+        {
+          "path": "E:\\cd-throwaway\\claude-code-home",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [],
+          "added": true,
+          "hidden": false,
+          "entries": 1,
+          "last_opened": [],
+          "notes": [
+            {
+              "agent": "claude-code",
+              "code": "walk_down_left_out",
+              "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+            }
+          ]
+        },
         {
           "path": "E:\\cd-throwaway\\many\\project-01",
           "missing": false,
@@ -11765,7 +11998,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-02",
@@ -11778,7 +12012,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-03",
@@ -11791,7 +12026,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-04",
@@ -11804,7 +12040,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-05",
@@ -11817,7 +12054,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-06",
@@ -11830,7 +12068,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-07",
@@ -11843,7 +12082,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-08",
@@ -11856,7 +12096,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-09",
@@ -11869,7 +12110,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-10",
@@ -11882,7 +12124,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-11",
@@ -11895,7 +12138,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-12",
@@ -11908,7 +12152,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-13",
@@ -11921,7 +12166,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-14",
@@ -11934,7 +12180,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-15",
@@ -11947,7 +12194,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-16",
@@ -11960,7 +12208,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-17",
@@ -11973,7 +12222,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-18",
@@ -11986,7 +12236,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-19",
@@ -11999,7 +12250,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-20",
@@ -12012,7 +12264,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-21",
@@ -12025,7 +12278,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-22",
@@ -12038,7 +12292,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-23",
@@ -12051,7 +12306,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-24",
@@ -12064,7 +12320,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-25",
@@ -12077,7 +12334,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-26",
@@ -12090,7 +12348,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-27",
@@ -12103,7 +12362,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-28",
@@ -12116,7 +12376,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-29",
@@ -12129,7 +12390,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-30",
@@ -12142,7 +12404,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\many\\project-gone",
@@ -12155,7 +12418,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 12,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
@@ -12168,7 +12432,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\project",
@@ -12181,7 +12446,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 3,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\project-deleted",
@@ -12194,7 +12460,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\project-extra",
@@ -12205,7 +12472,8 @@ export const fixtures: Fixtures = {
           "added": true,
           "hidden": false,
           "entries": 1,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\project-gone",
@@ -12218,7 +12486,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": false,
           "entries": 1,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         },
         {
           "path": "E:\\cd-throwaway\\project-hide",
@@ -12231,7 +12500,8 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": true,
           "entries": 0,
-          "last_opened": []
+          "last_opened": [],
+          "notes": []
         }
       ],
       "leftovers": [
@@ -13376,7 +13646,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-e94",
+      "id": "20261001-120000-764",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -13402,7 +13672,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-97e",
+      "id": "20261001-120000-123",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -13425,10 +13695,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123"
     },
     {
-      "id": "20261001-120000-9fc",
+      "id": "20261001-120000-1cb",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -13456,7 +13726,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-e94",
+        "id": "20261001-120000-764",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -13501,6 +13771,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-stranded",
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
           "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\claude-code-home",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
           "project": "E:\\cd-throwaway\\many\\project-01",
           "before": "effective",
           "after": "disabled"
@@ -13905,7 +14186,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -13925,7 +14206,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -13944,7 +14225,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -13953,7 +14234,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-97e",
+        "id": "20261001-120000-123",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -13976,7 +14257,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123"
       },
       "project": null,
       "changes": [
@@ -13988,6 +14269,17 @@ export const fixtures: Fixtures = {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
           "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
           "project": null,
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\claude-code-home",
           "before": "effective",
           "after": "disabled"
         },
@@ -14402,7 +14694,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -14440,16 +14732,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -14464,7 +14756,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-9fc",
+        "id": "20261001-120000-1cb",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -14508,6 +14800,17 @@ export const fixtures: Fixtures = {
           "item": "cd-throwaway-codex",
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
           "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\claude-code-home",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
           "project": "E:\\cd-throwaway\\many\\project-01",
           "before": "effective",
           "after": "disabled"
@@ -14912,7 +15215,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -14932,7 +15235,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -14945,10 +15248,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-9fc",
+          "operation": "20261001-120000-1cb",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb\\1-config.toml"
         }
       ]
     },
@@ -14956,10 +15259,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-e94",
+          "operation": "20261001-120000-764",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764\\2-manifest.json"
         }
       ]
     }
@@ -17182,6 +17485,17 @@ export const fixtures: Fixtures = {
               "item": "cd-throwaway-desktop",
               "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
               "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\claude-code-home",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
               "project": "E:\\cd-throwaway\\many\\project-01",
               "before": "disabled",
               "after": "effective"
@@ -17752,6 +18066,17 @@ export const fixtures: Fixtures = {
               "path": "E:\\cd-throwaway\\codex-home\\config.toml",
               "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
               "project": null,
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\claude-code-home",
               "before": "disabled",
               "after": "effective"
             },
@@ -19638,14 +19963,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-e94"
+        "operation": "20261001-120000-764"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-e94 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-e94",
+          "title": "Undo 20261001-120000-764 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-764",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -19701,15 +20026,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-e94"
+        "operation": "20261001-120000-764"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-e94 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-764 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-e94",
+          "backup_of": "20261001-120000-764",
           "project": null,
           "changes": [],
           "effective": [],
@@ -19717,11 +20042,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-e94",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-e94 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-764",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-764 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -19730,15 +20055,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-97e"
+        "operation": "20261001-120000-123"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-97e \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-123 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-97e",
+          "backup_of": "20261001-120000-123",
           "project": null,
           "changes": [],
           "effective": [],
@@ -19746,10 +20071,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-97e",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-97e can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-123",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-123 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -19758,14 +20083,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-9fc"
+        "operation": "20261001-120000-1cb"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-9fc \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-9fc",
+          "title": "Undo 20261001-120000-1cb \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-1cb",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -19777,6 +20102,17 @@ export const fixtures: Fixtures = {
               "path": "E:\\cd-throwaway\\codex-home\\config.toml",
               "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
               "project": null,
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\claude-code-home",
               "before": "disabled",
               "after": "effective"
             },
@@ -20240,15 +20576,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-9fc"
+        "operation": "20261001-120000-1cb"
       },
       "preview": {
         "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-9fc \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-1cb \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-9fc",
+          "backup_of": "20261001-120000-1cb",
           "project": null,
           "changes": [],
           "effective": [],
@@ -20256,10 +20592,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-9fc can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-1cb can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -20269,11 +20605,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-9fc",
+      "operation": "20261001-120000-1cb",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-9fc",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-9fc: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1cb",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-1cb: verified.",
       "hints": []
     }
   },
@@ -20321,8 +20657,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "fceb4ca",
-    "date": "2026-10-31",
+    "commit": "c1301bc",
+    "date": "2026-11-02",
     "platform": "Windows x64",
     "pages": [
       {

@@ -518,11 +518,9 @@ fn render_projects(
                 .fit(width)
                 .render(),
         );
-        for opened in &project.last_opened {
-            out.push_str(&plain_line(
-                &format!("{INDENT}{INDENT}{}", opened.sentence),
-                width,
-            ));
+        let notes = project.last_opened.iter().map(|opened| &opened.sentence);
+        for sentence in notes.chain(project.notes.iter().map(|note| &note.sentence)) {
+            out.push_str(&plain_line(&format!("{INDENT}{INDENT}{sentence}"), width));
         }
     }
     out

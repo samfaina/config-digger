@@ -6,7 +6,8 @@
 //! no process runs. `cargo xtask fake-backend` runs the recording.
 //!
 //! The recording does what the UAT does by hand: it adds the Claude Desktop
-//! home, three more Claude Code homes and the extra Project, hides a Project,
+//! home, three more Claude Code homes, the extra Project and the user's
+//! folder as a Project, whose nested skills folders it leaves out, hides a Project,
 //! and disables two servers, so that History holds Operations and Settings a
 //! parked Entry. It then parks the server of a second Claude Desktop home
 //! and forgets the home, so that Projects & homes lists a Stranded Entry.
@@ -116,8 +117,9 @@ pub fn record(root: &Path) -> Result<Value, Error> {
 }
 
 /// Adds the Claude Desktop home, three more Claude Code homes, whose last
-/// parts fill a tile in the smallest window, and the extra Project, then
-/// hides a Project, as the UAT does: what the last change did.
+/// parts fill a tile in the smallest window, the extra Project and the
+/// user's folder as a Project, then hides a Project, as the UAT does: what
+/// the last change did.
 fn change_lists(root: &Path) -> Result<ListChanged, Error> {
     let kept = SessionState::default();
     let scanned = root.to_path_buf();
@@ -141,6 +143,9 @@ fn change_lists(root: &Path) -> Result<ListChanged, Error> {
         },
         ListChange::AddProject {
             path: root.join("project-extra"),
+        },
+        ListChange::AddProject {
+            path: root.join("claude-code-home"),
         },
     ];
     for change in &added {

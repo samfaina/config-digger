@@ -4128,7 +4128,7 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
         assert!(parse("test.toml", &own).is_ok(), "{}", error(&own));
     }
 
-    const DOWN: &str = r#"{ down = { needs_git = true, skip = ["node_modules", ".git"], ignore_files = [".ignore", ".gitignore"], ignores_path = true, follow_links = false } }"#;
+    const DOWN: &str = r#"{ down = { outside_git = "nothing", skip = ["node_modules", ".git"], ignore_files = [".ignore", ".gitignore"], ignores_path = true, follow_links = false } }"#;
 
     /// Every walk a location can take, as a TOML value.
     const WALKS: [&str; 3] = [r#""up-to-repo-root""#, r#""up-to-below-root""#, DOWN];

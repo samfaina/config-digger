@@ -2505,6 +2505,17 @@ pub(crate) fn last_opened(
     }
 }
 
+/// Why config-digger reads none of the folders named `path` below a
+/// Project outside git that is a home folder, above one or a drive root,
+/// though `agent_name` loads them.
+pub(crate) fn walk_down_left_out(agent_name: &str, path: &str) -> String {
+    let path = path.replace('/', "\\");
+    format!(
+        "{agent_name} also loads the `{path}` folders below this Project, but config-digger does not read them here: \
+         outside a git repo, that would walk every folder below a home folder or a drive."
+    )
+}
+
 /// The label of an Agent home `owner` copies from another.
 pub(crate) fn mirror_label(owner: &str) -> String {
     format!("Mirrored by {owner}")

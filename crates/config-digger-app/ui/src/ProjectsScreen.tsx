@@ -377,6 +377,11 @@ function ProjectLine({ row, busy, onShow, onHide, onForget }: ProjectLineProps) 
       </div>
       <div className="place-sub">{row.kind}</div>
       <Tags tags={row.tags} />
+      {row.notes.map((note) => (
+        <div key={note} className="place-sub">
+          {note}
+        </div>
+      ))}
     </PlaceRow>
   );
 }

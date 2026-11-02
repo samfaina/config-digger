@@ -2188,6 +2188,67 @@
             "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -NestedSkills"
           },
           "covers": ["#352"]
+        },
+        {
+          "id": "28.2",
+          "title": "Skills anidados fuera de git, y un Project que es la carpeta del usuario",
+          "goal": "Fuera de un repo git, config-digger lee los skills de las carpetas .claude\\skills de más abajo de un Project como en un repo; en un Project que es la carpeta del usuario no mira debajo, y lo dice con una nota en el Project.",
+          "instructions": [
+            "Cierra config-digger si está abierto.",
+            "Ejecuta en PowerShell la orden «Abrir config-digger con claude-code-home como carpeta del usuario».",
+            "Ve a Projects & homes.",
+            "Pulsa Add Project.",
+            "Pulsa Choose folder….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\project-outside-git.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Pulsa Add Project.",
+            "Pulsa Choose folder….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Lee las filas de E:\\cd-throwaway\\project-outside-git y E:\\cd-throwaway\\claude-code-home en la pestaña Projects.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\project-outside-git.",
+            "Abre el Item cd-throwaway-outside-git-skill y lee los avisos de su Entry.",
+            "En el campo Project de la cabecera, elige E:\\cd-throwaway\\claude-code-home.",
+            "Lee los avisos encima de los Items.",
+            "Busca cd-throwaway-home-nested-skill en la lista Items.",
+            "Ve a Projects & homes.",
+            "En las filas de E:\\cd-throwaway\\project-outside-git y E:\\cd-throwaway\\claude-code-home, pulsa Remove from list.",
+            "Cierra config-digger y ábrelo otra vez como siempre, sin la orden."
+          ],
+          "commands": [
+            {
+              "label": "Abrir config-digger con claude-code-home como carpeta del usuario",
+              "shell": "powershell",
+              "text": "$env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-home'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+            }
+          ],
+          "expect": [
+            "En Projects & homes, bajo «E:\\cd-throwaway\\claude-code-home» sale la nota «Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.».",
+            "La fila de «E:\\cd-throwaway\\project-outside-git» no lleva esa nota.",
+            "Con E:\\cd-throwaway\\project-outside-git elegido, el Item «cd-throwaway-outside-git-skill» sale «Effective».",
+            "Bajo su nombre sale «project · E:\\cd-throwaway\\project-outside-git\\apps\\web\\.claude\\skills\\cd-throwaway-outside-git-skill».",
+            "Su Entry tiene el aviso «Claude Code loads it only once it reads or edits a file under `apps\\web` in the Project.».",
+            "Con E:\\cd-throwaway\\claude-code-home elegido, un aviso encima de los Items dice «Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.».",
+            "Con E:\\cd-throwaway\\claude-code-home elegido, «cd-throwaway-home-nested-skill» no sale en la lista Items."
+          ],
+          "setup": {
+            "label": "Crear los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#489"],
+          "automation": [
+            {
+              "tool": "fake-ui",
+              "where": "ci",
+              "test": "crates/config-digger-app/ui/uat/nested.uat.ts > 28.2"
+            }
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados, que tienen claude-code-home como Project pero no project-outside-git; nadie más abre la app real con USERPROFILE sobre los datos de prueba, así que una persona recorre el paso entero en la app real."
         }
       ]
     },
