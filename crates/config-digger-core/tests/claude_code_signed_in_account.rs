@@ -34,7 +34,7 @@ fn with_oauth_account(fs: FakeFileSystem, account: Value) -> FakeFileSystem {
     fs.with_file(in_home(".claude.json"), state.to_string())
 }
 
-/// Where Claude Code keeps its claude.ai tokens on Windows.
+/// Where Claude Code keeps its claude.ai tokens on Windows and Linux.
 const CREDENTIALS: &str = r".claude\.credentials.json";
 
 /// The home's `.credentials.json`, whose contents config-digger never reads.
@@ -543,7 +543,7 @@ fn an_account_named_without_its_credentials_is_signed_out() {
     assert_eq!(states(&inventory, &SYNCED), all("unread", "not_signed_in"));
     assert_eq!(
         entry(&inventory, "anthropic-skills:pdf")["reason"]["sentence"],
-        r"Claude Code keeps no sign-in credentials at C:\Users\fixture\.claude\.credentials.json, so it is signed out of its claude.ai account, and reads this only for the account it is signed in to."
+        r"Claude Code keeps no sign-in credentials at C:\Users\fixture\.claude\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
     );
 }
 

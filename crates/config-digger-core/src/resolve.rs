@@ -13,7 +13,7 @@ use crate::definitions::{
 };
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
-    GateReading, HomeSource, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
+    GateReading, HomeSource, NotSignedIn, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
     ScannedParked, ScannedPlugin, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
@@ -587,8 +587,8 @@ pub(crate) fn resolve(
                         let reason = match closed {
                             Closed::Gate(gate, on) => explain::feature_gate(agent_name, gate, on),
                             Closed::Setting(setting) => explain::needs_setting(agent_name, setting),
-                            Closed::NotSignedIn(signed_in) => {
-                                explain::not_signed_in(agent_name, account(), &signed_in)
+                            Closed::NotSignedIn(why) => {
+                                explain::not_signed_in(agent_name, account(), &why)
                             }
                             Closed::OffAccount(off) => {
                                 explain::off_account(agent_name, account(), &off)
@@ -2761,7 +2761,7 @@ enum Closed<'d> {
     /// The setting that does not have the value it needs.
     Setting(&'d SettingIs),
     /// The Agent home is signed in to no account, as this says why.
-    NotSignedIn(SignedIn),
+    NotSignedIn(NotSignedIn),
     /// What takes the Agent off the account it is signed in to.
     OffAccount(OffBy),
     /// The Entry is in another folder than that of the account the Agent
@@ -2821,10 +2821,11 @@ fn account_closed<'d>(
     project: Option<&str>,
 ) -> Option<Closed<'d>> {
     let Some(account) = snapshot.account_of(entry, project) else {
-        return Some(Closed::NotSignedIn(SignedIn::ToNone));
+        return Some(Closed::NotSignedIn(NotSignedIn::NoAccount));
     };
-    let SignedIn::To(ours) = &account.signed_in else {
-        return Some(Closed::NotSignedIn(account.signed_in.clone()));
+    let ours = match &account.signed_in {
+        SignedIn::To(folder) => folder,
+        SignedIn::Not(why) => return Some(Closed::NotSignedIn(why.clone())),
     };
     if let OnAccount::No(off) = &account.on_account {
         return Some(Closed::OffAccount(off.clone()));

@@ -509,16 +509,24 @@ pub(crate) struct ScannedAccount {
 pub(crate) enum SignedIn {
     /// The account whose folder has this name.
     To(String),
-    /// No account: the file that names it is missing, or lacks one of its
-    /// ids.
-    ToNone,
-    /// The file that names it, at this path, cannot be read or parsed.
+    /// No account, for this reason.
+    Not(NotSignedIn),
+}
+
+/// Why an Agent home is signed in to no account.
+#[derive(Clone)]
+pub(crate) enum NotSignedIn {
+    /// The file that names it is missing, or lacks one of its ids, and the
+    /// home keeps no credentials.
+    NoAccount,
+    /// The file that names it, at this path, cannot be read or parsed, so
+    /// the home is taken to be signed in to none.
     Unreadable(PathBuf),
-    /// No account: the file names one, but the home keeps no credentials
-    /// for it at this path, so the Agent is signed out.
+    /// The file names one, but the home keeps no credentials for it at this
+    /// path, so the Agent is signed out.
     WithoutCredentials(PathBuf),
-    /// No account yet: the home keeps credentials at this path, but no file
-    /// names the account, which the Agent fetches at its next start online.
+    /// The home keeps credentials at this path, but no file names the
+    /// account, which the Agent fetches at its next start online.
     Unnamed(PathBuf),
 }
 
@@ -2318,19 +2326,24 @@ fn read_accounts(
                     .folder_of(|key_path| Some(lookup(&document, key_path)?.as_str()?.to_owned()))
             })
         });
-        // The credentials file is checked for existence only, never read.
         let credentials = account.credentials.as_ref().map(|anchor| {
-            let path = anchor
+            anchor
                 .path(&home.roots, None)
-                .expect("validation puts the credentials in a file of the Agent home");
-            (reader.fs.exists(&path), path)
+                .expect("validation puts the credentials in a file of the Agent home")
         });
+        // The credentials file is checked for existence only, never read.
+        let kept = |credentials: &Path| reader.fs.exists(credentials);
         let signed_in = match (named, credentials) {
-            (Err(()), _) => SignedIn::Unreadable(path),
-            (Ok(Some(folder)), None | Some((true, _))) => SignedIn::To(folder),
-            (Ok(Some(_)), Some((false, credentials))) => SignedIn::WithoutCredentials(credentials),
-            (Ok(None), Some((true, credentials))) => SignedIn::Unnamed(credentials),
-            (Ok(None), None | Some((false, _))) => SignedIn::ToNone,
+            (Err(()), _) => SignedIn::Not(NotSignedIn::Unreadable(path)),
+            (Ok(Some(folder)), None) => SignedIn::To(folder),
+            (Ok(Some(folder)), Some(credentials)) if kept(&credentials) => SignedIn::To(folder),
+            (Ok(Some(_)), Some(credentials)) => {
+                SignedIn::Not(NotSignedIn::WithoutCredentials(credentials))
+            }
+            (Ok(None), Some(credentials)) if kept(&credentials) => {
+                SignedIn::Not(NotSignedIn::Unnamed(credentials))
+            }
+            (Ok(None), _) => SignedIn::Not(NotSignedIn::NoAccount),
         };
         let on_account = |project: Option<&Path>, reader: &mut Reader| match &account.off {
             Some(off) => on_account(off, home, project, settings, reader, ports),

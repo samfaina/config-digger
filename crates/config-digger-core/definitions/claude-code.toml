@@ -75,15 +75,15 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 # it syncs from claude.ai only from the account's folder,
 # `<organizationUuid>_<accountUuid>` [test]. It runs on the account by the
 # claude.ai tokens it keeps, though, `.credentials.json` in its config
-# folder on Windows: with `oauthAccount` and no tokens it is signed out and
+# folder on Windows and Linux: with `oauthAccount` and no tokens it is signed out and
 # reads no synced skill or plugin; with tokens and no `oauthAccount` it
 # reads none offline, and online it fetches the account at start, writes
 # `oauthAccount` back and reads the synced skills [test]. So the home is
 # signed in to the account `oauthAccount` names only while
 # `.credentials.json` exists. config-digger checks only that it exists, and
 # never reads it (ADR 0013). On macOS Claude Code keeps the tokens in the
-# keychain, which config-digger never asks, and `oauthAccount` decides
-# alone there.
+# keychain instead [docs], which config-digger never asks, and
+# `oauthAccount` would decide alone there.
 [account]
 name = "claude.ai"
 anchor = { block = "home", root = "state_file" }
@@ -143,8 +143,8 @@ settings_file = ".claude/settings.json"
 skills = ".claude/skills"
 # The plugins Claude Code installed, and the cache of their files.
 plugins = ".claude/plugins"
-# The claude.ai tokens Claude Code keeps on Windows, checked for existence
-# only.
+# The claude.ai tokens Claude Code keeps on Windows and Linux, checked for
+# existence only.
 credentials_file = ".claude/.credentials.json"
 
 # The settings an organisation deploys, highest first [docs]. The cache of

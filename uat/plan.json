@@ -2302,15 +2302,19 @@
             "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-logout-home.",
             "Pulsa Seleccionar carpeta.",
             "Pulsa Add.",
-            "Vuelve al Inventario y elige ese home.",
-            "Elige la skill anthropic-skills:cd-throwaway-logout-skill y lee su tarjeta.",
-            "Vuelve a Projects & homes, abre la pestaña Agent homes y, en la fila de E:\\cd-throwaway\\claude-code-logout-home, bajo Claude Code, pulsa Remove from list."
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-logout-home.",
+            "Elige la skill anthropic-skills:cd-throwaway-logout-skill.",
+            "Lee su tarjeta.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-logout-home, bajo Claude Code, pulsa Remove from list."
           ],
           "commands": [],
           "expect": [
             "El Item «anthropic-skills:cd-throwaway-logout-skill» sale «Unread».",
             "Su tarjeta tiene la etiqueta «cloud mirror».",
-            "Su tarjeta dice «Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only for the account it is signed in to.».",
+            "Su tarjeta dice «Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in.».",
             "El botón Disable de su tarjeta está desactivado."
           ],
           "setup": {
@@ -2333,9 +2337,13 @@
             "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-unnamed-home.",
             "Pulsa Seleccionar carpeta.",
             "Pulsa Add.",
-            "Vuelve al Inventario y elige ese home.",
-            "Elige la skill anthropic-skills:cd-throwaway-unnamed-skill y lee su tarjeta.",
-            "Vuelve a Projects & homes, abre la pestaña Agent homes y, en la fila de E:\\cd-throwaway\\claude-code-unnamed-home, bajo Claude Code, pulsa Remove from list."
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-unnamed-home.",
+            "Elige la skill anthropic-skills:cd-throwaway-unnamed-skill.",
+            "Lee su tarjeta.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-unnamed-home, bajo Claude Code, pulsa Remove from list."
           ],
           "commands": [],
           "expect": [
