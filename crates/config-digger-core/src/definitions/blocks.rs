@@ -5172,6 +5172,8 @@ pub(crate) enum Malformed {
     NotOneOf(String, Vec<String>),
     /// This field's value does not start with this prefix.
     WrongPrefix(String, String),
+    /// This field's value is not a URL of this scheme with a host.
+    WrongUrl(String, String),
     /// It holds this field, which it must not.
     Forbidden(String),
     /// A key or a string it holds, at any depth, holds a character of
@@ -5240,12 +5242,13 @@ impl Conform for Shape {
 /// one, and limit what some of them hold. The Entry fails the first check
 /// it does not pass, in this order: `name`, then `refused_names`, on its
 /// name; then on its value, `forbidden`, in its order; `values`, a field
-/// the Entry does not hold failing it; `prefixes`, checked only on a
-/// string; one walk of the keys and strings the value holds, at any depth,
-/// in the order it holds them, each key checked against `refused_chars`
-/// and each string against `refused_chars`, then `no_references`;
-/// `required`, in its order; `one_of`; then `types`. `values`, `prefixes`
-/// and `types` check their fields in the order of the fields' names.
+/// the Entry does not hold failing it; `prefixes`, then `urls`, each
+/// checked only on a string; one walk of the keys and strings the value
+/// holds, at any depth, in the order it holds them, each key checked
+/// against `refused_chars` and each string against `refused_chars`, then
+/// `no_references`; `required`, in its order; `one_of`; then `types`.
+/// `values`, `prefixes`, `urls` and `types` check their fields in the order
+/// of the fields' names.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FieldShape {
@@ -5263,6 +5266,12 @@ pub(crate) struct FieldShape {
     /// holds it as a string, such as `https://` for `url`.
     #[serde(default)]
     pub prefixes: BTreeMap<String, String>,
+    /// For a field, the scheme its string must have, when the Entry holds
+    /// it as a string, such as `https` for `url`: the string parses as a
+    /// WHATWG URL, the parser lowercasing the scheme and trimming spaces,
+    /// with that scheme and a host that is not empty.
+    #[serde(default)]
+    pub urls: BTreeMap<String, String>,
     /// The Entry must hold none of these, such as `command`.
     #[serde(default)]
     pub forbidden: Vec<String>,
@@ -5332,9 +5341,19 @@ impl Validate for FieldShape {
             .chain(&self.forbidden)
             .chain(self.values.keys())
             .chain(self.prefixes.keys())
+            .chain(self.urls.keys())
             .find(|field| field.is_empty())
         {
             return Err(format!("a shape field `{field}` must not be empty"));
+        }
+        if let Some((field, scheme)) = self
+            .urls
+            .iter()
+            .find(|(_, scheme)| !is_lower_case_scheme(scheme))
+        {
+            return Err(format!(
+                "the scheme `{scheme}` of shape field `{field}` must be a lower-case URL scheme, such as `https`"
+            ));
         }
         if self.refused_names.iter().any(String::is_empty) {
             return Err("a shape's refused name must not be empty".into());
@@ -5354,6 +5373,7 @@ impl Validate for FieldShape {
             && self.forbidden.is_empty()
             && self.values.is_empty()
             && self.prefixes.is_empty()
+            && self.urls.is_empty()
             && self.refused_chars.is_none()
             && !self.no_references
             && self.name.is_none()
@@ -5402,6 +5422,23 @@ impl RefusedChars {
             RefusedChars::ControlOrFormat => CONTROL_OR_FORMAT.is_match(text),
         }
     }
+}
+
+/// Whether `scheme` is a URL scheme as the WHATWG parser gives it: an
+/// ASCII lower-case letter, then lower-case letters, digits, `+`, `-` and
+/// `.`, without the `:` that ends it.
+fn is_lower_case_scheme(scheme: &str) -> bool {
+    let mut chars = scheme.chars();
+    chars.next().is_some_and(|c| c.is_ascii_lowercase())
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || "+-.".contains(c))
+}
+
+/// Whether `text` parses as a WHATWG URL with the scheme `scheme` and a
+/// host that is not empty.
+fn is_url_with_host(text: &str, scheme: &str) -> bool {
+    url::Url::parse(text).is_ok_and(|url| {
+        url.scheme() == scheme && url.host_str().is_some_and(|host| !host.is_empty())
+    })
 }
 
 /// Whether `text` holds a `${...}` reference.
@@ -5454,13 +5491,26 @@ impl Conform for FieldShape {
         }) {
             return Some(Malformed::NotOneOf(field.clone(), allowed.clone()));
         }
-        if let Some((field, prefix)) = self.prefixes.iter().find(|(field, prefix)| {
-            object
-                .get(*field)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.starts_with(prefix.as_str()))
-        }) {
-            return Some(Malformed::WrongPrefix(field.clone(), prefix.clone()));
+        // The first field of `rules` the Entry holds as a string that fails
+        // its rule, with the rule.
+        let failing_string = |rules: &BTreeMap<String, String>, passes: fn(&str, &str) -> bool| {
+            rules
+                .iter()
+                .find(|(field, rule)| {
+                    object
+                        .get(*field)
+                        .and_then(Value::as_str)
+                        .is_some_and(|value| !passes(value, rule))
+                })
+                .map(|(field, rule)| (field.clone(), rule.clone()))
+        };
+        if let Some((field, prefix)) =
+            failing_string(&self.prefixes, |value, prefix| value.starts_with(prefix))
+        {
+            return Some(Malformed::WrongPrefix(field, prefix));
+        }
+        if let Some((field, scheme)) = failing_string(&self.urls, is_url_with_host) {
+            return Some(Malformed::WrongUrl(field, scheme));
         }
         if let Some(malformed) = self.walk_malformed(value) {
             return Some(malformed);

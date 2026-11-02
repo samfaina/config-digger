@@ -75,6 +75,9 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 unicode-width = "0.2"
+# The WHATWG URL parser, as Claude Code parses a `managedMcpServers`
+# entry's `url` with `new URL`.
+url = "2.5"
 # The package API that names an MSIX package's install folder, which
 # `config-digger-msix` calls: the narrow feature only.
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Storage_Packaging_Appx"] }

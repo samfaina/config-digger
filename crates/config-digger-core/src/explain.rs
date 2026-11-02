@@ -1967,6 +1967,9 @@ pub(crate) fn malformed_entry(agent_name: &str, malformed: &Malformed, competes:
             format!("`{field}` must be one of {}", any_of(values))
         }
         Malformed::WrongPrefix(field, prefix) => format!("`{field}` must start with `{prefix}`"),
+        Malformed::WrongUrl(field, scheme) => {
+            format!("`{field}` must be an `{scheme}:` URL with a host")
+        }
         Malformed::Forbidden(field) => format!("it must not hold `{field}`"),
         Malformed::RefusedChars(RefusedChars::ControlOrFormat) => {
             "no key or value may hold a control or invisible formatting character".to_owned()

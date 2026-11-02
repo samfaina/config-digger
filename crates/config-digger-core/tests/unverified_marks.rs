@@ -374,6 +374,11 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         (
             "claude-code.toml",
             "locations[managed-settings-mcp]",
+            "whose host is not empty",
+        ),
+        (
+            "claude-code.toml",
+            "locations[managed-settings-mcp]",
             "fails several",
         ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),

@@ -3666,9 +3666,29 @@ shape = {{ block = \"fields\", {fields} }}
     #[test]
     fn a_shape_with_the_checks_of_a_remote_server_loads() {
         let text = with_shape(
-            r#"required = ["type", "url"], values = { type = ["http"] }, prefixes = { url = "https://" }, forbidden = ["command"], no_references = true, name = "letters-digits-dash-underscore""#,
+            r#"required = ["type", "url"], values = { type = ["http"] }, urls = { url = "https" }, forbidden = ["command"], no_references = true, name = "letters-digits-dash-underscore""#,
         );
         assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_checking_a_url_alone_loads() {
+        let text = with_shape(r#"urls = { url = "https" }"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_shape_url_scheme_must_be_a_lower_case_scheme() {
+        for scheme in ["", "https:", "HTTPS", "1https", "ht tps"] {
+            let text = with_shape(&format!(r#"urls = {{ url = "{scheme}" }}"#));
+            assert!(
+                error(&text).contains(&format!(
+                    "the scheme `{scheme}` of shape field `url` must be a lower-case URL scheme"
+                )),
+                "{scheme}: {}",
+                error(&text)
+            );
+        }
     }
 
     #[test]
@@ -3700,6 +3720,7 @@ shape = {{ block = \"fields\", {fields} }}
             r#"forbidden = [""]"#,
             r#"values = { "" = ["http"] }"#,
             r#"prefixes = { "" = "https://" }"#,
+            r#"urls = { "" = "https" }"#,
         ] {
             let text = with_shape(fields);
             assert!(

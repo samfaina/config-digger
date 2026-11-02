@@ -386,7 +386,7 @@ fn managed_servers_that_run_a_command_or_use_plain_http_are_invalid() {
             check(
                 "plain",
                 "invalid",
-                "Claude Code skips this Entry: `url` must start with `https://`."
+                "Claude Code skips this Entry: `url` must be an `https:` URL with a host."
             ),
             check("wiki", "effective", ""),
         ]
@@ -446,11 +446,34 @@ fn a_managed_server_needs_an_https_url() {
         "http://mcp.corp.example/a",
         "http://localhost:3000/mcp",
         "ftp://mcp.corp.example",
+        "https://",
+        "https://a b",
+        "mcp.corp.example/a",
     ] {
         assert_eq!(
             beside_a_passing_server(json!({ "type": "http", "url": url })),
-            fails("`url` must start with `https://`"),
+            fails("`url` must be an `https:` URL with a host"),
             "{url}"
+        );
+    }
+}
+
+#[test]
+fn a_managed_server_url_is_parsed_as_claude_code_parses_it() {
+    for url in [
+        "HTTPS://mcp.corp.example/a",
+        " https://mcp.corp.example/a",
+        "https://mcp.corp.example/a ",
+        "https://localhost:3000/mcp",
+        "https:mcp.corp.example/a",
+    ] {
+        assert_eq!(
+            beside_a_passing_server(json!({ "type": "http", "url": url })),
+            [
+                check("failing", "effective", ""),
+                check("wiki", "effective", "")
+            ],
+            "{url:?}"
         );
     }
 }
@@ -642,6 +665,18 @@ fn a_managed_server_failing_several_checks_fails_the_first() {
         (
             json!({ "url": "https://mcp.corp.example/a", "command": "npx" }),
             "it must not hold `command`",
+        ),
+        (
+            json!({ "type": "stdio", "url": "https://" }),
+            "`type` must be one of `http`, `sse` or `streamable-http`",
+        ),
+        (
+            json!({ "type": "http", "url": "https://", "headers": { "X-A": "${TOKEN}" } }),
+            "`url` must be an `https:` URL with a host",
+        ),
+        (
+            json!({ "type": "http", "url": "https://", "headers": { "X-A": "a\u{7}b" } }),
+            "`url` must be an `https:` URL with a host",
         ),
         (
             json!({ "type": "http", "url": "https://${HOST}/a", "headers": { "X-A": "a\u{7}b" } }),
