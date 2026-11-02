@@ -509,11 +509,25 @@ pub(crate) struct ScannedAccount {
 pub(crate) enum SignedIn {
     /// The account whose folder has this name.
     To(String),
-    /// No account: the file that names it is missing, or lacks one of its
-    /// ids.
-    ToNone,
-    /// The file that names it, at this path, cannot be read or parsed.
+    /// No account, for this reason.
+    Not(NotSignedIn),
+}
+
+/// Why an Agent home is signed in to no account.
+#[derive(Clone)]
+pub(crate) enum NotSignedIn {
+    /// The file that names it is missing, or lacks one of its ids, and the
+    /// home keeps no credentials.
+    NoAccount,
+    /// The file that names it, at this path, cannot be read or parsed, so
+    /// the home is taken to be signed in to none.
     Unreadable(PathBuf),
+    /// The file names one, but the home keeps no credentials for it at this
+    /// path, so the Agent is signed out.
+    WithoutCredentials(PathBuf),
+    /// The home keeps credentials at this path, but no file names the
+    /// account, which the Agent fetches at its next start online.
+    Unnamed(PathBuf),
 }
 
 /// Whether an Agent runs on its Signed-in account in a context.
@@ -2306,15 +2320,30 @@ fn read_accounts(
             Ok(Some(text)) => JsonFormat::STRICT.parse(text).map(Some).map_err(|_| ()),
             Err(_) => Err(()),
         };
-        let signed_in = match document {
-            Ok(document) => document
-                .and_then(|document| {
-                    account.folder_of(|key_path| {
-                        Some(lookup(&document, key_path)?.as_str()?.to_owned())
-                    })
-                })
-                .map_or(SignedIn::ToNone, SignedIn::To),
-            Err(()) => SignedIn::Unreadable(path),
+        let named = document.map(|document| {
+            document.and_then(|document| {
+                account
+                    .folder_of(|key_path| Some(lookup(&document, key_path)?.as_str()?.to_owned()))
+            })
+        });
+        let credentials = account.credentials.as_ref().map(|anchor| {
+            anchor
+                .path(&home.roots, None)
+                .expect("validation puts the credentials in a file of the Agent home")
+        });
+        // The credentials file is checked for existence only, never read.
+        let kept = |credentials: &Path| reader.fs.exists(credentials);
+        let signed_in = match (named, credentials) {
+            (Err(()), _) => SignedIn::Not(NotSignedIn::Unreadable(path)),
+            (Ok(Some(folder)), None) => SignedIn::To(folder),
+            (Ok(Some(folder)), Some(credentials)) if kept(&credentials) => SignedIn::To(folder),
+            (Ok(Some(_)), Some(credentials)) => {
+                SignedIn::Not(NotSignedIn::WithoutCredentials(credentials))
+            }
+            (Ok(None), Some(credentials)) if kept(&credentials) => {
+                SignedIn::Not(NotSignedIn::Unnamed(credentials))
+            }
+            (Ok(None), _) => SignedIn::Not(NotSignedIn::NoAccount),
         };
         let on_account = |project: Option<&Path>, reader: &mut Reader| match &account.off {
             Some(off) => on_account(off, home, project, settings, reader, ports),

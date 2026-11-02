@@ -868,6 +868,17 @@
           "description": "The name of the account's folder, made of its ids, each `{<name>}`,\nsuch as `{organization}_{account}`.",
           "type": "string"
         },
+        "credentials": {
+          "description": "The file of the Agent home that keeps the account's sign-in\ncredentials, such as Claude Code's `.credentials.json`. config-digger\nchecks only that it exists, and never reads it: without it, the home\nis signed in to no account. Omitted where the Agent keeps them\noutside the home, and then the file naming the account decides alone.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Anchor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "off": {
           "description": "What takes the Agent off the account. Without it, nothing does.",
           "anyOf": [

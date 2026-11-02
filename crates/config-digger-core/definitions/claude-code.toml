@@ -74,17 +74,22 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/.cla
 # 2.1.311 binaries say [binary]. Claude Code reads the skills and plugins
 # it syncs from claude.ai only from the account's folder,
 # `<organizationUuid>_<accountUuid>` [test]. It runs on the account by the
-# claude.ai tokens it keeps, though, `.credentials.json` on Windows: with
-# `oauthAccount` and no tokens it is signed out and reads no synced skill
-# or plugin; with tokens and no `oauthAccount` it reads none offline, and
-# online it fetches the account at start, writes `oauthAccount` back and
-# reads the synced skills [test]. config-digger reads `oauthAccount` alone
-# (#491).
+# claude.ai tokens it keeps, though, `.credentials.json` in its config
+# folder on Windows and Linux: with `oauthAccount` and no tokens it is signed out and
+# reads no synced skill or plugin; with tokens and no `oauthAccount` it
+# reads none offline, and online it fetches the account at start, writes
+# `oauthAccount` back and reads the synced skills [test]. So the home is
+# signed in to the account `oauthAccount` names only while
+# `.credentials.json` exists. config-digger checks only that it exists, and
+# never reads it (ADR 0013). On macOS Claude Code keeps the tokens in the
+# keychain instead [docs], which config-digger never asks, and
+# `oauthAccount` would decide alone there.
 [account]
 name = "claude.ai"
 anchor = { block = "home", root = "state_file" }
 ids = { organization = ["oauthAccount", "organizationUuid"], account = ["oauthAccount", "accountUuid"] }
 folder = "{organization}_{account}"
+credentials = { block = "home", root = "credentials_file" }
 
 # What takes Claude Code off the account, so that it reads none of the
 # account's synced skills and plugins in the context. It runs on the
@@ -138,6 +143,9 @@ settings_file = ".claude/settings.json"
 skills = ".claude/skills"
 # The plugins Claude Code installed, and the cache of their files.
 plugins = ".claude/plugins"
+# The claude.ai tokens Claude Code keeps on Windows and Linux, checked for
+# existence only.
+credentials_file = ".claude/.credentials.json"
 
 # The settings an organisation deploys, highest first [docs]. The cache of
 # server-managed settings, which claude.ai or a gateway delivers, ranks

@@ -118,10 +118,12 @@ fn every_item_is_a_throwaway_one() {
         .collect();
     assert!(names.contains(&"cd-throwaway-codex"), "{names:?}");
     assert!(names.contains(&"cd-throwaway-project"), "{names:?}");
-    // Cursor names a plugin's server `plugin-<plugin>-<server>`.
+    // Cursor names a plugin's server `plugin-<plugin>-<server>`, and Claude
+    // Code a skill synced from claude.ai `anthropic-skills:<skill>`.
     assert!(
         names.iter().all(|name| name
             .strip_prefix("plugin-")
+            .or_else(|| name.strip_prefix("anthropic-skills:"))
             .unwrap_or(name)
             .starts_with("cd-throwaway-")),
         "{names:?}"
@@ -175,11 +177,13 @@ fn every_screen_has_what_it_shows() {
             .any(|home| home.ends_with("claude-desktop-home")),
         "{homes:?}"
     );
-    // Claude Code's homes whose last parts fill a tile in the smallest window.
+    // Claude Code's homes whose last parts fill a tile in the smallest
+    // window, and the one signed out of its claude.ai account.
     for last in [
         "claude-code-shape-home",
         "claude-code-synced-home",
         "claude-code-many-home",
+        "claude-code-logout-home",
     ] {
         assert!(
             homes.iter().any(|home| home.ends_with(last)),

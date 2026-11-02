@@ -125,6 +125,7 @@ fn a_folder_is_checked_for_the_files_an_agent_reads_before_it_is_added() {
         as_claude_code.looked_for,
         [
             ".claude.json",
+            r".claude\.credentials.json",
             r".claude\plugins",
             r".claude\settings.json",
             r".claude\skills"
@@ -133,7 +134,7 @@ fn a_folder_is_checked_for_the_files_an_agent_reads_before_it_is_added() {
     assert_eq!(
         as_claude_code.no_configuration.as_deref(),
         Some(
-            r"No configuration found for Claude Code in D:\alt-claude: none of .claude.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries."
+            r"No configuration found for Claude Code in D:\alt-claude: none of .claude.json, .claude\.credentials.json, .claude\plugins, .claude\settings.json and .claude\skills is there. It can still be added, as a home with no Entries."
         )
     );
     assert_eq!(as_codex.no_configuration, None);

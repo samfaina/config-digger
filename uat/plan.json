@@ -2286,6 +2286,77 @@
       ]
     },
     {
+      "id": "32",
+      "title": "La cuenta de claude.ai y sus credenciales",
+      "steps": [
+        {
+          "id": "32.1",
+          "title": "Un home de Claude Code con oauthAccount y sin credenciales",
+          "goal": "Sin .credentials.json, Claude Code está fuera de la cuenta de claude.ai aunque oauthAccount la nombre, y config-digger enseña sus skills sincronizadas Unread, con una razón que nombra el fichero que falta.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-logout-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-logout-home.",
+            "Elige la skill anthropic-skills:cd-throwaway-logout-skill.",
+            "Lee su tarjeta.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-logout-home, bajo Claude Code, pulsa Remove from list."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «anthropic-skills:cd-throwaway-logout-skill» sale «Unread».",
+            "Su tarjeta tiene la etiqueta «cloud mirror».",
+            "Su tarjeta dice «Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in.».",
+            "El botón Disable de su tarjeta está desactivado."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#491"]
+        },
+        {
+          "id": "32.2",
+          "title": "Un home de Claude Code con credenciales y sin oauthAccount",
+          "goal": "Con .credentials.json y sin oauthAccount, Claude Code no lee las skills sincronizadas hasta que trae la cuenta al arrancar con conexión, y config-digger las enseña Unread, con una razón que lo dice.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-unnamed-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-unnamed-home.",
+            "Elige la skill anthropic-skills:cd-throwaway-unnamed-skill.",
+            "Lee su tarjeta.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-unnamed-home, bajo Claude Code, pulsa Remove from list."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «anthropic-skills:cd-throwaway-unnamed-skill» sale «Unread».",
+            "Su tarjeta tiene la etiqueta «cloud mirror».",
+            "Su tarjeta dice «Claude Code keeps sign-in credentials at E:\\cd-throwaway\\claude-code-unnamed-home\\.claude\\.credentials.json, but names no claude.ai account: it fetches the account at its next start online, and until then reads this for none.».",
+            "El botón Disable de su tarjeta está desactivado."
+          ],
+          "covers": ["#491"]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

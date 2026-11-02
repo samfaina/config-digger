@@ -29,10 +29,13 @@ fn with_skill(fs: FakeFileSystem, folder: impl AsRef<Path>, text: &str) -> FakeF
 }
 
 /// A Claude Code home with no MCP servers, signed in to the claude.ai
-/// account whose synced skills are in `synced\org_acct`.
+/// account whose synced skills are in `synced\org_acct`: `oauthAccount`
+/// names it and `.credentials.json` keeps its tokens.
 fn claude_home() -> FakeFileSystem {
     let state = json!({ "oauthAccount": { "organizationUuid": "org", "accountUuid": "acct" } });
-    FakeFileSystem::new().with_file(in_home(".claude.json"), state.to_string())
+    FakeFileSystem::new()
+        .with_file(in_home(".claude.json"), state.to_string())
+        .with_file(in_home(r".claude\.credentials.json"), "not-a-real-secret")
 }
 
 fn core(fs: &FakeFileSystem) -> Core {

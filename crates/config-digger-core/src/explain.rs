@@ -12,7 +12,9 @@ use crate::definitions::blocks::{
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
-use crate::scan::{Expected, OffBy, ScannedReadFailure, ScannedRejection, ScannedShape, ValueType};
+use crate::scan::{
+    Expected, NotSignedIn, OffBy, ScannedReadFailure, ScannedRejection, ScannedShape, ValueType,
+};
 use crate::{locator, park};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -2109,15 +2111,22 @@ pub(crate) fn other_account(agent_name: &str, account: &str, folder: &str) -> Re
 }
 
 /// An Unread Entry's reason: `agent_name` reads it only for the `account`
-/// account it is signed in to, and it is signed in to none, or is taken to
-/// be since config-digger cannot read the file `unreadable` that names it.
-pub(crate) fn not_signed_in(agent_name: &str, account: &str, unreadable: Option<&Path>) -> Reason {
-    let sentence = match unreadable {
-        Some(path) => format!(
+/// account it is signed in to, and it is signed in to none, as `why` says.
+pub(crate) fn not_signed_in(agent_name: &str, account: &str, why: &NotSignedIn) -> Reason {
+    let sentence = match why {
+        NotSignedIn::Unreadable(path) => format!(
             "config-digger cannot read {}, which names the {account} account {agent_name} is signed in to, so it takes {agent_name} to be signed in to none, and then it does not read this.",
             path.display()
         ),
-        None => format!(
+        NotSignedIn::WithoutCredentials(path) => format!(
+            "{agent_name} keeps no sign-in credentials at {}, so it is signed out of its {account} account, and reads this only while signed in.",
+            path.display()
+        ),
+        NotSignedIn::Unnamed(path) => format!(
+            "{agent_name} keeps sign-in credentials at {}, but names no {account} account: it fetches the account at its next start online, and until then reads this for none.",
+            path.display()
+        ),
+        NotSignedIn::NoAccount => format!(
             "{agent_name} is signed in to no {account} account, and reads this only for the account it is signed in to."
         ),
     };
