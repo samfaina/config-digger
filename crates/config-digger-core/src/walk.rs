@@ -2,7 +2,7 @@
 //! a location's [`DownWalk`] gives, such as the ones Cursor searches for
 //! nested skills folders.
 
-use crate::definitions::blocks::DownWalk;
+use crate::definitions::blocks::{DownWalk, OutsideGit};
 use crate::paths;
 use crate::ports::FileSystem;
 use ignore::Match;
@@ -75,15 +75,25 @@ fn ignore_files(
 }
 
 /// Every folder below `project` the walk `walk` enters, at any depth, in
-/// the order of their paths, each folder before those below it; none when
-/// the walk needs a git work tree and `project` is in none.
-fn folders_below(fs: &dyn FileSystem, project: &Path, walk: &DownWalk) -> Vec<PathBuf> {
-    if walk.needs_git
-        && !project
-            .ancestors()
-            .any(|folder| fs.exists(&folder.join(".git")))
+/// the order of their paths, each folder before those below it. Outside a
+/// git work tree, none when the walk enters nothing there, and `None` when
+/// it leaves `project` out, as the user's home folder `home`, a folder
+/// above it or a drive root.
+fn folders_below(
+    fs: &dyn FileSystem,
+    home: Option<&Path>,
+    project: &Path,
+    walk: &DownWalk,
+) -> Option<Vec<PathBuf>> {
+    if !project
+        .ancestors()
+        .any(|folder| fs.exists(&folder.join(".git")))
     {
-        return Vec::new();
+        match walk.outside_git {
+            OutsideGit::Nothing => return Some(Vec::new()),
+            OutsideGit::UnlessHomeOrDrive if home_or_drive(fs, home, project) => return None,
+            OutsideGit::UnlessHomeOrDrive => {}
+        }
     }
     // The ignore files of the folders above the Project folder apply too.
     let names = &walk.ignore_files;
@@ -124,56 +134,80 @@ fn folders_below(fs: &dyn FileSystem, project: &Path, walk: &DownWalk) -> Vec<Pa
             folders.push((child, files.clone()));
         }
     }
-    found
+    Some(found)
+}
+
+/// Whether `project`, as a real path and case aside, is the user's home
+/// folder `home`, a folder above it or a drive root.
+fn home_or_drive(fs: &dyn FileSystem, home: Option<&Path>, project: &Path) -> bool {
+    let project = paths::canonical(fs, project).0;
+    paths::is_drive_root(&project)
+        || home.is_some_and(|home| {
+            let home = paths::canonical_key(fs, home);
+            Path::new(&home).starts_with(paths::key(&project))
+        })
 }
 
 /// One walk down: the Project folder it starts from, its rules, and the
-/// folders it entered.
+/// folders it entered, `None` when it left the Project out.
 struct Walked {
     project: PathBuf,
     rules: DownWalk,
-    entered: Vec<PathBuf>,
+    entered: Option<Vec<PathBuf>>,
 }
 
 /// The walks down a scan has made, so that the locations that walk alike
-/// from one Project folder walk once.
-#[derive(Default)]
-pub(crate) struct WalksDown(Vec<Walked>);
+/// from one Project folder walk once, and the user's home folder they
+/// leave out, outside git, with the folders above it.
+pub(crate) struct WalksDown {
+    home: Option<PathBuf>,
+    walked: Vec<Walked>,
+}
 
 impl WalksDown {
+    /// No walk yet, with `home` as the user's home folder.
+    pub fn new(home: Option<PathBuf>) -> WalksDown {
+        WalksDown {
+            home,
+            walked: Vec::new(),
+        }
+    }
+
     /// The folders below `project` that may hold the `/`-separated path
     /// `path`, by the rules `walk`, in the order the walk entered them: the
     /// folder holding each entered folder named as the path's first folder,
     /// case aside, so that the rules apply down to that folder and not
     /// below it. A path of one name may be in any folder entered, and so
     /// may any path when the rules leave the path's first folder to it.
+    /// `None` when the rules leave the Project out, outside git, as the
+    /// user's home folder, a folder above it or a drive root.
     pub fn holders(
         &mut self,
         fs: &dyn FileSystem,
         project: &Path,
         walk: &DownWalk,
         path: &str,
-    ) -> Vec<PathBuf> {
+    ) -> Option<Vec<PathBuf>> {
         let at = match self
-            .0
+            .walked
             .iter()
             .position(|walked| walked.project == project && walked.rules == *walk)
         {
             Some(at) => at,
             None => {
-                self.0.push(Walked {
+                self.walked.push(Walked {
                     project: project.to_path_buf(),
                     rules: walk.clone(),
-                    entered: folders_below(fs, project, walk),
+                    entered: folders_below(fs, self.home.as_deref(), project, walk),
                 });
-                self.0.len() - 1
+                self.walked.len() - 1
             }
         };
-        let entered = &self.0[at].entered;
+        let entered = self.walked[at].entered.as_ref()?;
         let Some((first, _)) = path.split_once('/').filter(|_| walk.ignores_path) else {
-            return entered.clone();
+            return Some(entered.clone());
         };
-        entered
+        let holders = entered
             .iter()
             .filter(|folder| {
                 folder
@@ -183,6 +217,7 @@ impl WalksDown {
             .filter_map(|folder| folder.parent())
             .filter(|holder| *holder != project)
             .map(Path::to_path_buf)
-            .collect()
+            .collect();
+        Some(holders)
     }
 }

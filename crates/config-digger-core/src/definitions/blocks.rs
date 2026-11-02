@@ -641,10 +641,9 @@ impl Validate for ProjectWalk {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DownWalk {
-    /// Whether the walk runs only when the Project folder is in a git work
-    /// tree, at or below a folder holding `.git`. Outside one, nothing is
-    /// read below it.
-    pub needs_git: bool,
+    /// What the walk enters when the Project folder is in no git work
+    /// tree, at or below no folder holding `.git`. In one, it walks.
+    pub outside_git: OutsideGit,
     /// Folder names, compared without regard to case, that the walk never
     /// enters at any depth, nor reads a path through, below the path it
     /// finds too, such as `node_modules`.
@@ -664,6 +663,21 @@ pub(crate) struct DownWalk {
     pub ignores_path: bool,
     /// Whether the walk enters links and junctions to folders.
     pub follow_links: bool,
+}
+
+/// What a walk down enters below a Project folder in no git work tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum OutsideGit {
+    /// Nothing, as Cursor walks.
+    Nothing,
+    /// The folders below it, by the same rules as in a git work tree,
+    /// unless the Project folder, compared as a real path and case aside,
+    /// is the user's home folder, a folder above it or a drive root: the
+    /// walk then enters nothing, since it would walk every folder below a
+    /// home folder or a drive, and the Project gets a Project note saying
+    /// so.
+    UnlessHomeOrDrive,
 }
 
 impl DownWalk {

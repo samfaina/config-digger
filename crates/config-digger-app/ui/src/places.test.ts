@@ -15,6 +15,7 @@ function project(overrides: Partial<Project> = {}): Project {
     hidden: false,
     entries: 0,
     last_opened: [],
+    notes: [],
     ...overrides,
   };
 }
@@ -88,6 +89,21 @@ describe("the Projects tab", () => {
       },
       { path: String.raw`E:\code\tools`, kind: "Folder", tags: plain("added by you", "known to Claude Code"), entries: "No Project Entries" },
     ]);
+  });
+
+  test("shows under a Project each of its notes, for whichever Agent", () => {
+    const sentence =
+      "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.";
+    const { present } = projectSections(
+      places({
+        projects: [
+          project({ path: String.raw`C:\Users\me`, notes: [{ agent: "claude-code", code: "walk_down_left_out", sentence }] }),
+          project(),
+        ],
+      }),
+    );
+
+    expect(present.map((row) => row.notes)).toEqual([[sentence], []]);
   });
 
   test("offers Remove from list only on what the user added and no registry records, and Hide otherwise", () => {

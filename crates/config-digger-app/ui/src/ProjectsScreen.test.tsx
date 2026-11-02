@@ -51,6 +51,7 @@ function project(overrides: Partial<Project> = {}): Project {
     hidden: false,
     entries: 0,
     last_opened: [],
+    notes: [],
     ...overrides,
   };
 }

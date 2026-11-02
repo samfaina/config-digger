@@ -60,6 +60,12 @@ pub(crate) fn is_absolute(lexical: &Path) -> bool {
     is_drive(&text) || text.starts_with("\\\\")
 }
 
+/// Whether a lexically normalised path is the root of a drive, such as `E:\`.
+pub(crate) fn is_drive_root(lexical: &Path) -> bool {
+    let text = lexical.to_string_lossy();
+    is_drive(&text) && text.len() == 3
+}
+
 /// Whether `text` starts with a drive, such as `E:`.
 fn is_drive(text: &str) -> bool {
     let bytes = text.as_bytes();

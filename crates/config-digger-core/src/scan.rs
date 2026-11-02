@@ -1082,6 +1082,17 @@ pub(crate) struct ScannedProject {
     /// The Agent home each Agent last opened it in, as the Agent records it,
     /// at most one per Agent.
     pub last_opened: Vec<ScannedLastOpened>,
+    /// The walks down that left it out, outside git, as a home folder or a
+    /// drive root.
+    pub left_out: BTreeSet<LeftOut>,
+}
+
+/// A walk down that left a Project out: the Agent's, by index, and the
+/// path it reads below.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct LeftOut {
+    pub agent_index: usize,
+    pub path: String,
 }
 
 /// The Agent home an Agent last opened a Project in.
@@ -1621,22 +1632,37 @@ fn read_as_if(
             .or_default()
             .extend(plugins);
     }
-    let mut walks = walk::WalksDown::default();
+    let mut walks = walk::WalksDown::new(ports.env.home_dir());
+    // The walks down that left each Project out, by its key.
+    let mut left_out: BTreeMap<String, BTreeSet<LeftOut>> = BTreeMap::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
             if !location.anchor.in_project() {
                 continue;
             }
+            let leaves_out = |left_out: &mut BTreeMap<String, BTreeSet<LeftOut>>, key: &String| {
+                let path = location.anchor.walks_down().map_or("", |(_, path)| path);
+                left_out.entry(key.clone()).or_default().insert(LeftOut {
+                    agent_index: home.agent_index,
+                    path: path.to_owned(),
+                });
+            };
             // Each folder or file read, with the key of its Project and how
             // far it ranks below the Project's own.
             let mut read: Vec<(PathBuf, &String, usize)> = Vec::new();
             if !location.anchor.project_file() {
                 for (project_folder, key) in &folders {
-                    for (folder, depth) in
-                        folders_read(ports, &as_if, project_folder, &location.anchor, &mut walks)
+                    match folders_read(ports, &as_if, project_folder, &location.anchor, &mut walks)
                     {
-                        read.push((folder, key, depth));
+                        Some(folders) => {
+                            read.extend(
+                                folders
+                                    .into_iter()
+                                    .map(|(folder, depth)| (folder, key, depth)),
+                            );
+                        }
+                        None => leaves_out(&mut left_out, key),
                     }
                 }
             }
@@ -1647,10 +1673,13 @@ fn read_as_if(
                         continue;
                     }
                     for (index, member) in members.iter().enumerate() {
-                        for (folder, depth) in
-                            folders_read(ports, &as_if, member, &location.anchor, &mut walks)
-                        {
-                            read.push((folder, key, index * MEMBER_RANKS + depth));
+                        match folders_read(ports, &as_if, member, &location.anchor, &mut walks) {
+                            Some(folders) => {
+                                read.extend(folders.into_iter().map(|(folder, depth)| {
+                                    (folder, key, index * MEMBER_RANKS + depth)
+                                }))
+                            }
+                            None => leaves_out(&mut left_out, key),
                         }
                     }
                 }
@@ -1693,6 +1722,10 @@ fn read_as_if(
                 }
             }
         }
+    }
+
+    for project in &mut scanner.projects.list {
+        project.left_out = left_out.remove(&project.key).unwrap_or_default();
     }
 
     scanner.mask_entries(definitions);
@@ -3420,23 +3453,24 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
 
 /// The folders the location anchored at `anchor` in the Project folder
 /// `folder` is read in, with how many levels up each one is: 0 for a
-/// folder below it. Whether a linked worktree's root holds the path, and
-/// which main checkout it names, is read as if the planned folders were
-/// done, from `as_if`.
+/// folder below it, or `None` when its walk down leaves the Project out.
+/// Whether a linked worktree's root holds the path, and which main
+/// checkout it names, is read as if the planned folders were done, from
+/// `as_if`.
 fn folders_read(
     ports: &Ports,
     as_if: &dyn FileSystem,
     folder: &Path,
     anchor: &Anchor,
     walks: &mut walk::WalksDown,
-) -> Vec<(PathBuf, usize)> {
+) -> Option<Vec<(PathBuf, usize)>> {
     let fs = ports.fs.as_ref();
-    match anchor.walk() {
+    let read = match anchor.walk() {
         ProjectWalk::None => vec![(folder.to_path_buf(), 0)],
         ProjectWalk::Down(down) => {
             let path = anchor.walks_down().map_or("", |(_, path)| path);
             walks
-                .holders(fs, folder, down, path)
+                .holders(fs, folder, down, path)?
                 .into_iter()
                 .map(|holder| (holder, 0))
                 .collect()
@@ -3444,7 +3478,7 @@ fn folders_read(
         ProjectWalk::UpToRepoRoot => {
             let up: Vec<&Path> = folder.ancestors().collect();
             let Some(root) = up.iter().position(|parent| fs.exists(&parent.join(".git"))) else {
-                return vec![(folder.to_path_buf(), 0)];
+                return Some(vec![(folder.to_path_buf(), 0)]);
             };
             let mut read: Vec<(PathBuf, usize)> = up[..=root]
                 .iter()
@@ -3465,7 +3499,8 @@ fn folders_read(
             .enumerate()
             .map(|(depth, parent)| (parent.to_path_buf(), depth))
             .collect(),
-    }
+    };
+    Some(read)
 }
 
 /// The root of the git repository the folder `folder` is in, the folder at
@@ -6283,6 +6318,7 @@ impl<'p> Projects<'p> {
                             repo_root: None,
                             main_checkout: None,
                             last_opened: Vec::new(),
+                            left_out: BTreeSet::new(),
                         });
                         self.by_spelling.insert(key, self.list.len() - 1);
                         self.list.len() - 1

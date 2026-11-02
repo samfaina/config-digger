@@ -135,6 +135,18 @@ pub(crate) fn resolve(
                     }
                 })
                 .collect(),
+            notes: project
+                .left_out
+                .iter()
+                .map(|left_out| {
+                    let agent = &definitions[left_out.agent_index].agent;
+                    api::ProjectNote {
+                        agent: agent.id.clone(),
+                        code: api::ProjectNoteCode::WalkDownLeftOut,
+                        sentence: explain::walk_down_left_out(&agent.name, &left_out.path),
+                    }
+                })
+                .collect(),
         })
         .collect();
 

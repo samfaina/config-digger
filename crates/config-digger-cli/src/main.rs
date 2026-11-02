@@ -1317,6 +1317,15 @@ fn render_list(inventory: &Inventory, selected: bool, width: Option<usize>) -> S
             BOLD,
         );
         out.push_str(&title.fit(width).render());
+        // What to know about the Project for the Agent, such as folders
+        // below it it does not read.
+        let notes = context_project(inventory)
+            .into_iter()
+            .flat_map(|project| &project.notes)
+            .filter(|note| note.agent == home.agent);
+        for note in notes {
+            out.push_str(&plain_line(&format!("  {}", note.sentence), width));
+        }
         if rows.is_empty() {
             out.push_str(&plain_line("  No Items.", width));
             continue;

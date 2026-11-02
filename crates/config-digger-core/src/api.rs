@@ -1719,6 +1719,32 @@ pub struct Project {
     /// Its Last-opened home for each Agent that records one, in definition
     /// order. Nothing it says changes a State.
     pub last_opened: Vec<LastOpened>,
+    /// What to know about it for an Agent, in definition order, such as
+    /// folders below it config-digger does not read. None of them changes a
+    /// State or blocks a write.
+    pub notes: Vec<ProjectNote>,
+}
+
+/// Something about a Project for one Agent, which changes no State and
+/// blocks nothing.
+#[derive(Debug, Clone, PartialEq, Serialize, specta::Type)]
+pub struct ProjectNote {
+    pub agent: String,
+    /// What it notes, from a closed set.
+    pub code: ProjectNoteCode,
+    /// The note as a sentence, rendered by the core.
+    pub sentence: String,
+}
+
+/// What a Project note is about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectNoteCode {
+    /// The Project is outside git and is the user's home folder, a folder
+    /// above it or a drive root, so config-digger does not walk the folders
+    /// below it for those the Agent loads there, such as Claude Code's
+    /// nested skills folders.
+    WalkDownLeftOut,
 }
 
 /// The Agent home an Agent last opened a Project in, as the Agent itself

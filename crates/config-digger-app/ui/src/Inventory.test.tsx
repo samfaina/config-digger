@@ -53,7 +53,7 @@ describe("the Entries by State filter", () => {
 });
 
 function project(path: string, missing = false, last_opened: LastOpened[] = []): Project {
-  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened };
+  return { path, missing, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened, notes: [] };
 }
 
 /** VS Code's Last-opened home `home`, the profile Work. */

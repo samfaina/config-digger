@@ -716,9 +716,9 @@
       "description": "The rules of a walk down from the Project folder, as the Agent searches\nit.",
       "type": "object",
       "properties": {
-        "needs_git": {
-          "description": "Whether the walk runs only when the Project folder is in a git work\ntree, at or below a folder holding `.git`. Outside one, nothing is\nread below it.",
-          "type": "boolean"
+        "outside_git": {
+          "description": "What the walk enters when the Project folder is in no git work\ntree, at or below no folder holding `.git`. In one, it walks.",
+          "$ref": "#/$defs/OutsideGit"
         },
         "skip": {
           "description": "Folder names, compared without regard to case, that the walk never\nenters at any depth, nor reads a path through, below the path it\nfinds too, such as `node_modules`.",
@@ -748,11 +748,26 @@
       },
       "additionalProperties": false,
       "required": [
-        "needs_git",
+        "outside_git",
         "skip",
         "ignore_files",
         "ignores_path",
         "follow_links"
+      ]
+    },
+    "OutsideGit": {
+      "description": "What a walk down enters below a Project folder in no git work tree.",
+      "oneOf": [
+        {
+          "description": "Nothing, as Cursor walks.",
+          "type": "string",
+          "const": "nothing"
+        },
+        {
+          "description": "The folders below it, by the same rules as in a git work tree,\nunless the Project folder, compared as a real path and case aside,\nis the user's home folder, a folder above it or a drive root: the\nwalk then enters nothing, since it would walk every folder below a\nhome folder or a drive, and the Project gets a Project note saying\nso.",
+          "type": "string",
+          "const": "unless-home-or-drive"
+        }
       ]
     },
     "LinkedWorktree": {

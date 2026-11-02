@@ -139,6 +139,14 @@ export function lastOpenedNotes(lastOpened: LastOpened[], selection: Selection):
   return lastOpened.filter((opened) => isSelected(opened.agent, selection) && !isShown(opened, selection)).map((opened) => opened.sentence);
 }
 
+/** What to know about the context's Project for the selected Agents, such as folders below it config-digger does not read. */
+export function projectNotesShown(inventory: Inventory, selection: Selection): string[] {
+  const picked = inventory.project;
+  if (picked === null) return [];
+  const project = inventory.projects.find((p) => samePath(p.path, picked));
+  return (project?.notes ?? []).filter((note) => isSelected(note.agent, selection)).map((note) => note.sentence);
+}
+
 /** The Items of the selected Agents, each in its chosen home. */
 export function itemsShown(items: Item[], selection: Selection): Item[] {
   return items.filter((item) => isShown(item, selection));

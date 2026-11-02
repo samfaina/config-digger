@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { Agent, Home, Inventory, Item, LastOpened, ReadFailure } from "./bindings";
+import type { Agent, Home, Inventory, Item, LastOpened, Project, ProjectNote, ReadFailure } from "./bindings";
 import { inventoryStart } from "./places";
 import { entry } from "./testData";
 import {
@@ -18,6 +18,7 @@ import {
   itemsShown,
   leftoversNotShown,
   projectFailures,
+  projectNotesShown,
   readerItem,
   stateCounts,
 } from "./view";
@@ -234,6 +235,36 @@ describe("agent flags shown", () => {
   });
 });
 
+describe("the notes of the context's Project", () => {
+  const picked = String.raw`C:\Users\me`;
+  const note = (agent: string) => ({ agent, code: "walk_down_left_out" as const, sentence: `${agent} note.` });
+  const project = (path: string, notes: ProjectNote[]): Project => ({
+    path,
+    missing: false,
+    workspace_file: false,
+    members: [],
+    registered_by: [],
+    added: true,
+    hidden: false,
+    entries: 0,
+    last_opened: [],
+    notes,
+  });
+  const read = (picking: string | null) =>
+    inventory({ project: picking, projects: [project(picked, [note("claude-code"), note("cursor")]), project(String.raw`E:\other`, [note("codex")])] });
+  const homes = { "claude-code": "default" };
+
+  test("are those for the selected Agents of the Project picked, in any case", () => {
+    expect(projectNotesShown(read(picked), { agent: "claude-code", homes })).toEqual(["claude-code note."]);
+    expect(projectNotesShown(read(picked.toLowerCase()), { agent: "all", homes })).toEqual(["claude-code note.", "cursor note."]);
+    expect(projectNotesShown(read(picked), { agent: "codex", homes })).toEqual([]);
+  });
+
+  test("are none with no Project picked", () => {
+    expect(projectNotesShown(read(null), { agent: "all", homes })).toEqual([]);
+  });
+});
+
 describe("agent stats", () => {
   test("count Items in use and Entries with no effect", () => {
     const items = [
@@ -357,7 +388,7 @@ describe("the Read failures of a Project once it is picked", () => {
       project: null,
       homes,
       read_failures: failures,
-      projects: [{ path: picked, missing: false, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened }],
+      projects: [{ path: picked, missing: false, workspace_file: false, members: [], registered_by: [], added: true, hidden: false, entries: 0, last_opened, notes: [] }],
     });
   const opened: LastOpened = { agent: "claude-code", home: shapeHome, name: null, shares_home: false, hidden: false, sentence: "" };
   /** How many of the failures picking the Project with `agent` selected shows, from the homes in `choice`. */

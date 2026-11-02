@@ -42,6 +42,7 @@ import {
   lastOpenedNotes,
   leftoversNotShown,
   projectFailures,
+  projectNotesShown,
   readerItem,
   samePath,
   stateCounts,
@@ -109,6 +110,7 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
   const failures = inventory ? failuresInContext(inventory.read_failures, inventory.project, selection) : [];
   const flags = flagsShown(inventory?.agent_flags ?? [], selection);
   const notShown = inventory ? leftoversNotShown(inventory, selection) : [];
+  const projectNotes = inventory ? projectNotesShown(inventory, selection) : [];
   useEffect(() => {
     if (!inventory || !startItem.current) return;
     const item = findItem(inventory.items, startItem.current);
@@ -242,6 +244,12 @@ export function InventoryScreen({ start, onOpenHistory, onAddHome, onOpenHomes }
                 <button type="button" className="link" onClick={() => chooseHome(leftovers.agent, leftovers.home)}>
                   Show
                 </button>
+              </div>
+            ))}
+            {projectNotes.map((note) => (
+              <div key={note} className="alert" role="status">
+                <Icon name="flag" small />
+                {note}
               </div>
             ))}
             <div className="scroll">
