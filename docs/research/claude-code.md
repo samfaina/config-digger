@@ -129,6 +129,20 @@ Facts from the [skills](https://code.claude.com/docs/en/skills) and [worktrees](
 
 config-digger reads this through `linked_worktree = "main-checkout-fallback"` on the `project-skills` anchor: the main checkout root's `.claude\skills` is read as one more folder of the walk, below the worktree root, when the worktree root does not hold `.claude\skills`. Its skills are `project` Entries of the worktree's Project, at their real path in the main checkout.
 
+### Project-scope plugins in a linked worktree
+
+Facts from the [worktrees](https://code.claude.com/docs/en/worktrees#what-worktrees-share-with-the-main-checkout) and [settings](https://code.claude.com/docs/en/settings#where-claude-code-keeps-the-local-file-in-a-git-repository) docs pages as of 2026-10-29, and `uat/agents/claude-code.mjs` on a throwaway main checkout and its `git worktree add` worktrees, inside it and outside it, with plugins of a `directory` marketplace, `cd-throwaway-market`, and the local model stand-in (#480). Versions: see `release-gate.md`.
+
+- Plugins installed at project scope from the main checkout also load in linked worktrees of the same repository, whether the worktree was made with `--worktree` or `git worktree add` [docs, test]. A worktree inside the main checkout (`.claude\worktrees\<name>`) and one outside it load them alike [test]. So does a plugin installed at local scope [test].
+- A record's `projectPath` is the folder `claude plugin install --scope project` ran in: the main checkout's, or the worktree's when it ran in a worktree [test]. A plugin installed from a worktree loads in the main checkout and in the other worktrees, a worktree made after the install included [test].
+- In a worktree, only the worktree's own `.claude\settings.json` and `.claude\settings.local.json` turn the plugin on or off. The main checkout's two files are not read there: one turning the plugin on does not load it in a worktree whose files do not name it, and a clash between the main checkout's and a worktree's `settings.json` goes the worktree's way, on or off [test].
+- Permission approvals go to the main checkout's `.claude\settings.local.json` in a worktree, except on Windows, where the local file stays with the worktree [docs]. On Windows the worktree's own `settings.local.json` is read, and wins over its `settings.json` as in any Project [test].
+- Between the checkouts of a bare repo, of a `--separate-git-dir` checkout, and of a submodule, a plugin installed at project scope from one checkout records that checkout's folder and loads in another whose own settings turn it on [test].
+- Claude Code does not hold a project-scope record to its repository at all: it loads the plugin in any folder whose own settings turn it on, another repository, the repository holding a submodule, or a folder outside any repository [test]. config-digger reads it only in the checkouts of the record's repository; a Ticket, not yet filed.
+- A worktree session started from the desktop app reads all project configuration from the main checkout's root [docs]. config-digger does not read those sessions apart.
+
+config-digger reads this through `project_reach = "checkouts"` on the `installed` registry: a record bound to the root of one checkout of a git repository, the main checkout or a linked worktree, is read at the root of every other checkout of the repository among the Projects, the checkouts sharing one common git folder. Its servers and skills are Entries of each such Project, read from the plugin's folder, with that Project's own settings files as their switches, so Disable writes the worktree's own `settings.local.json`.
+
 ### Nested skills
 
 Facts from 2.1.312: the skills docs page, its bundled code, and `uat/agents/claude-code.mjs` on throwaway folders with the local model stand-in answering with a Read tool call (#352).

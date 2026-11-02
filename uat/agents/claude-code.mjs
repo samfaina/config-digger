@@ -788,6 +788,172 @@ function verbatimSkill(dir, folder) {
   });
 }
 
+// ---------------------------------------------------------------- project-scope plugins in linked worktrees
+
+{
+  const dir = fresh("worktree-plugins", base);
+  const home = path.join(dir, "home");
+  const market = path.join(dir, "market");
+  const git = async (cwd, ...args) => {
+    const { code, stderr } = await run("git", ["-c", "user.name=cd-throwaway", "-c", "user.email=cd-throwaway@example.invalid", ...args], { cwd });
+    if (code !== 0) throw new Error(`git ${args.join(" ")} failed: ${stderr}`);
+  };
+  const commit = async (folder) => {
+    write(path.join(folder, "README"), "throwaway\n");
+    await git(folder, "add", "README");
+    await git(folder, "commit", "-q", "-m", "throwaway");
+  };
+  // One plugin per repository the probe installs it in, each with a server
+  // and a skill.
+  const names = ["cd-throwaway-wp", "cd-throwaway-wl", "cd-throwaway-wq", "cd-throwaway-wb", "cd-throwaway-ws", "cd-throwaway-wm"];
+  for (const name of names) {
+    write(path.join(market, name, ".claude-plugin", "plugin.json"), { name, version: "1.0.0" });
+    write(path.join(market, name, ".mcp.json"), { mcpServers: { [`${name}-srv`]: stdio(name) } });
+    skill(path.join(market, name, "skills", `${name}-skill`), [`name: ${name}-skill`, `description: ${name}`]);
+  }
+  write(path.join(market, ".claude-plugin", "marketplace.json"), { name: "cd-throwaway-market", owner: { name: "cd-throwaway" }, plugins: names.map((name) => ({ name, source: `./${name}` })) });
+  const id = (name) => `${name}@cd-throwaway-market`;
+  const installedFile = path.join(home, "plugins", "installed_plugins.json");
+  // Installs `name` at `scope` from `cwd`, and gives the `projectPath` of
+  // its record.
+  const install = async (cwd, name, scope = "project") => {
+    await claude(home, cwd, "plugin", "install", id(name), "--scope", scope);
+    return json(installedFile).plugins[id(name)]?.map((record) => record.projectPath);
+  };
+  // The settings file `file` of `folder`'s `.claude`, switching `name`, or
+  // none when `on` is null.
+  const switchIn = (folder, file, name, on) => {
+    const settings = path.join(folder, ".claude", file);
+    if (on === null) fs.rmSync(settings, { force: true });
+    else write(settings, { enabledPlugins: { [id(name)]: on } });
+  };
+  // What a session in `cwd` loads of the plugin `name`: the plugin, its
+  // server and its skill, or nothing.
+  const loads = async (cwd, name) => {
+    const s = await session(home, cwd);
+    const all = [...s.plugins, ...s.servers, ...s.skills].filter((n) => n.includes(name));
+    return all.length === 0 ? false : same(all, [name, `plugin:${name}:${name}-srv`, `${name}:${name}-skill`]).pass || all;
+  };
+
+  // A main checkout with one commit, and worktrees of it `git worktree add`
+  // makes outside it and inside it, where `--worktree` puts one. The
+  // settings files are untracked, so no worktree has the main checkout's.
+  const outer = path.join(dir, "outer");
+  const main = path.join(outer, "main");
+  await gitInit(main);
+  await commit(main);
+  await claude(home, main, "plugin", "marketplace", "add", market);
+  const fromMain = await install(main, "cd-throwaway-wp");
+  const outside = path.join(outer, "wt-outside");
+  await git(main, "worktree", "add", "-q", outside);
+  const inside = path.join(main, ".claude", "worktrees", "cd-throwaway-inside");
+  await git(main, "worktree", "add", "-q", inside);
+  const worktrees = { outside, inside };
+  // What each worktree loads of `cd-throwaway-wp` once `main` and each
+  // worktree hold the switches given, `[file, on]` each.
+  const inWorktrees = async (mainSwitches, worktreeSwitches) => {
+    for (const file of ["settings.json", "settings.local.json"]) {
+      switchIn(main, file, "cd-throwaway-wp", mainSwitches[file] ?? null);
+      for (const folder of Object.values(worktrees)) switchIn(folder, file, "cd-throwaway-wp", worktreeSwitches[file] ?? null);
+    }
+    const seen = {};
+    for (const [label, folder] of Object.entries(worktrees)) seen[label] = await loads(folder, "cd-throwaway-wp");
+    return seen;
+  };
+  const both = (loaded) => ({ outside: loaded, inside: loaded });
+
+  await p.check("plugins[installed]", "a plugin installed at project scope from the main checkout records the main checkout's folder as its `projectPath`, and the main checkout's `.claude/settings.json` turns it on", async () => {
+    return same({ fromMain, settings: json(path.join(main, ".claude", "settings.json")) }, { fromMain: [main], settings: { enabledPlugins: { [id("cd-throwaway-wp")]: true } } });
+  });
+  await p.check("plugins[installed]", "a plugin installed at project scope from the main checkout loads, with its server and skill, in a worktree outside or inside the main checkout whose own `.claude/settings.json` turns it on", async () => {
+    return same(await inWorktrees({}, { "settings.json": true }), both(true));
+  });
+  await p.check("items.mcp.disable[6]", "in a worktree, the main checkout's `.claude/settings.json` and `.claude/settings.local.json` are not read: one turning the plugin on loads it in neither worktree", async () => {
+    return same({ json: await inWorktrees({ "settings.json": true }, {}), local: await inWorktrees({ "settings.local.json": true }, {}) }, { json: both(false), local: both(false) });
+  });
+  await p.check("items.mcp.disable[6]", "a clash between the main checkout's and a worktree's `.claude/settings.json` goes the worktree's way, on or off", async () => {
+    const on = await inWorktrees({ "settings.json": false }, { "settings.json": true });
+    const off = await inWorktrees({ "settings.json": true }, { "settings.json": false });
+    return same({ on, off }, { on: both(true), off: both(false) });
+  });
+  await p.check("items.mcp.disable[6]", "on Windows, a worktree's own `.claude/settings.local.json` is read, and wins over its `.claude/settings.json`", async () => {
+    const off = await inWorktrees({}, { "settings.json": true, "settings.local.json": false });
+    const on = await inWorktrees({}, { "settings.json": false, "settings.local.json": true });
+    return same({ off, on }, { off: both(false), on: both(true) });
+  });
+  await inWorktrees({ "settings.json": true }, {});
+  await p.check("plugins[installed]", "a plugin installed at local scope from the main checkout records the main checkout's folder, and loads in a worktree whose own `.claude/settings.local.json` turns it on", async () => {
+    const fromMainLocal = await install(main, "cd-throwaway-wl", "local");
+    switchIn(outside, "settings.local.json", "cd-throwaway-wl", true);
+    const seen = { fromMainLocal, outside: await loads(outside, "cd-throwaway-wl"), inside: await loads(inside, "cd-throwaway-wl") };
+    switchIn(outside, "settings.local.json", "cd-throwaway-wl", null);
+    return same(seen, { fromMainLocal: [main], outside: true, inside: false });
+  });
+
+  // A plugin installed at project scope from the worktree outside, then a
+  // second worktree made after the install.
+  const fromWorktree = await install(outside, "cd-throwaway-wq");
+  const later = path.join(outer, "wt-later");
+  await git(main, "worktree", "add", "-q", later);
+  await p.check("plugins[installed]", "a plugin installed at project scope from a worktree records the worktree's folder as its `projectPath`, and loads in the main checkout and in another worktree whose own settings turn it on, and not in one whose settings do not", async () => {
+    switchIn(main, "settings.json", "cd-throwaway-wq", true);
+    switchIn(later, "settings.json", "cd-throwaway-wq", true);
+    const seen = { fromWorktree, worktree: await loads(outside, "cd-throwaway-wq"), main: await loads(main, "cd-throwaway-wq"), later: await loads(later, "cd-throwaway-wq"), inside: await loads(inside, "cd-throwaway-wq") };
+    switchIn(main, "settings.json", "cd-throwaway-wp", true);
+    return same(seen, { fromWorktree: [outside], worktree: true, main: true, later: true, inside: false });
+  });
+
+  // The worktrees of #474's other repositories: of a bare repo, of a
+  // `--separate-git-dir` checkout, and of a submodule, the plugin installed
+  // from one checkout and turned on in the other's own settings.
+  const seed = path.join(dir, "seed");
+  await gitInit(seed);
+  await commit(seed);
+  const bareRepo = path.join(dir, "bare", "x.git");
+  await git(dir, "clone", "-q", "--bare", seed, bareRepo);
+  const [bareA, bareB] = [path.join(dir, "bare", "a"), path.join(dir, "bare", "b")];
+  for (const folder of [bareA, bareB]) await git(bareRepo, "worktree", "add", "-q", folder);
+  for (const folder of ["separate", "gitdirs"]) fs.mkdirSync(path.join(dir, folder), { recursive: true });
+  await git(path.join(dir, "separate"), "init", "-q", "--separate-git-dir", path.join(dir, "gitdirs", "main"), "main");
+  const separateMain = path.join(dir, "separate", "main");
+  await commit(separateMain);
+  const separateWorktree = path.join(dir, "separate", "wt");
+  await git(separateMain, "worktree", "add", "-q", separateWorktree);
+  const superRepo = path.join(dir, "super");
+  await gitInit(superRepo);
+  await commit(superRepo);
+  await git(superRepo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", seed, "sub");
+  const sub = path.join(superRepo, "sub");
+  const subWorktree = path.join(dir, "sub-wt");
+  await git(sub, "worktree", "add", "-q", subWorktree);
+  await p.check("plugins[installed]", "in a bare repo, a `--separate-git-dir` checkout or a submodule, a plugin installed at project scope from one checkout records that checkout's folder, and loads in another checkout of the repository whose own settings turn it on", async () => {
+    const seen = {};
+    for (const [label, name, from, to] of [
+      ["bare", "cd-throwaway-wb", bareA, bareB],
+      ["separate", "cd-throwaway-ws", separateMain, separateWorktree],
+      ["submodule", "cd-throwaway-wm", sub, subWorktree],
+    ]) {
+      const projectPath = await install(from, name);
+      switchIn(to, "settings.json", name, true);
+      seen[label] = { projectPath: projectPath?.[0] === from, loads: await loads(to, name) };
+    }
+    const expected = { projectPath: true, loads: true };
+    return same(seen, { bare: expected, separate: expected, submodule: expected });
+  });
+
+  // Found while probing #480, a Ticket: Claude Code does not hold a
+  // project-scope record to its `projectPath` at all.
+  const otherRepo = path.join(dir, "other-repo");
+  await gitInit(otherRepo);
+  const plain = path.join(dir, "plain");
+  for (const folder of [otherRepo, plain, superRepo]) switchIn(folder, "settings.json", "cd-throwaway-wm", true);
+  await p.check("plugins[installed]", "a plugin installed at project scope loads in any folder whose own settings turn it on: another repository, the repository holding its submodule, or a folder outside any repository", async () => {
+    const seen = {};
+    for (const [label, folder] of Object.entries({ otherRepo, superRepo, plain })) seen[label] = await loads(folder, "cd-throwaway-wm");
+    return same(seen, { otherRepo: true, superRepo: true, plain: true });
+  });
+}
+
 // ---------------------------------------------------------------- bundles and declared skills
 
 {

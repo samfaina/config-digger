@@ -194,6 +194,30 @@ registries = [
 # its manifest's `name`, the manifest being optional [docs], or else by its
 # id up to `@`. `claude plugin uninstall` also deletes the plugin's data
 # folder [docs].
+#
+# A linked git worktree. A plugin installed at project scope from the main
+# checkout also loads in its linked worktrees, made with `--worktree` or
+# `git worktree add` [docs, test], inside the main checkout or outside it
+# [test]. Its record's `projectPath` is the folder it was installed from:
+# the main checkout's, or a worktree's when installed there, and a plugin
+# installed from a worktree loads in the main checkout and in the other
+# worktrees too [test]; so it does between the checkouts of a bare repo, of
+# a `--separate-git-dir` checkout, and of a submodule [test]. In each
+# checkout only its own `.claude/settings.json` and
+# `.claude/settings.local.json` turn the plugin on or off: a worktree reads
+# neither of the main checkout's, a clash between them goes the worktree's
+# way, and on Windows the worktree's own local file is read, as the docs
+# say, and wins over its `settings.json` [docs, test]. So Disable writes the
+# Project's own local file, in a worktree as in the main checkout.
+# `project_reach = "checkouts"` reads a record bound to the root of one
+# checkout at the root of every other checkout of the repository among the
+# Projects. Claude Code does not hold the record to its repository either:
+# it loads the plugin in any folder whose own settings turn it on, another
+# repository, the one holding a submodule, or a folder outside any
+# repository [test]; config-digger does not read it there (a Ticket, not
+# yet filed). A worktree session the desktop app starts reads all project
+# configuration from the main checkout's root [docs], which config-digger
+# does not read apart.
 [[plugins]]
 id = "installed"
 superseded_marker = ".orphaned_at"
@@ -208,6 +232,7 @@ root = ["plugins"]
 folder = "installPath"
 scope = "scope"
 project = "projectPath"
+project_reach = "checkouts"
 version = "version"
 
 # A plugin of a `directory` marketplace, a folder of the user's, is read

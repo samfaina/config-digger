@@ -5844,6 +5844,36 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
     }
 
     #[test]
+    fn a_plugin_record_reaches_other_checkouts_only_with_its_project_field() {
+        let records = |fields: &str| {
+            with_plugins("").replace(
+                r#"folder = "path" }"#,
+                &format!(r#"folder = "path"{fields} }}"#),
+            )
+        };
+        for fields in [
+            r#", project = "projectPath", project_reach = "checkouts""#,
+            r#", project = "projectPath", project_reach = "project""#,
+            r#", project_reach = "project""#,
+        ] {
+            let text = records(fields);
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{fields}: {}",
+                error(&text)
+            );
+        }
+        let text = records(r#", project_reach = "checkouts""#);
+        assert!(
+            error(&text).contains("a plugin registry's `project_reach` needs `project`"),
+            "{}",
+            error(&text)
+        );
+        let text = records(r#", project = "projectPath", project_reach = "worktrees""#);
+        assert!(error(&text).contains("unknown variant"), "{}", error(&text));
+    }
+
+    #[test]
     fn a_project_s_plugins_marketplace_is_one_folder_name() {
         let keys = |marketplace: &str| {
             with_plugins("").replace(

@@ -1979,6 +1979,14 @@ impl PluginRegistry {
     pub fn folder_fallback(&self) -> bool {
         matches!(self, PluginRegistry::JsonPluginList(block) if block.folder_fallback)
     }
+
+    /// The Projects a record bound to one Project applies in.
+    pub fn project_reach(&self) -> ProjectReach {
+        match self {
+            PluginRegistry::JsonPluginRecords(block) => block.project_reach,
+            _ => ProjectReach::Project,
+        }
+    }
 }
 
 impl ListPlugins for PluginRegistry {
@@ -2417,6 +2425,10 @@ pub(crate) struct JsonPluginRecords {
     /// The field of a record that holds the path of the one Project it
     /// applies in. Without it, a record applies in every Project.
     pub project: Option<String>,
+    /// With `project`, the Projects a record bound to one Project applies
+    /// in. Without it, that Project alone.
+    #[serde(default)]
+    pub project_reach: ProjectReach,
     /// The field of a record that holds its version.
     pub version: Option<String>,
     /// The marketplaces the plugins come from, when a plugin of a
@@ -2424,6 +2436,24 @@ pub(crate) struct JsonPluginRecords {
     /// the folder its record holds. Without it, every plugin is read from
     /// its record's folder.
     pub marketplaces: Option<FolderMarketplaces>,
+}
+
+/// The Projects a plugin record bound to one Project applies in.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ProjectReach {
+    /// The Project its record names alone.
+    #[default]
+    Project,
+    /// The Project its record names, and when that Project is the root of
+    /// a checkout of a git repository, the root of every other checkout of
+    /// the repository among the Projects: its main checkout and its linked
+    /// worktrees, which share one common git folder. That folder is
+    /// `<root>\.git` for a `.git` folder, and for a `.git` file the folder
+    /// its `gitdir:` names, or `<common>` when it names
+    /// `<common>\worktrees\<name>`, as for a bare repo, a
+    /// `--separate-git-dir` checkout or a submodule too.
+    Checkouts,
 }
 
 /// The marketplaces plugins are installed from, as far as they say where a
@@ -2601,6 +2631,9 @@ impl Validate for JsonPluginRecords {
             if field.is_empty() {
                 return Err("a plugin registry field must not be empty".into());
             }
+        }
+        if self.project_reach != ProjectReach::Project && self.project.is_none() {
+            return Err("a plugin registry's `project_reach` needs `project`".into());
         }
         if let Some(marketplaces) = &self.marketplaces {
             marketplaces.validate()?;
