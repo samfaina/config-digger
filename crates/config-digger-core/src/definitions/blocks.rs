@@ -5173,7 +5173,7 @@ pub(crate) enum Malformed {
     /// This field's value does not start with this prefix.
     WrongPrefix(String, String),
     /// This field's value is not a URL of this scheme with a host.
-    NotAUrl(String, String),
+    WrongUrl(String, String),
     /// It holds this field, which it must not.
     Forbidden(String),
     /// A key or a string it holds, at any depth, holds a character of
@@ -5491,21 +5491,26 @@ impl Conform for FieldShape {
         }) {
             return Some(Malformed::NotOneOf(field.clone(), allowed.clone()));
         }
-        if let Some((field, prefix)) = self.prefixes.iter().find(|(field, prefix)| {
-            object
-                .get(*field)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.starts_with(prefix.as_str()))
-        }) {
-            return Some(Malformed::WrongPrefix(field.clone(), prefix.clone()));
+        // The first field of `rules` the Entry holds as a string that fails
+        // its rule, with the rule.
+        let failing_string = |rules: &BTreeMap<String, String>, passes: fn(&str, &str) -> bool| {
+            rules
+                .iter()
+                .find(|(field, rule)| {
+                    object
+                        .get(*field)
+                        .and_then(Value::as_str)
+                        .is_some_and(|value| !passes(value, rule))
+                })
+                .map(|(field, rule)| (field.clone(), rule.clone()))
+        };
+        if let Some((field, prefix)) =
+            failing_string(&self.prefixes, |value, prefix| value.starts_with(prefix))
+        {
+            return Some(Malformed::WrongPrefix(field, prefix));
         }
-        if let Some((field, scheme)) = self.urls.iter().find(|(field, scheme)| {
-            object
-                .get(*field)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !is_url_with_host(value, scheme))
-        }) {
-            return Some(Malformed::NotAUrl(field.clone(), scheme.clone()));
+        if let Some((field, scheme)) = failing_string(&self.urls, is_url_with_host) {
+            return Some(Malformed::WrongUrl(field, scheme));
         }
         if let Some(malformed) = self.walk_malformed(value) {
             return Some(malformed);
