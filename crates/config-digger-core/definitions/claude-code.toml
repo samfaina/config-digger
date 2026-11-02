@@ -325,9 +325,13 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # the value's other settings when no admin source holds any: the location
 # leaves the HKCU value out, `skips_user_writable`. It drops an entry that
 # fails one of these checks and still loads the others: `type` is `http`,
-# `sse` or `streamable-http`, an alias of `http` [docs]; `url` starts with
-# `https://`, a plain `http://` URL refused [test], `localhost` included
-# [docs]; the entry holds no `command` [test], `args`, `env` or
+# `sse` or `streamable-http`, an alias of `http` [docs]; `url` is an
+# `https:` URL, a plain `http://` URL refused [test], `localhost` included
+# [docs], which Claude Code checks only on a string: it parses as a URL
+# whose protocol is `https:` and whose host is not empty, the parser
+# lowercasing the scheme and trimming spaces, so `https://` alone or a host
+# the parser refuses fails it and `HTTPS://` or a URL with spaces around it
+# passes [binary]; the entry holds no `command` [test], `args`, `env` or
 # `headersHelper` [docs]; no key or value holds a control or invisible
 # formatting character [docs], a control or format character, U+2028 or
 # U+2029, in any key of an object or any string [binary]; no value holds a
@@ -341,10 +345,10 @@ shape = { block = "fields", one_of = ["command", "url"], types = { type = "strin
 # [binary]; config-digger checks every depth. Of the checks an entry fails,
 # Claude Code reports the first, in this order [binary], which the `fields`
 # shape follows: the name; `command`, `args`, `env` and `headersHelper`;
-# `type`, a missing one included; a `url` that is a string starting with
-# `https://`; one walk of the keys and strings in the order the entry holds
-# them, a string checked for the characters, then for a reference; then a
-# missing `url` or a field of the wrong type. A dropped entry competes with
+# `type`, a missing one included; an `https:` `url` with a host; one walk
+# of the keys and strings in the order the entry holds them, a string
+# checked for the characters, then for a reference; then a missing `url`
+# or a field of the wrong type. A dropped entry competes with
 # no server by name: a user server of its name loads, beside an entry with
 # a command or at an `http://` URL, in `managed-settings.json` or the HKLM
 # value [test].
@@ -354,6 +358,7 @@ unverified = [
   { sentence = "What Claude Code does with a `remote-settings.json` it cannot parse is not known.", needs = "Claude Teams or Enterprise" },
   "Every character the rule against control and invisible formatting characters refuses is taken from the 2.1.312 binary, with config-digger's Unicode tables; none was tested.",
   "The seven server names Claude Code refuses, and that it takes the other `Object.prototype` names such as `toString`, are read from the 2.1.312 binary; none was tested.",
+  "That a `url` must parse as a URL whose protocol is `https:` and whose host is not empty, and the cases this decides otherwise than a prefix would, `https://` alone, a host the parser refuses, an upper-case scheme and spaces around the URL, are read from the 2.1.312 binary; none was tested.",
   "Which check Claude Code reports for an entry that fails several, the name first, then `command`, `args`, `env` and `headersHelper`, `type`, an `https:` `url`, the walk of the keys and strings, then a missing `url` or a field of the wrong type, is read from the 2.1.312 binary; it was not tested.",
 ]
 anchor = { block = "settings", settings = "managed", skips_user_writable = true }
@@ -364,7 +369,7 @@ scope = "managed"
 provenance = "managed"
 store_class = "plain"
 on_read_failure = "unknown"
-shape = { block = "fields", required = ["type", "url"], values = { type = ["http", "sse", "streamable-http"] }, prefixes = { url = "https://" }, forbidden = ["command", "args", "env", "headersHelper"], refused_chars = "control-or-format", no_references = true, name = "letters-digits-dash-underscore", refused_names = ["constructor", "prototype", "__proto__", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"], types = { type = "string", url = "string", headers = "string-map" } }
+shape = { block = "fields", required = ["type", "url"], values = { type = ["http", "sse", "streamable-http"] }, urls = { url = "https" }, forbidden = ["command", "args", "env", "headersHelper"], refused_chars = "control-or-format", no_references = true, name = "letters-digits-dash-underscore", refused_names = ["constructor", "prototype", "__proto__", "__defineGetter__", "__defineSetter__", "__lookupGetter__", "__lookupSetter__"], types = { type = "string", url = "string", headers = "string-map" } }
 
 [[locations]]
 id = "local-mcp"

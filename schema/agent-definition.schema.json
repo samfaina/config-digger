@@ -3546,7 +3546,7 @@
       "description": "The minimal shape of the Entries of a location.",
       "oneOf": [
         {
-          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `name`, then `refused_names`, on its\nname; then on its value, `forbidden`, in its order; `values`, a field\nthe Entry does not hold failing it; `prefixes`, checked only on a\nstring; one walk of the keys and strings the value holds, at any depth,\nin the order it holds them, each key checked against `refused_chars`\nand each string against `refused_chars`, then `no_references`;\n`required`, in its order; `one_of`; then `types`. `values`, `prefixes`\nand `types` check their fields in the order of the fields' names.",
+          "description": "An object that holds at least one of some fields, each field it holds\nbeing of the type the Agent reads. It may also need some fields, each\none, and limit what some of them hold. The Entry fails the first check\nit does not pass, in this order: `name`, then `refused_names`, on its\nname; then on its value, `forbidden`, in its order; `values`, a field\nthe Entry does not hold failing it; `prefixes`, then `urls`, each\nchecked only on a string; one walk of the keys and strings the value\nholds, at any depth, in the order it holds them, each key checked\nagainst `refused_chars` and each string against `refused_chars`, then\n`no_references`; `required`, in its order; `one_of`; then `types`.\n`values`, `prefixes`, `urls` and `types` check their fields in the order\nof the fields' names.",
           "type": "object",
           "properties": {
             "one_of": {
@@ -3583,6 +3583,19 @@
             },
             "prefixes": {
               "description": "For a field, the prefix its string must start with, when the Entry\nholds it as a string, such as `https://` for `url`.",
+              "type": "object",
+              "properties": {
+                "unverified": {
+                  "$ref": "#/$defs/Unverified"
+                }
+              },
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {}
+            },
+            "urls": {
+              "description": "For a field, the scheme its string must have, when the Entry holds\nit as a string, such as `https` for `url`: the string parses as a\nWHATWG URL, the parser lowercasing the scheme and trimming spaces,\nwith that scheme and a host that is not empty.",
               "type": "object",
               "properties": {
                 "unverified": {
