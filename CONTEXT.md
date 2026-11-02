@@ -133,7 +133,7 @@ Said of an Entry that the Agent never reads in any context, such as one in an Ag
 _Avoid_: Orphaned, stale, ignored
 
 **Signed-in account**:
-The account an Agent home is signed in to, as a file of the home names it, such as the claude.ai account of `oauthAccount` in Claude Code's `~/.claude.json`. An Agent reads the configuration it keeps for an account, such as Claude Code's synced skills and plugins, only in the Signed-in account's folder, and none while the home is signed in to no account or a setting takes the Agent off it, such as an API key or a third-party provider.
+The account an Agent home is signed in to, as a file of the home names it, such as the claude.ai account of `oauthAccount` in Claude Code's `~/.claude.json`, while the home also keeps the account's sign-in credentials, such as Claude Code's `.credentials.json`. A home whose file names an account but that keeps no credentials is signed in to none. One that keeps credentials but no file naming the account is signed in to none until the Agent names the account again, as Claude Code does at its next start online. Where the credentials are kept outside the home, such as in the macOS keychain, the file naming the account decides alone. An Agent reads the configuration it keeps for an account, such as Claude Code's synced skills and plugins, only in the Signed-in account's folder, and none while the home is signed in to no account or a setting takes the Agent off it, such as an API key or a third-party provider.
 _Avoid_: Logged-in user, current account, active account
 
 **Leftover**:
