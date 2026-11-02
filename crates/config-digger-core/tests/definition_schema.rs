@@ -87,3 +87,34 @@ fn the_schema_rejects_an_unknown_linked_worktree_rule() {
 
     assert_ne!(errors(&definition), Vec::<String>::new());
 }
+
+/// The registry of the plugin list `id` of `definition`.
+fn plugin_registry<'d>(definition: &'d mut Value, id: &str) -> &'d mut Value {
+    definition["plugins"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|plugins| plugins["id"] == id)
+        .unwrap()
+        .get_mut("registry")
+        .unwrap()
+}
+
+#[test]
+fn the_schema_accepts_a_plugin_record_reaching_the_other_checkouts_of_its_repository() {
+    let mut definition = claude_code();
+
+    assert_eq!(
+        plugin_registry(&mut definition, "installed")["project_reach"],
+        "checkouts"
+    );
+    assert_eq!(errors(&definition), Vec::<String>::new());
+}
+
+#[test]
+fn the_schema_rejects_an_unknown_project_reach() {
+    let mut definition = claude_code();
+    plugin_registry(&mut definition, "installed")["project_reach"] = "worktrees".into();
+
+    assert_ne!(errors(&definition), Vec::<String>::new());
+}

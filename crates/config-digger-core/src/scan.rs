@@ -9,9 +9,9 @@ use crate::definitions::blocks::{
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
     Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
     NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
-    PluginRegistry, ProjectPluginKeys, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
-    SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList, Spelling, StoreClass,
-    Unlisted, is_entry_key,
+    PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
+    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList,
+    Spelling, StoreClass, Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -3509,14 +3509,38 @@ fn fallback_folder(common: PathBuf) -> PathBuf {
 /// `<common>` of the `<common>\worktrees\<name>` its `.git` file names,
 /// such as `<main>\.git` or a bare repo's folder. None for any other root.
 fn linked_common_folder(fs: &dyn FileSystem, root: &Path) -> Option<PathBuf> {
-    // A `.git` folder cannot be read as a file.
-    let text = String::from_utf8(fs.read(&root.join(".git")).ok()?).ok()?;
-    let gitdir = text.lines().find_map(|line| line.strip_prefix("gitdir:"))?;
-    let gitdir = paths::lexical(&root.join(gitdir.trim()));
+    worktrees_common_folder(&named_git_folder(fs, root)?)
+}
+
+/// The `<common>` of the git folder `gitdir` when it is
+/// `<common>\worktrees\<name>`, a linked worktree's. None otherwise.
+fn worktrees_common_folder(gitdir: &Path) -> Option<PathBuf> {
     let worktrees = gitdir.parent()?;
     named(worktrees, "worktrees")
         .then(|| worktrees.parent().map(Path::to_path_buf))
         .flatten()
+}
+
+/// The folder the `gitdir:` line of the `.git` file at the root `root`
+/// names. None when `root` holds no `.git` file.
+fn named_git_folder(fs: &dyn FileSystem, root: &Path) -> Option<PathBuf> {
+    // A `.git` folder cannot be read as a file.
+    let text = String::from_utf8(fs.read(&root.join(".git")).ok()?).ok()?;
+    let gitdir = text.lines().find_map(|line| line.strip_prefix("gitdir:"))?;
+    Some(paths::lexical(&root.join(gitdir.trim())))
+}
+
+/// The common git folder every checkout of the repository whose checkout
+/// root is `root` shares: `<root>\.git` for a `.git` folder, and for a
+/// `.git` file, the `<common>` of the `<common>\worktrees\<name>` it names,
+/// or else the folder it names, as for a `--separate-git-dir` checkout or a
+/// submodule. None when `root` holds no `.git`.
+fn common_git_folder(fs: &dyn FileSystem, root: &Path) -> Option<PathBuf> {
+    let dot_git = root.join(".git");
+    match named_git_folder(fs, root) {
+        Some(gitdir) => Some(worktrees_common_folder(&gitdir).unwrap_or(gitdir)),
+        None => fs.exists(&dot_git).then_some(dot_git),
+    }
 }
 
 /// Whether the last part of `path` is `name`, without regard to case.
@@ -4093,7 +4117,51 @@ impl Scanner<'_> {
         if plugins.same_names_invalid {
             self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
+        if plugins.registry.project_reach() == ProjectReach::Checkouts {
+            self.copy_to_other_checkouts(&mut found);
+        }
         found
+    }
+
+    /// Adds to `found`, for each plugin bound to a Project at the root of a
+    /// checkout of a git repository, the plugin bound to the root of each
+    /// other checkout of that repository among the Projects, unless `found`
+    /// already binds a plugin of its id there.
+    fn copy_to_other_checkouts(&self, found: &mut Vec<ScannedPlugin>) {
+        let checkouts: Vec<(&str, String)> = self
+            .projects
+            .list
+            .iter()
+            .filter(|project| project.is_folder())
+            .filter_map(|project| {
+                let common = common_git_folder(self.reader.fs, &project.path)?;
+                Some((project.key.as_str(), paths::key(&common)))
+            })
+            .collect();
+        let mut copies: Vec<ScannedPlugin> = Vec::new();
+        for plugin in found.iter() {
+            let Some((own, common)) = checkouts
+                .iter()
+                .find(|(key, _)| Some(*key) == plugin.project.as_deref())
+            else {
+                continue;
+            };
+            for (other, _) in checkouts
+                .iter()
+                .filter(|(key, other_common)| key != own && other_common == common)
+            {
+                let bound = |known: &ScannedPlugin| {
+                    known.id == plugin.id && known.project.as_deref() == Some(*other)
+                };
+                if !found.iter().chain(&copies).any(bound) {
+                    copies.push(ScannedPlugin {
+                        project: Some((*other).to_owned()),
+                        ..plugin.clone()
+                    });
+                }
+            }
+        }
+        found.extend(copies);
     }
 
     /// Leaves out of `plugins`, read for one Agent home, each plugin that

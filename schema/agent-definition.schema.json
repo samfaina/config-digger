@@ -2011,6 +2011,10 @@
                 "null"
               ]
             },
+            "project_reach": {
+              "description": "With `project`, the Projects a record bound to one Project applies\nin. Without it, that Project alone.",
+              "$ref": "#/$defs/ProjectReach"
+            },
             "version": {
               "description": "The field of a record that holds its version.",
               "type": [
@@ -2302,6 +2306,21 @@
             "anchor",
             "separator"
           ]
+        }
+      ]
+    },
+    "ProjectReach": {
+      "description": "The Projects a plugin record bound to one Project applies in.",
+      "oneOf": [
+        {
+          "description": "The Project its record names alone.",
+          "type": "string",
+          "const": "project"
+        },
+        {
+          "description": "The Project its record names, and when that Project is the root of\na checkout of a git repository, the root of every other checkout of\nthe repository among the Projects: its main checkout and its linked\nworktrees, which share one common git folder. That folder is\n`<root>\\.git` for a `.git` folder, and for a `.git` file the folder\nits `gitdir:` names, or `<common>` when it names\n`<common>\\worktrees\\<name>`, as for a bare repo, a\n`--separate-git-dir` checkout or a submodule too.",
+          "type": "string",
+          "const": "checkouts"
         }
       ]
     },
