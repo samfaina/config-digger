@@ -2223,7 +2223,7 @@
             {
               "label": "Abrir config-digger con claude-code-home como carpeta del usuario",
               "shell": "powershell",
-              "text": "$env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-home'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\""
+              "text": "$keep = $env:USERPROFILE; $env:USERPROFILE = 'E:\\cd-throwaway\\claude-code-home'; & \"$env:LOCALAPPDATA\\Programs\\config-digger\\config-digger.exe\"; $env:USERPROFILE = $keep"
             }
           ],
           "expect": [

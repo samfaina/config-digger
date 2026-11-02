@@ -4465,25 +4465,51 @@ fn projects_list_names_each_project_s_last_opened_home_hidden_or_not() {
     assert_eq!(opened["hidden"], true);
 }
 
-#[test]
-fn projects_list_notes_a_home_folder_project_whose_nested_skills_folders_are_not_read() {
-    // Claude Code records the user's home folder as a Project, in no git
-    // work tree.
+/// The note of a Project whose nested skills folders Claude Code loads and
+/// config-digger does not read.
+const LEFT_OUT: &str = "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.";
+
+/// A Claude Code home in the folder the binary runs in, which is the user's
+/// home folder, in no git work tree, and records it as a Project; with the
+/// variables that make it the home folder.
+fn home_folder_project() -> (Harness, [(&'static str, String); 2]) {
     let harness = Harness::new();
     let cwd = harness.cwd().display().to_string();
     let state = json!({ "projects": { cwd.replace('\\', "/"): {} } });
     let harness = harness.with_cwd_file(".claude.json", &state.to_string());
     let home = harness.root.path().display().to_string();
-    let env = [("USERPROFILE", home.as_str()), ("HOME", home.as_str())];
+    (harness, [("USERPROFILE", home.clone()), ("HOME", home)])
+}
+
+#[test]
+fn projects_list_notes_a_home_folder_project_whose_nested_skills_folders_are_not_read() {
+    let (harness, env) = home_folder_project();
+    let env = env.each_ref().map(|(name, value)| (*name, value.as_str()));
+    let cwd = harness.cwd().display().to_string();
 
     let text = harness.run_with_env(&["projects", "list", "--wide"], &env);
 
     assert_eq!(text.code, 0, "{}", text.stderr);
     assert!(
-        text.stdout.contains(&format!(
-            "{cwd}\n    Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive.\n"
-        )),
+        text.stdout.contains(&format!("{cwd}\n    {LEFT_OUT}\n")),
         "{}",
         text.stdout
     );
+}
+
+#[test]
+fn list_notes_under_each_home_of_the_agent_a_project_whose_nested_skills_folders_are_not_read() {
+    let (harness, env) = home_folder_project();
+    let env = env.each_ref().map(|(name, value)| (*name, value.as_str()));
+
+    let text = harness.run_with_env(&["list", "--wide"], &env);
+
+    assert_eq!(text.code, 0, "{}", text.stderr);
+    assert!(
+        text.stdout
+            .contains(&format!("Claude Code (home: default)\n  {LEFT_OUT}\n")),
+        "{}",
+        text.stdout
+    );
+    assert_eq!(text.stdout.matches(LEFT_OUT).count(), 1, "{}", text.stdout);
 }

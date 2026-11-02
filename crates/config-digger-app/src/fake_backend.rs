@@ -7,9 +7,9 @@
 //!
 //! The recording does what the UAT does by hand: it adds the Claude Desktop
 //! home, three more Claude Code homes, the extra Project and the user's
-//! folder as a Project, whose nested skills folders it leaves out, hides a Project,
-//! and disables two servers, so that History holds Operations and Settings a
-//! parked Entry. It then parks the server of a second Claude Desktop home
+//! folder as a Project, whose nested skills folders it leaves out, hides a
+//! Project, and disables two servers, so that History holds Operations and
+//! Settings a parked Entry. It then parks the server of a second Claude Desktop home
 //! and forgets the home, so that Projects & homes lists a Stranded Entry.
 //! Every path under the folder is then written as under
 //! [`UAT_ROOT`], where the UAT's steps have it.

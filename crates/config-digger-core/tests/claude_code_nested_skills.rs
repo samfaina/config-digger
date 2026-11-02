@@ -28,25 +28,35 @@ fn with_skill(fs: FakeFileSystem, folder: &str, name: &str) -> FakeFileSystem {
     fs.with_file(path, skill_md(name))
 }
 
+/// A Claude Code home in the user's home folder.
+fn claude_code_home() -> FakeFileSystem {
+    FakeFileSystem::new().with_file(PathBuf::from(HOME).join(".claude.json"), "{}")
+}
+
 /// A Claude Code home, and the Project as a git repo.
 fn repo() -> FakeFileSystem {
-    FakeFileSystem::new()
-        .with_file(PathBuf::from(HOME).join(".claude.json"), "{}")
-        .with_folder(Path::new(PROJECT).join(".git"))
+    claude_code_home().with_folder(Path::new(PROJECT).join(".git"))
 }
 
 fn inventory(fs: &FakeFileSystem) -> Inventory {
+    inventory_at(fs, PROJECT)
+}
+
+/// The inventory with the Project at `project` as the context.
+fn inventory_at(fs: &FakeFileSystem, project: &str) -> Inventory {
     let env = FakeEnvironment::with_home(HOME);
     let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
-    let context = Context {
-        project: Some(PathBuf::from(PROJECT)),
-    };
     let snapshot = core
         .scan(&ScanOptions {
-            projects: vec![PathBuf::from(PROJECT)],
+            projects: vec![PathBuf::from(project)],
         })
         .unwrap();
-    core.resolve(&snapshot, &context)
+    core.resolve(
+        &snapshot,
+        &Context {
+            project: Some(PathBuf::from(project)),
+        },
+    )
 }
 
 /// The skill Items, by name.
@@ -259,19 +269,13 @@ fn skill_overrides_turn_a_nested_skill_off_by_its_name_and_a_prefixed_one_by_its
 
 /// A Claude Code home, and the Project folder in no git work tree.
 fn outside_git() -> FakeFileSystem {
-    FakeFileSystem::new()
-        .with_file(PathBuf::from(HOME).join(".claude.json"), "{}")
-        .with_folder(PROJECT)
+    claude_code_home().with_folder(PROJECT)
 }
 
-/// The notes of the Project at `PROJECT`.
+/// The notes of the one Project of `inventory`.
 fn project_notes(inventory: &Inventory) -> Value {
-    let project = inventory
-        .projects
-        .iter()
-        .find(|project| project.path == Path::new(PROJECT))
-        .expect("the Project");
-    json!(project.notes)
+    assert_eq!(inventory.projects.len(), 1, "{:?}", inventory.projects);
+    json!(inventory.projects[0].notes)
 }
 
 #[test]
@@ -313,29 +317,6 @@ fn outside_a_git_repo_a_gitignore_in_the_project_folder_hides_a_folder_as_in_a_g
     assert_eq!(names(&inventory), ["lint"]);
 }
 
-/// The inventory with the Project at `project` as the context.
-fn inventory_at(fs: &FakeFileSystem, project: &str) -> Inventory {
-    let env = FakeEnvironment::with_home(HOME);
-    let core = Core::new(fake::ports(fs.clone(), env)).unwrap();
-    let snapshot = core
-        .scan(&ScanOptions {
-            projects: vec![PathBuf::from(project)],
-        })
-        .unwrap();
-    core.resolve(
-        &snapshot,
-        &Context {
-            project: Some(PathBuf::from(project)),
-        },
-    )
-}
-
-/// The notes of the one Project of `inventory`.
-fn only_project_notes(inventory: &Inventory) -> Value {
-    assert_eq!(inventory.projects.len(), 1, "{:?}", inventory.projects);
-    json!(inventory.projects[0].notes)
-}
-
 /// The note of a Project whose nested skills folders Claude Code loads and
 /// config-digger does not read.
 fn left_out_note() -> Value {
@@ -349,12 +330,10 @@ fn left_out_note() -> Value {
 /// A Claude Code home, and a skill in `apps\web\.claude\skills` below the
 /// folder `project`, in no git work tree.
 fn skill_below(project: &str) -> FakeFileSystem {
-    FakeFileSystem::new()
-        .with_file(PathBuf::from(HOME).join(".claude.json"), "{}")
-        .with_file(
-            Path::new(project).join(r"apps\web\.claude\skills\web\SKILL.md"),
-            skill_md("web"),
-        )
+    claude_code_home().with_file(
+        Path::new(project).join(r"apps\web\.claude\skills\web\SKILL.md"),
+        skill_md("web"),
+    )
 }
 
 #[test]
@@ -363,7 +342,7 @@ fn outside_a_git_repo_the_user_home_folder_as_a_project_has_no_nested_skill_and_
     let inventory = inventory_at(&skill_below(HOME), HOME);
 
     assert_eq!(names(&inventory), Vec::<&str>::new());
-    assert_eq!(only_project_notes(&inventory), left_out_note());
+    assert_eq!(project_notes(&inventory), left_out_note());
 }
 
 #[test]
@@ -371,7 +350,7 @@ fn outside_a_git_repo_the_user_home_folder_spelled_in_another_case_is_left_out_t
     let inventory = inventory_at(&skill_below(HOME), r"c:\users\FIXTURE");
 
     assert_eq!(names(&inventory), Vec::<&str>::new());
-    assert_eq!(only_project_notes(&inventory), left_out_note());
+    assert_eq!(project_notes(&inventory), left_out_note());
 }
 
 #[test]
@@ -379,7 +358,7 @@ fn outside_a_git_repo_a_folder_above_the_user_home_folder_as_a_project_is_left_o
     let inventory = inventory_at(&skill_below(r"C:\Users"), r"C:\Users");
 
     assert_eq!(names(&inventory), Vec::<&str>::new());
-    assert_eq!(only_project_notes(&inventory), left_out_note());
+    assert_eq!(project_notes(&inventory), left_out_note());
 }
 
 #[test]
@@ -387,7 +366,7 @@ fn outside_a_git_repo_a_drive_root_as_a_project_is_left_out() {
     let inventory = inventory_at(&skill_below(r"E:\"), r"E:\");
 
     assert_eq!(names(&inventory), Vec::<&str>::new());
-    assert_eq!(only_project_notes(&inventory), left_out_note());
+    assert_eq!(project_notes(&inventory), left_out_note());
 }
 
 #[test]
@@ -397,7 +376,7 @@ fn the_user_home_folder_in_a_git_work_tree_walks_as_any_project_and_has_no_note(
     let inventory = inventory_at(&fs, HOME);
 
     assert_eq!(names(&inventory), ["web"]);
-    assert_eq!(only_project_notes(&inventory), json!([]));
+    assert_eq!(project_notes(&inventory), json!([]));
 }
 
 #[test]

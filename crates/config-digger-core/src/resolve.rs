@@ -138,12 +138,12 @@ pub(crate) fn resolve(
             notes: project
                 .left_out
                 .iter()
-                .map(|(agent_index, path)| {
-                    let agent = &definitions[*agent_index].agent;
+                .map(|left_out| {
+                    let agent = &definitions[left_out.agent_index].agent;
                     api::ProjectNote {
                         agent: agent.id.clone(),
                         code: api::ProjectNoteCode::WalkDownLeftOut,
-                        sentence: explain::walk_down_left_out(&agent.name, path),
+                        sentence: explain::walk_down_left_out(&agent.name, &left_out.path),
                     }
                 })
                 .collect(),

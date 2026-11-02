@@ -675,7 +675,8 @@ pub(crate) enum OutsideGit {
     /// unless the Project folder, compared as a real path and case aside,
     /// is the user's home folder, a folder above it or a drive root: the
     /// walk then enters nothing, since it would walk every folder below a
-    /// home folder or a drive, and the Project gets a Note saying so.
+    /// home folder or a drive, and the Project gets a Project note saying
+    /// so.
     UnlessHomeOrDrive,
 }
 

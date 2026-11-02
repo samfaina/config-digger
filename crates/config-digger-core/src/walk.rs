@@ -157,11 +157,22 @@ struct Walked {
 }
 
 /// The walks down a scan has made, so that the locations that walk alike
-/// from one Project folder walk once.
-#[derive(Default)]
-pub(crate) struct WalksDown(Vec<Walked>);
+/// from one Project folder walk once, and the user's home folder they
+/// leave out, outside git, with the folders above it.
+pub(crate) struct WalksDown {
+    home: Option<PathBuf>,
+    walked: Vec<Walked>,
+}
 
 impl WalksDown {
+    /// No walk yet, with `home` as the user's home folder.
+    pub fn new(home: Option<PathBuf>) -> WalksDown {
+        WalksDown {
+            home,
+            walked: Vec::new(),
+        }
+    }
+
     /// The folders below `project` that may hold the `/`-separated path
     /// `path`, by the rules `walk`, in the order the walk entered them: the
     /// folder holding each entered folder named as the path's first folder,
@@ -169,31 +180,30 @@ impl WalksDown {
     /// below it. A path of one name may be in any folder entered, and so
     /// may any path when the rules leave the path's first folder to it.
     /// `None` when the rules leave the Project out, outside git, as the
-    /// user's home folder `home`, a folder above it or a drive root.
+    /// user's home folder, a folder above it or a drive root.
     pub fn holders(
         &mut self,
         fs: &dyn FileSystem,
-        home: Option<&Path>,
         project: &Path,
         walk: &DownWalk,
         path: &str,
     ) -> Option<Vec<PathBuf>> {
         let at = match self
-            .0
+            .walked
             .iter()
             .position(|walked| walked.project == project && walked.rules == *walk)
         {
             Some(at) => at,
             None => {
-                self.0.push(Walked {
+                self.walked.push(Walked {
                     project: project.to_path_buf(),
                     rules: walk.clone(),
-                    entered: folders_below(fs, home, project, walk),
+                    entered: folders_below(fs, self.home.as_deref(), project, walk),
                 });
-                self.0.len() - 1
+                self.walked.len() - 1
             }
         };
-        let entered = self.0[at].entered.as_ref()?;
+        let entered = self.walked[at].entered.as_ref()?;
         let Some((first, _)) = path.split_once('/').filter(|_| walk.ignores_path) else {
             return Some(entered.clone());
         };

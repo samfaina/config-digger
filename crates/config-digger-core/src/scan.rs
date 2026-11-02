@@ -1082,9 +1082,17 @@ pub(crate) struct ScannedProject {
     /// The Agent home each Agent last opened it in, as the Agent records it,
     /// at most one per Agent.
     pub last_opened: Vec<ScannedLastOpened>,
-    /// The Agents, by index, and the paths of their locations whose walk
-    /// down left it out, outside git, as a home folder or a drive root.
-    pub left_out: BTreeSet<(usize, String)>,
+    /// The walks down that left it out, outside git, as a home folder or a
+    /// drive root.
+    pub left_out: BTreeSet<LeftOut>,
+}
+
+/// A walk down that left a Project out: the Agent's, by index, and the
+/// path it reads below.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct LeftOut {
+    pub agent_index: usize,
+    pub path: String,
 }
 
 /// The Agent home an Agent last opened a Project in.
@@ -1624,30 +1632,37 @@ fn read_as_if(
             .or_default()
             .extend(plugins);
     }
-    let mut walks = walk::WalksDown::default();
-    // The Projects, by key, a walk down left out, with the Agent and the
-    // path it reads below.
-    let mut left_out: BTreeSet<(String, usize, String)> = BTreeSet::new();
+    let mut walks = walk::WalksDown::new(ports.env.home_dir());
+    // The walks down that left each Project out, by its key.
+    let mut left_out: BTreeMap<String, BTreeSet<LeftOut>> = BTreeMap::new();
     for home in &found {
         let definition = &definitions[home.agent_index];
         for location in definition.locations.iter() {
             if !location.anchor.in_project() {
                 continue;
             }
+            let leaves_out = |left_out: &mut BTreeMap<String, BTreeSet<LeftOut>>, key: &String| {
+                let path = location.anchor.walks_down().map_or("", |(_, path)| path);
+                left_out.entry(key.clone()).or_default().insert(LeftOut {
+                    agent_index: home.agent_index,
+                    path: path.to_owned(),
+                });
+            };
             // Each folder or file read, with the key of its Project and how
             // far it ranks below the Project's own.
             let mut read: Vec<(PathBuf, &String, usize)> = Vec::new();
             if !location.anchor.project_file() {
                 for (project_folder, key) in &folders {
-                    let Some(folders) =
-                        folders_read(ports, &as_if, project_folder, &location.anchor, &mut walks)
-                    else {
-                        let path = location.anchor.walks_down().map_or("", |(_, path)| path);
-                        left_out.insert((key.clone(), home.agent_index, path.to_owned()));
-                        continue;
-                    };
-                    for (folder, depth) in folders {
-                        read.push((folder, key, depth));
+                    match folders_read(ports, &as_if, project_folder, &location.anchor, &mut walks)
+                    {
+                        Some(folders) => {
+                            read.extend(
+                                folders
+                                    .into_iter()
+                                    .map(|(folder, depth)| (folder, key, depth)),
+                            );
+                        }
+                        None => leaves_out(&mut left_out, key),
                     }
                 }
             }
@@ -1658,15 +1673,13 @@ fn read_as_if(
                         continue;
                     }
                     for (index, member) in members.iter().enumerate() {
-                        let Some(folders) =
-                            folders_read(ports, &as_if, member, &location.anchor, &mut walks)
-                        else {
-                            let path = location.anchor.walks_down().map_or("", |(_, path)| path);
-                            left_out.insert((key.clone(), home.agent_index, path.to_owned()));
-                            continue;
-                        };
-                        for (folder, depth) in folders {
-                            read.push((folder, key, index * MEMBER_RANKS + depth));
+                        match folders_read(ports, &as_if, member, &location.anchor, &mut walks) {
+                            Some(folders) => {
+                                read.extend(folders.into_iter().map(|(folder, depth)| {
+                                    (folder, key, index * MEMBER_RANKS + depth)
+                                }))
+                            }
+                            None => leaves_out(&mut left_out, key),
                         }
                     }
                 }
@@ -1712,11 +1725,7 @@ fn read_as_if(
     }
 
     for project in &mut scanner.projects.list {
-        project.left_out = left_out
-            .iter()
-            .filter(|(key, ..)| *key == project.key)
-            .map(|(_, agent, path)| (*agent, path.clone()))
-            .collect();
+        project.left_out = left_out.remove(&project.key).unwrap_or_default();
     }
 
     scanner.mask_entries(definitions);
@@ -3444,9 +3453,10 @@ fn members(reader: &mut Reader, file: &Path) -> Vec<PathBuf> {
 
 /// The folders the location anchored at `anchor` in the Project folder
 /// `folder` is read in, with how many levels up each one is: 0 for a
-/// folder below it. `None` when its walk down leaves the Project out. Whether a linked worktree's root holds the path, and
-/// which main checkout it names, is read as if the planned folders were
-/// done, from `as_if`.
+/// folder below it, or `None` when its walk down leaves the Project out.
+/// Whether a linked worktree's root holds the path, and which main
+/// checkout it names, is read as if the planned folders were done, from
+/// `as_if`.
 fn folders_read(
     ports: &Ports,
     as_if: &dyn FileSystem,
@@ -3459,9 +3469,8 @@ fn folders_read(
         ProjectWalk::None => vec![(folder.to_path_buf(), 0)],
         ProjectWalk::Down(down) => {
             let path = anchor.walks_down().map_or("", |(_, path)| path);
-            let home = ports.env.home_dir();
             walks
-                .holders(fs, home.as_deref(), folder, down, path)?
+                .holders(fs, folder, down, path)?
                 .into_iter()
                 .map(|holder| (holder, 0))
                 .collect()

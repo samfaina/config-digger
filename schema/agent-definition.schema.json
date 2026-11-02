@@ -764,7 +764,7 @@
           "const": "nothing"
         },
         {
-          "description": "The folders below it, by the same rules as in a git work tree,\nunless the Project folder, compared as a real path and case aside,\nis the user's home folder, a folder above it or a drive root: the\nwalk then enters nothing, since it would walk every folder below a\nhome folder or a drive, and the Project gets a Note saying so.",
+          "description": "The folders below it, by the same rules as in a git work tree,\nunless the Project folder, compared as a real path and case aside,\nis the user's home folder, a folder above it or a drive root: the\nwalk then enters nothing, since it would walk every folder below a\nhome folder or a drive, and the Project gets a Project note saying\nso.",
           "type": "string",
           "const": "unless-home-or-drive"
         }

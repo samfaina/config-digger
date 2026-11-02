@@ -916,14 +916,14 @@ on_read_failure = "ignores_file"
 # except below a Project that is the user's home folder, a folder above it
 # or a drive root, compared as real paths, case aside: walking every folder
 # below a home folder or a drive is config-digger's own limit, and such a
-# Project gets a Note saying it does not read them. In a git work tree that
-# Project is walked as any other. Claude Code also skips its own claude.ai
-# sync folders, and on Windows a
-# path holding an 8.3 short name (`~1`), which a walk never meets [code]. It
-# runs no discovery at all while the `projectSettings` source is off or a
-# policy allows only plugin customization ("Dynamic skill discovery
-# skipped") [code], which config-digger does not read yet. It loads these
-# skills as Project skills, as `project-skills` reads them [code].
+# Project gets a Project note saying it does not read them. In a git work
+# tree that Project is walked as any other. Claude Code also skips its own
+# claude.ai sync folders, and on Windows a path holding an 8.3 short name
+# (`~1`), which a walk never meets [code]. It runs no discovery at all
+# while the `projectSettings` source is off or a policy allows only plugin
+# customization ("Dynamic skill discovery skipped") [code], which
+# config-digger does not read yet. It loads these skills as Project skills,
+# as `project-skills` reads them [code].
 [[locations]]
 id = "nested-skills"
 unverified = [
