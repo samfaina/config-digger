@@ -10,11 +10,10 @@ use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
-    FindsBy, FolderMarketplaces, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition,
-    InstallationFolder, Interpolation, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder,
-    ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register,
-    Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate,
-    VersionSource,
+    FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, InstallationFolder,
+    Interpolation, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins, Locate,
+    Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
+    SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -2614,12 +2613,7 @@ impl AgentDefinition {
                 .chain(
                     self.plugins
                         .iter()
-                        .filter(|plugins| {
-                            plugins
-                                .registry
-                                .marketplaces()
-                                .is_some_and(FolderMarketplaces::fails_plugin)
-                        })
+                        .filter(|plugins| plugins.registry.fails_plugin())
                         .map(|plugins| plugins.id.as_str()),
                 )
                 .collect();
@@ -6319,6 +6313,174 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
             assert!(
                 message.contains("unknown variant") || message.contains("invalid type"),
                 "{dialect}: {message}"
+            );
+        }
+    }
+
+    /// [`with_plugins`], whose registry is a plugin list with the
+    /// marketplaces `marketplaces`, or none for `""`, and whose kind
+    /// checks `checks`.
+    fn with_listed_marketplaces(marketplaces: &str, checks: &str) -> String {
+        let marketplaces = if marketplaces.is_empty() {
+            String::new()
+        } else {
+            format!(", marketplaces = {marketplaces}")
+        };
+        with_plugins("")
+            .replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "json-plugin-list", anchor = {{ block = "machine", path = "~/.agent/plugins/installed.json" }}, list = ["installed"], folder = "pluginUri", spelling = "file-uri"{marketplaces} }}"#
+                ),
+            )
+            .replace(r#"checks = ["disable", "precedence"]"#, checks)
+    }
+
+    /// A plugin list's marketplaces, `fields` replacing the fields they name.
+    fn listed_marketplaces(fields: &[(&str, &str)]) -> String {
+        let mut all = vec![
+            ("field", r#""marketplace""#),
+            ("clone", r#""git-url""#),
+            ("ref_folder", r#"".marketplace-repositories""#),
+            ("item_name", r#""name""#),
+            (
+                "files",
+                r#"["marketplace.json", ".plugin/marketplace.json"]"#,
+            ),
+            ("dialect", r#""jsonc""#),
+            ("reads_around_error", "true"),
+            ("plugins", r#"["plugins"]"#),
+            ("name", r#""name""#),
+            ("source", r#""source""#),
+            ("plugin_root", r#"["metadata", "pluginRoot"]"#),
+            (
+                "source_objects",
+                r#"{ kind = "source", kinds = ["github"] }"#,
+            ),
+        ];
+        for (field, value) in fields {
+            match all.iter_mut().find(|(known, _)| known == field) {
+                Some(known) => known.1 = value,
+                None => all.push((field, value)),
+            }
+        }
+        let fields: Vec<String> = all
+            .iter()
+            .filter(|(_, value)| !value.is_empty())
+            .map(|(field, value)| format!("{field} = {value}"))
+            .collect();
+        format!("{{ {} }}", fields.join(", "))
+    }
+
+    #[test]
+    fn a_plugin_list_s_marketplaces_need_the_plugin_load_check() {
+        let without = r#"checks = ["disable", "precedence"]"#;
+        let text = with_listed_marketplaces(&listed_marketplaces(&[]), PLUGIN_LOAD);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_listed_marketplaces(&listed_marketplaces(&[]), without);
+        assert!(
+            error(&text).contains("checks leaves out `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+        // Without them, as before.
+        let text = with_listed_marketplaces("", without);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_listed_marketplaces("", PLUGIN_LOAD);
+        assert!(
+            error(&text).contains("checks holds `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_plugin_list_s_marketplaces_are_well_formed() {
+        // Only the fields that have a default may be left out.
+        for optional in [
+            "ref_folder",
+            "dialect",
+            "reads_around_error",
+            "plugin_root",
+            "source_objects",
+        ] {
+            let text =
+                with_listed_marketplaces(&listed_marketplaces(&[(optional, "")]), PLUGIN_LOAD);
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{optional}: {}",
+                error(&text)
+            );
+        }
+        for (field, value, message) in [
+            (
+                "field",
+                r#""""#,
+                "a marketplace list field must not be empty",
+            ),
+            (
+                "item_name",
+                r#""""#,
+                "a marketplace list field must not be empty",
+            ),
+            (
+                "name",
+                r#""""#,
+                "a marketplace list field must not be empty",
+            ),
+            (
+                "source",
+                r#""""#,
+                "a marketplace list field must not be empty",
+            ),
+            ("field", "", "missing field `field`"),
+            ("files", "[]", "a marketplace list needs at least one file"),
+            (
+                "files",
+                r#"["../marketplace.json"]"#,
+                "must be a relative path",
+            ),
+            ("ref_folder", r#""../clones""#, "must be a relative path"),
+            (
+                "plugins",
+                "[]",
+                "a marketplace list needs a key path, with no empty key",
+            ),
+            (
+                "plugins",
+                r#"["plugins", ""]"#,
+                "a marketplace list needs a key path, with no empty key",
+            ),
+            (
+                "plugin_root",
+                r#"["metadata", ""]"#,
+                "plugin_root must have no empty key",
+            ),
+            (
+                "source_objects",
+                r#"{ kind = "", kinds = ["github"] }"#,
+                "source_objects needs a field",
+            ),
+            (
+                "source_objects",
+                r#"{ kind = "source", kinds = [] }"#,
+                "source_objects needs a field",
+            ),
+            (
+                "source_objects",
+                r#"{ kind = "source", kinds = [""] }"#,
+                "source_objects needs a field",
+            ),
+            ("clone", r#""path""#, "unknown variant `path`"),
+            ("dialect", r#""json5""#, "unknown variant `json5`"),
+            ("other", "1", "unknown field `other`"),
+        ] {
+            let text =
+                with_listed_marketplaces(&listed_marketplaces(&[(field, value)]), PLUGIN_LOAD);
+            assert!(
+                error(&text).contains(message),
+                "{field} = {value}: {}",
+                error(&text)
             );
         }
     }

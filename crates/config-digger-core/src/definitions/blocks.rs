@@ -1957,6 +1957,8 @@ pub(crate) struct PluginRecord {
     pub version: Option<String>,
     /// What leaves it out of the plugins the Agent loads, when something does.
     pub not_listed: Option<NotListed>,
+    /// The marketplace whose list may name it, when the registry reads one.
+    pub listed_in: Option<ListedIn>,
 }
 
 /// A plugin the file listing the plugins the Agent loads leaves out, so
@@ -2020,6 +2022,23 @@ impl PluginRegistry {
     pub fn marketplaces(&self) -> Option<&FolderMarketplaces> {
         match self {
             PluginRegistry::JsonPluginRecords(block) => block.marketplaces.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// Whether the Agent fails to load some of its plugins for what their
+    /// marketplaces say: a manifest that does not list one, or a list
+    /// that names another.
+    pub fn fails_plugin(&self) -> bool {
+        self.marketplaces()
+            .is_some_and(FolderMarketplaces::fails_plugin)
+            || self.listed_marketplaces().is_some()
+    }
+
+    /// The marketplaces whose lists name its plugins, if any.
+    pub fn listed_marketplaces(&self) -> Option<&ListedMarketplaces> {
+        match self {
+            PluginRegistry::JsonPluginList(block) => block.marketplaces.as_ref(),
             _ => None,
         }
     }
@@ -2860,6 +2879,7 @@ impl JsonPluginRecords {
                     project: text_of(record, self.project.as_ref()),
                     version: text_of(record, self.version.as_ref()),
                     not_listed: None,
+                    listed_in: None,
                 });
             }
         }
@@ -2896,6 +2916,10 @@ pub(crate) struct JsonPluginList {
     /// the plugin is named by its id, as its `[[plugins]]` says.
     #[serde(default)]
     pub folder_fallback: bool,
+    /// The marketplaces the items come from, as far as each one's list
+    /// names its plugins. Without it, no item is read in a marketplace's
+    /// list.
+    pub marketplaces: Option<ListedMarketplaces>,
 }
 
 impl Validate for JsonPluginList {
@@ -2912,8 +2936,343 @@ impl Validate for JsonPluginList {
                 return Err("a plugin registry field must not be empty".into());
             }
         }
+        if let Some(marketplaces) = &self.marketplaces {
+            marketplaces.validate()?;
+        }
         Ok(())
     }
+}
+
+/// The marketplaces the items of a plugin list come from, as far as each
+/// one's list names its plugins, such as the marketplaces VS Code installs
+/// agent plugins from. An item whose `field` names a marketplace sits in
+/// the marketplace's clone, which `clone` places below the plugin list's
+/// folder, and the first of `files` at the clone's root whose `plugins`
+/// key path holds a list is the marketplace's list. Of its entries, those
+/// whose `name` holds a non-empty string and whose `source` names a plugin
+/// count. The entry an item matches names its plugin: the entry whose
+/// `name` is the item's `item_name`, exactly, whatever its source, or, for
+/// an item without one, the entry whose source is a path to the plugin's
+/// folder. A plugin whose marketplace has a list that it matches no entry
+/// of fails to load. A marketplace with no list, no file holding one or a
+/// list with no entry that counts, leaves its plugins named as their
+/// `[[plugins]]` says.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListedMarketplaces {
+    /// The field of an item that names its marketplace.
+    pub field: String,
+    /// How that field places the marketplace's clone below the folder of
+    /// the plugin list.
+    pub clone: CloneSpelling,
+    /// The folder below the plugin list's that holds the clones of the
+    /// marketplaces whose URL names a ref. Without it, such a marketplace
+    /// has no list.
+    pub ref_folder: Option<String>,
+    /// The field of an item that holds the plugin's name in its
+    /// marketplace's list.
+    pub item_name: String,
+    /// The files at the clone's root that may hold the list, in the order
+    /// they are tried.
+    pub files: Vec<String>,
+    /// The dialect the files are read in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
+    /// Whether a file that does not parse is read around its error, for
+    /// what parses before and after it. Without it, such a file holds no
+    /// list. Neither is a Read failure.
+    #[serde(default)]
+    pub reads_around_error: bool,
+    /// The key path of the list's entries.
+    pub plugins: Vec<String>,
+    /// The field of an entry that holds the plugin's name.
+    pub name: String,
+    /// The field of an entry that holds where the plugin is: a path below
+    /// the clone's root, `\` read as `/`, trimmed, with leading `./` and
+    /// `/` and trailing `/` dropped and `..` stopping at the root; the root
+    /// itself when the field is missing or null; or an object of
+    /// `source_objects`, a plugin elsewhere.
+    pub source: String,
+    /// The key path of the list's folder below the clone's root that the
+    /// path of a source lies in, unless it starts with that folder already.
+    #[serde(default)]
+    pub plugin_root: Vec<String>,
+    /// The objects a source may hold, each naming a plugin elsewhere.
+    /// Without it, an entry whose source is an object does not count.
+    pub source_objects: Option<SourceObjects>,
+}
+
+/// The objects an entry's source may hold in a marketplace's list, each
+/// naming a plugin outside the marketplace's clone: one whose `kind`
+/// field holds one of `kinds`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SourceObjects {
+    /// The field of the object that holds its kind.
+    pub kind: String,
+    /// The kinds that name a plugin.
+    pub kinds: Vec<String>,
+}
+
+/// How an item's field places its marketplace's clone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum CloneSpelling {
+    /// A git URL of the scheme `http`, `https` or `ssh` with a host, as VS
+    /// Code clones a marketplace: in the folder of its host, lowercased,
+    /// then one per segment of its path, a final `.git` dropped, each of
+    /// `\/:*?"<>|` in a name turned into `_`. A URL whose fragment names a
+    /// ref is cloned below the `ref_folder` instead, in a last folder
+    /// `ref_` followed by the ref, URI-encoded. A `file:` URI with no
+    /// fragment names the clone itself; any other text names none.
+    GitUrl,
+}
+
+impl Validate for ListedMarketplaces {
+    fn validate(&self) -> Result<(), String> {
+        for field in [&self.field, &self.item_name, &self.name, &self.source] {
+            if field.is_empty() {
+                return Err("a marketplace list field must not be empty".into());
+            }
+        }
+        if self.files.is_empty() {
+            return Err("a marketplace list needs at least one file".into());
+        }
+        for file in self.files.iter().chain(&self.ref_folder) {
+            validate_relative(file)?;
+        }
+        if self.plugins.is_empty() || self.plugins.iter().any(String::is_empty) {
+            return Err("a marketplace list needs a key path, with no empty key".into());
+        }
+        if self.plugin_root.iter().any(String::is_empty) {
+            return Err("a marketplace list's plugin_root must have no empty key".into());
+        }
+        if let Some(objects) = &self.source_objects
+            && (objects.kind.is_empty()
+                || objects.kinds.is_empty()
+                || objects.kinds.iter().any(String::is_empty))
+        {
+            return Err("source_objects needs a field and at least one kind, none empty".into());
+        }
+        Ok(())
+    }
+}
+
+/// The marketplace an item of a plugin list says its plugin comes from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ListedIn {
+    /// The marketplace, as the item names it.
+    pub marketplace: String,
+    /// The marketplace's clone.
+    pub clone: PathBuf,
+    /// The plugin's name in the marketplace's list, when the item gives one.
+    pub name: Option<String>,
+}
+
+/// An entry of a marketplace's list that counts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ListEntry {
+    /// The plugin's name.
+    pub name: String,
+    /// The plugin's folder in the clone; `None` for a plugin elsewhere.
+    pub folder: Option<PathBuf>,
+}
+
+impl ListedMarketplaces {
+    /// The marketplace `item` names, in a plugin list whose folder is
+    /// `base`, when the clone of what it names can be placed.
+    pub fn listed_in(&self, item: &Value, base: &Path) -> Option<ListedIn> {
+        let marketplace = item.get(&self.field)?.as_str()?;
+        let clone = match self.clone {
+            CloneSpelling::GitUrl => git_clone(marketplace, base, self.ref_folder.as_deref())?,
+        };
+        let name = item
+            .get(&self.item_name)
+            .and_then(Value::as_str)
+            .filter(|name| !name.is_empty())
+            .map(str::to_owned);
+        Some(ListedIn {
+            marketplace: marketplace.to_owned(),
+            clone,
+            name,
+        })
+    }
+
+    /// How the files are parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
+
+    /// The entries that count of the list `document` holds, for a
+    /// marketplace cloned in `clone`; `None` when its `plugins` key path
+    /// holds no list.
+    pub fn entries(&self, document: &Value, clone: &Path) -> Option<Vec<ListEntry>> {
+        let entries = self
+            .plugins
+            .iter()
+            .try_fold(document, |value, key| value.get(key))?
+            .as_array()?;
+        let root = self
+            .plugin_root
+            .iter()
+            .try_fold(document, |value, key| value.get(key))
+            .filter(|_| !self.plugin_root.is_empty())
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        Some(
+            entries
+                .iter()
+                .filter_map(|entry| {
+                    let name = entry
+                        .get(&self.name)?
+                        .as_str()
+                        .filter(|name| !name.is_empty())?;
+                    let folder = match entry.get(&self.source) {
+                        None | Some(Value::Null) => Some(listed_folder(clone, root, "")),
+                        Some(Value::String(source)) => Some(listed_folder(clone, root, source)),
+                        Some(Value::Object(object)) => {
+                            let objects = self.source_objects.as_ref()?;
+                            let kind = object.get(&objects.kind)?.as_str()?;
+                            if !objects.kinds.iter().any(|known| known == kind) {
+                                return None;
+                            }
+                            None
+                        }
+                        Some(_) => return None,
+                    };
+                    Some(ListEntry {
+                        name: name.to_owned(),
+                        folder,
+                    })
+                })
+                .collect(),
+        )
+    }
+}
+
+/// The folder in the clone `clone` that the source path `source` names,
+/// below the list's plugin root `root` unless it starts with it, as VS
+/// Code resolves one: each trimmed, `\` read as `/`, leading `./` and `/`
+/// and trailing `/` dropped, `.` skipped and `..` stopping at the root.
+fn listed_folder(clone: &Path, root: &str, source: &str) -> PathBuf {
+    let tidy = |path: &str| {
+        let path = path.trim().replace('\\', "/");
+        let path = path
+            .strip_prefix('.')
+            .filter(|rest| rest.starts_with('/'))
+            .unwrap_or(&path);
+        path.trim_start_matches('/')
+            .trim_end_matches('/')
+            .to_owned()
+    };
+    let (root, source) = (tidy(root), tidy(source));
+    let under_root =
+        !root.is_empty() && (source == root || source.starts_with(&format!("{root}/")));
+    let joined = if under_root || root.is_empty() {
+        source
+    } else {
+        format!("{root}/{source}")
+    };
+    let mut parts: Vec<&str> = Vec::new();
+    for part in joined.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    parts
+        .iter()
+        .fold(clone.to_path_buf(), |path, part| path.join(part))
+}
+
+/// The folder below `base` that VS Code clones the marketplace `url` in,
+/// as [`CloneSpelling::GitUrl`] says; `None` when it names none.
+fn git_clone(url: &str, base: &Path, ref_folder: Option<&str>) -> Option<PathBuf> {
+    let (scheme, rest) = url.split_once("://")?;
+    let scheme = scheme.to_ascii_lowercase();
+    if scheme == "file" {
+        return if url.contains('#') {
+            None
+        } else {
+            paths::from_file_uri(url)
+        };
+    }
+    if !matches!(scheme.as_str(), "http" | "https" | "ssh") {
+        return None;
+    }
+    let (rest, fragment) = match rest.split_once('#') {
+        Some((rest, fragment)) => (rest, Some(percent_decoded(fragment)?)),
+        None => (rest, None),
+    };
+    let rest = rest.split_once('?').map_or(rest, |(rest, _)| rest);
+    let (authority, path) = rest.split_once('/').unwrap_or((rest, ""));
+    if authority.is_empty() {
+        return None;
+    }
+    let sanitized = |name: &str| name.replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], "_");
+    let path = percent_decoded(path)?;
+    let path = path.trim_matches('/');
+    let path = match path.len().checked_sub(4) {
+        Some(at) if path.is_char_boundary(at) && path[at..].eq_ignore_ascii_case(".git") => {
+            &path[..at]
+        }
+        _ => path,
+    };
+    let mut segments = vec![sanitized(&authority.to_lowercase())];
+    segments.extend(
+        path.split('/')
+            .filter(|segment| !segment.is_empty())
+            .map(sanitized),
+    );
+    let mut folder = base.to_path_buf();
+    if let Some(reference) = fragment.filter(|reference| !reference.is_empty()) {
+        folder = join_relative(&folder, ref_folder?);
+        segments.push(format!("ref_{}", uri_component(&reference)));
+    }
+    Some(
+        segments
+            .iter()
+            .fold(folder, |path, segment| path.join(segment)),
+    )
+}
+
+/// `text` with each `%` and two hex digits decoded; `None` when the bytes
+/// are not UTF-8.
+fn percent_decoded(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
+    let mut decoded = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        let hex = bytes
+            .get(at + 1..at + 3)
+            .and_then(|hex| u8::from_str_radix(std::str::from_utf8(hex).ok()?, 16).ok());
+        match (bytes[at], hex) {
+            (b'%', Some(byte)) => {
+                decoded.push(byte);
+                at += 3;
+            }
+            (byte, _) => {
+                decoded.push(byte);
+                at += 1;
+            }
+        }
+    }
+    String::from_utf8(decoded).ok()
+}
+
+/// `text` encoded as JavaScript's `encodeURIComponent` encodes it.
+fn uri_component(text: &str) -> String {
+    let mut encoded = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-_.!~*'()".contains(&byte) {
+            encoded.push(byte as char);
+        } else {
+            encoded.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    encoded
 }
 
 impl ListPlugins for JsonPluginList {
@@ -2953,6 +3312,10 @@ impl JsonPluginList {
                     project: None,
                     version: text_of(item, self.version.as_ref()),
                     not_listed: None,
+                    listed_in: self
+                        .marketplaces
+                        .as_ref()
+                        .and_then(|marketplaces| marketplaces.listed_in(item, &base)),
                 })
             })
             .collect())

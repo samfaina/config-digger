@@ -1645,6 +1645,409 @@ fn a_plugin_vs_code_installed_from_a_marketplace_is_read_where_installed_json_sa
     );
 }
 
+/// VS Code's clone of the probe's marketplace,
+/// `https://cd-throwaway.invalid/cd-throwaway/market.git`.
+fn market_clone() -> PathBuf {
+    Path::new(HOME).join(r".vscode\agent-plugins\cd-throwaway.invalid\cd-throwaway\market")
+}
+
+/// A plugin of the probe's marketplace: its folder below the clone, its
+/// item in `installed.json` and its files.
+struct MarketPlugin {
+    folder: String,
+    item: Value,
+    files: Vec<(String, String)>,
+}
+
+impl MarketPlugin {
+    /// The plugin in `plugins\<tag>` whose item names it `cd-throwaway-<tag>`,
+    /// with a `plugin.json` naming it `manifest`, a `.mcp.json` with the
+    /// server `cd-throwaway-<tag>-dot` and the skill `cd-throwaway-<tag>-sk`.
+    fn new(tag: &str, manifest: &str) -> Self {
+        let folder = format!("plugins/{tag}");
+        MarketPlugin {
+            item: serde_json::json!({
+                "pluginUri": format!("file:///c%3A/Users/fixture/.vscode/agent-plugins/cd-throwaway.invalid/cd-throwaway/market/{folder}"),
+                "marketplace": "https://cd-throwaway.invalid/cd-throwaway/market.git",
+                "name": format!("cd-throwaway-{tag}"),
+            }),
+            folder,
+            files: vec![
+                (
+                    "plugin.json".to_owned(),
+                    format!(r#"{{ "name": "{manifest}" }}"#),
+                ),
+                (
+                    ".mcp.json".to_owned(),
+                    format!(
+                        r#"{{ "mcpServers": {{ "cd-throwaway-{tag}-dot": {{ "command": "x" }} }} }}"#
+                    ),
+                ),
+                (
+                    format!("skills/cd-throwaway-{tag}-sk/SKILL.md"),
+                    "---\ndescription: probe\n---\n".to_owned(),
+                ),
+            ],
+        }
+    }
+
+    /// The same plugin, its item without `field`.
+    fn without(mut self, field: &str) -> Self {
+        self.item.as_object_mut().unwrap().remove(field);
+        self
+    }
+}
+
+/// `fs` with `installed.json` listing only `plugins`, in VS Code's clone of
+/// the probe's marketplace, whose root holds the files `lists`, each a path
+/// and its text.
+fn with_market(
+    fs: FakeFileSystem,
+    lists: &[(&str, &str)],
+    plugins: &[MarketPlugin],
+) -> FakeFileSystem {
+    let installed: Vec<&Value> = plugins.iter().map(|plugin| &plugin.item).collect();
+    let listed = serde_json::json!({ "version": 1, "installed": installed });
+    let fs = fs.with_file(installed_json(), listed.to_string());
+    let fs = lists.iter().fold(fs, |fs, (file, text)| {
+        fs.with_file(market_clone().join(file), *text)
+    });
+    plugins.iter().fold(fs, |fs, plugin| {
+        let folder = market_clone().join(&plugin.folder);
+        plugin.files.iter().fold(fs, |fs, (file, text)| {
+            fs.with_file(folder.join(file), text.as_str())
+        })
+    })
+}
+
+/// A marketplace list of `entries`, each a name and a source.
+fn market_list(entries: &[(&str, &str)]) -> String {
+    let plugins: Vec<Value> = entries
+        .iter()
+        .map(|(name, source)| serde_json::json!({ "name": name, "source": source }))
+        .collect();
+    serde_json::json!({ "name": "cd-throwaway-market", "plugins": plugins }).to_string()
+}
+
+/// The name of the plugin of each of the server `cd-throwaway-<tag>-dot`
+/// and the skill `cd-throwaway-<tag>-sk`, and the State of each.
+fn listed_plugin(inventory: &Inventory, tag: &str) -> [(String, String); 2] {
+    [
+        item(inventory, &format!("cd-throwaway-{tag}-dot")),
+        skill(inventory, &format!("cd-throwaway-{tag}-sk")),
+    ]
+    .map(|item| {
+        let entry = &item.entries[0];
+        (
+            entry.plugin.as_ref().unwrap().name.clone(),
+            code(entry.state),
+        )
+    })
+}
+
+#[test]
+fn a_plugin_its_marketplace_lists_is_named_by_its_entry_in_the_list_not_by_its_manifest() {
+    // The probe's `broken-manifest` launch: `cd-throwaway-listed`, whose
+    // `plugin.json` names it `cd-throwaway-listed-manifest`.
+    let list = market_list(&[("cd-throwaway-listed", "./plugins/listed")]);
+    let fs = with_market(
+        with_home(vscode()),
+        &[(".github/plugin/marketplace.json", &list)],
+        &[MarketPlugin::new("listed", "cd-throwaway-listed-manifest")],
+    );
+
+    let effective = ("cd-throwaway-listed".to_owned(), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory(&fs), "listed"),
+        [effective.clone(), effective]
+    );
+}
+
+#[test]
+fn a_plugin_its_marketplace_s_list_leaves_out_fails_to_load_and_keeps_its_manifest_s_name() {
+    // The probe's `unlisted`: its item names it `cd-throwaway-unlisted`,
+    // which no entry of the list does.
+    let list = market_list(&[("cd-throwaway-listed", "./plugins/listed")]);
+    let fs = with_market(
+        with_home(vscode()),
+        &[(".github/plugin/marketplace.json", &list)],
+        &[
+            MarketPlugin::new("listed", "cd-throwaway-listed-manifest"),
+            MarketPlugin::new("unlisted", "cd-throwaway-unlisted-manifest"),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    let invalid = (
+        "cd-throwaway-unlisted-manifest".to_owned(),
+        "invalid".to_owned(),
+    );
+    assert_eq!(
+        listed_plugin(&inventory, "unlisted"),
+        [invalid.clone(), invalid]
+    );
+    let sentence = format!(
+        "Invalid: VS Code does not load the plugin `cd-throwaway-unlisted-manifest`, since the manifest of its marketplace `https://cd-throwaway.invalid/cd-throwaway/market.git`, {}, does not list it.",
+        market_clone()
+            .join(r".github\plugin\marketplace.json")
+            .display()
+    );
+    for item in [
+        item(&inventory, "cd-throwaway-unlisted-dot"),
+        skill(&inventory, "cd-throwaway-unlisted-sk"),
+    ] {
+        let reason = item.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "plugin_failed_to_load");
+        assert_eq!(reason.sentence, sentence);
+    }
+    // The plugin the list names loads.
+    let effective = ("cd-throwaway-listed".to_owned(), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory, "listed"),
+        [effective.clone(), effective]
+    );
+}
+
+#[test]
+fn an_item_with_no_name_is_matched_by_the_folder_its_entry_s_source_names() {
+    // The probe's `nameless`: its item has no `name`, and the list names its
+    // folder under another name than its manifest's. Each source is spelled
+    // as VS Code reads one: trimmed, with `\` read as `/`, below the list's
+    // `metadata.pluginRoot`, and a `..` stops at the clone's root.
+    let list = serde_json::json!({
+        "name": "cd-throwaway-market",
+        "metadata": { "pluginRoot": "plugins" },
+        "plugins": [
+            { "name": "cd-throwaway-other", "source": "./plugins/other" },
+            { "name": "cd-throwaway-nameless-entry", "source": " .\\nameless\\ " },
+            { "name": "cd-throwaway-rooted", "source": "plugins/rooted" },
+            { "name": "cd-throwaway-climbing", "source": "../../../plugins/climbing" },
+            { "name": "cd-throwaway-github", "source": { "source": "github", "repo": "cd-throwaway/elsewhere" } },
+        ],
+    })
+    .to_string();
+    let fs = with_market(
+        with_home(vscode()),
+        &[("marketplace.json", &list)],
+        &[
+            MarketPlugin::new("nameless", "cd-throwaway-nameless-manifest").without("name"),
+            MarketPlugin::new("rooted", "cd-throwaway-rooted-manifest").without("name"),
+            MarketPlugin::new("climbing", "cd-throwaway-climbing-manifest").without("name"),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    for (tag, name) in [
+        ("nameless", "cd-throwaway-nameless-entry"),
+        ("rooted", "cd-throwaway-rooted"),
+        ("climbing", "cd-throwaway-climbing"),
+    ] {
+        let effective = (name.to_owned(), "effective".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory, tag),
+            [effective.clone(), effective],
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn an_item_is_matched_by_its_name_exactly_whatever_its_entry_s_source() {
+    // An entry of another case, or with spaces around the name, is no match;
+    // the one whose name is the item's is, though its source names another
+    // folder or a plugin elsewhere.
+    let list = serde_json::json!({
+        "plugins": [
+            { "name": "CD-THROWAWAY-EXACT", "source": "./plugins/exact" },
+            { "name": " cd-throwaway-exact ", "source": "./plugins/exact" },
+            { "name": "cd-throwaway-exact", "source": "./plugins/other" },
+            { "name": "cd-throwaway-github", "source": { "source": "github", "repo": "cd-throwaway/elsewhere" } },
+        ],
+    })
+    .to_string();
+    let fs = with_market(
+        with_home(vscode()),
+        &[("marketplace.json", &list)],
+        &[
+            MarketPlugin::new("exact", "cd-throwaway-exact-manifest"),
+            MarketPlugin::new("github", "cd-throwaway-github-manifest"),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    for tag in ["exact", "github"] {
+        let effective = (format!("cd-throwaway-{tag}"), "effective".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory, tag),
+            [effective.clone(), effective],
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn the_list_is_the_first_file_in_vs_code_s_order_whose_plugins_is_a_list() {
+    let naming = market_list(&[("cd-throwaway-ordered", "./plugins/ordered")]);
+    let other = market_list(&[("cd-throwaway-other", "./plugins/other")]);
+    // VS Code reads each file as JSONC, around its errors.
+    let commented = "{\n  // The probe's list.\n  \"plugins\": [{ \"name\": \"cd-throwaway-ordered\", \"source\": \"./plugins/ordered\", },],\n}";
+    let broken = r#"{ "plugins": [{ "name": "cd-throwaway-ordered", "source": "./plugins/ordered" }],, "owner": {} }"#;
+    for (case, lists) in [
+        (
+            "the root's first",
+            vec![
+                ("marketplace.json", naming.as_str()),
+                (".plugin/marketplace.json", other.as_str()),
+            ],
+        ),
+        (
+            "then .plugin",
+            vec![
+                (".plugin/marketplace.json", naming.as_str()),
+                (".github/plugin/marketplace.json", other.as_str()),
+            ],
+        ),
+        (
+            "then .github/plugin",
+            vec![
+                (".github/plugin/marketplace.json", naming.as_str()),
+                (".claude-plugin/marketplace.json", other.as_str()),
+            ],
+        ),
+        (
+            "then .claude-plugin",
+            vec![(".claude-plugin/marketplace.json", naming.as_str())],
+        ),
+        (
+            "past files whose plugins is no list",
+            vec![
+                (
+                    "marketplace.json",
+                    r#"{ "plugins": { "cd-throwaway-other": {} } }"#,
+                ),
+                (
+                    ".plugin/marketplace.json",
+                    r#"{ "name": "cd-throwaway-market" }"#,
+                ),
+                (".github/plugin/marketplace.json", "[]"),
+                (".claude-plugin/marketplace.json", naming.as_str()),
+            ],
+        ),
+        (
+            "with comments and trailing commas",
+            vec![
+                ("marketplace.json", commented),
+                (".plugin/marketplace.json", other.as_str()),
+            ],
+        ),
+        (
+            "around its error",
+            vec![
+                ("marketplace.json", broken),
+                (".plugin/marketplace.json", other.as_str()),
+            ],
+        ),
+    ] {
+        let fs = with_market(
+            with_home(vscode()),
+            &lists,
+            &[MarketPlugin::new(
+                "ordered",
+                "cd-throwaway-ordered-manifest",
+            )],
+        );
+
+        let effective = ("cd-throwaway-ordered".to_owned(), "effective".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory(&fs), "ordered"),
+            [effective.clone(), effective],
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn a_list_left_with_no_entry_that_counts_is_no_list_and_the_manifest_names_the_plugin() {
+    // The first list is the one read, though a later file would name the
+    // plugin otherwise, or leave it out.
+    let other = market_list(&[("cd-throwaway-other", "./plugins/other")]);
+    let unusable = serde_json::json!({
+        "plugins": [
+            { "source": "./plugins/bare" },
+            { "name": "", "source": "./plugins/bare" },
+            { "name": 3, "source": "./plugins/bare" },
+            { "name": "cd-throwaway-number", "source": 42 },
+            { "name": "cd-throwaway-svn", "source": { "source": "svn", "url": "svn://x" } },
+            { "name": "cd-throwaway-kindless", "source": { "repo": "cd-throwaway/elsewhere" } },
+            "cd-throwaway-bare",
+        ],
+    })
+    .to_string();
+    for (case, list) in [
+        ("empty", r#"{ "plugins": [] }"#),
+        ("unusable", unusable.as_str()),
+    ] {
+        let fs = with_market(
+            with_home(vscode()),
+            &[
+                ("marketplace.json", list),
+                (".github/plugin/marketplace.json", other.as_str()),
+            ],
+            &[MarketPlugin::new("bare", "cd-throwaway-bare-manifest")],
+        );
+
+        let effective = (
+            "cd-throwaway-bare-manifest".to_owned(),
+            "effective".to_owned(),
+        );
+        assert_eq!(
+            listed_plugin(&inventory(&fs), "bare"),
+            [effective.clone(), effective],
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn a_marketplace_whose_url_names_a_ref_is_read_in_its_clone_of_that_ref() {
+    // VS Code clones `market.git#v1/beta` into
+    // `.marketplace-repositories\<host>\<owner>\market\ref_v1%2Fbeta`, its
+    // host lowercased and its ref URI-encoded, and reads the list there,
+    // not in the clone without a ref, which lists the plugin otherwise.
+    let clone = Path::new(HOME).join(
+        r".vscode\agent-plugins\.marketplace-repositories\cd-throwaway.invalid\cd-throwaway\market\ref_v1%2Fbeta",
+    );
+    let mut plugin = MarketPlugin::new("pinned", "cd-throwaway-pinned-manifest");
+    plugin.item["marketplace"] =
+        "https://CD-Throwaway.invalid/cd-throwaway/market.git#v1/beta".into();
+    plugin.item["pluginUri"] =
+        "file:///c%3A/Users/fixture/.vscode/agent-plugins/.marketplace-repositories/cd-throwaway.invalid/cd-throwaway/market/ref_v1%252Fbeta/plugins/pinned".into();
+    let fs = plugin.files.iter().fold(
+        with_market(
+            with_home(vscode()),
+            &[(
+                "marketplace.json",
+                &market_list(&[("cd-throwaway-other", "./plugins/pinned")]),
+            )],
+            &[],
+        ),
+        |fs, (file, text)| fs.with_file(clone.join(r"plugins\pinned").join(file), text.as_str()),
+    );
+    let installed = serde_json::json!({ "version": 1, "installed": [plugin.item] });
+    let fs = fs
+        .with_file(installed_json(), installed.to_string())
+        .with_file(
+            clone.join("marketplace.json"),
+            market_list(&[("cd-throwaway-pinned", "./plugins/pinned")]),
+        );
+
+    let effective = ("cd-throwaway-pinned".to_owned(), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory(&fs), "pinned"),
+        [effective.clone(), effective]
+    );
+}
+
 /// The default profile's server Entries of agent plugins in `inventory`,
 /// each `<name> <state> <file name>`, sorted.
 fn plugin_server_states(inventory: &Inventory) -> Vec<String> {

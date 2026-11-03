@@ -111,8 +111,9 @@ workspace_files = true
 # folder's path below this one, `relativePath` [test]. A folder directly
 # here that `installed.json` does not list is not read [test]. A plugin's
 # id is its folder below this one, so two marketplaces' plugins of one
-# name stay apart. A plugin is named by its manifest's `name`, or else by
-# its folder (`folder_fallback`). Its manifest is the one its servers come
+# name stay apart. A plugin of a marketplace with no list is named by its
+# manifest's `name`, or else by its folder (`folder_fallback`), whatever
+# its item says [test]. Its manifest is the one its servers come
 # from (see `plugin-manifest-mcp`): the first that exists of
 # `.plugin\plugin.json`, `.claude-plugin\plugin.json` and `plugin.json`
 # [test], then `.github\plugin\plugin.json`, which only VS Code 1.143.1
@@ -122,16 +123,41 @@ workspace_files = true
 # plugin whose `.claude-plugin\plugin.json` does not parse is named by the
 # `name` before the error, though its `plugin.json` parses, and one whose
 # `plugin.json` does not parse by its `.claude-plugin\plugin.json` [test].
-# So each place is read as `jsonc`, around its errors. VS Code names a
-# plugin a marketplace lists by its name in that list, which its item in
-# `installed.json` matches, not by its manifest's `name` [test];
-# config-digger reads the manifest (see `release-gate.md`). VS Code uninstalls one in the Extensions view.
+# So each place is read as `jsonc`, around its errors.
+#
+# A plugin its marketplace's list names is named by its entry there, never
+# by its manifest (`marketplaces`) [test]. VS Code reads the list in its
+# clone of the marketplace, which it places from the item's `marketplace`
+# URL: `<host>\<owner>\<repo>`, or, for a URL whose fragment names a ref,
+# `.marketplace-repositories\<host>\<owner>\<repo>\ref_<ref>` [binary].
+# The list is the first of `marketplace.json`, `.plugin\marketplace.json`,
+# `.github\plugin\marketplace.json` and `.claude-plugin\marketplace.json`
+# at the clone's root whose `plugins` holds a list, each read with VS
+# Code's JSONC parser, around its errors [binary]. An entry counts when its
+# `name` is a non-empty string and its `source` names a plugin: a path
+# below the clone's root, within the list's `metadata.pluginRoot`, the
+# root itself when it has no `source`, or an object of a known kind, a
+# plugin elsewhere [binary]; VS Code also skips an object missing a field
+# its kind needs, which config-digger counts. An item matches the entry
+# whose `name` is its own, exactly, whatever its source [test], or, with
+# no `name`, the entry whose source is its folder [test]. A plugin whose
+# marketplace has a list it matches no entry of is not loaded, with no log
+# line [test]: every Entry of it is Invalid, the plugin named from its
+# manifests. A list with no entry that counts is no list [binary]. VS Code
+# 1.129.1 and 1.135.0 read the manifest of a plugin of a marketplace with
+# no list at the clone's root, and skip the plugin when that manifest's
+# name is not its item's [test]; this definition follows 1.141.0 and
+# later. config-digger reads no list for a marketplace named by the
+# `owner/repo` shorthand, whose list VS Code fetches from GitHub, or by
+# `git@<host>:<path>.git`.
+#
+# VS Code uninstalls a plugin in the Extensions view.
 # `chat.pluginLocations` in the user's settings adds plugins by their path
 # [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
 unverified = "A manifest whose error leaves no `name` before or after it is taken to pass the name on to the next manifest, as one with no `name` does; in VS Code's code, the plugin is then named by its marketplace when what parses is an object, and by the next manifest when it is not. A probe check of a manifest broken before its `name` would test it."
-registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true }
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true, marketplaces = { field = "marketplace", clone = "git-url", ref_folder = ".marketplace-repositories", item_name = "name", files = ["marketplace.json", ".plugin/marketplace.json", ".github/plugin/marketplace.json", ".claude-plugin/marketplace.json"], dialect = "jsonc", reads_around_error = true, plugins = ["plugins"], name = "name", source = "source", plugin_root = ["metadata", "pluginRoot"], source_objects = { kind = "source", kinds = ["github", "url", "git-subdir", "npm", "pip"] } } }
 name = [
   { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
   { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
@@ -522,7 +548,7 @@ sources = [
 # `settings.json` is read all the same.
 [items.mcp]
 precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
-checks = ["rules", "disable", "precedence", "trust", "approval"]
+checks = ["rules", "disable", "plugin-load", "precedence", "trust", "approval"]
 
 [items.mcp.competition]
 block = "case-insensitive-name"
@@ -814,7 +840,7 @@ on_read_failure = "ignores_file"
 unverified = "VS Code is taken to keep `disable-model-invocation: true`, quoted or not, from a frontmatter that is not YAML or never closes too, to read the first of a key given twice, and to take an empty `description` for none, as its code says; a probe check of such skills in `chat.getSkills` would test it."
 precedence = ["folder-agents-skills", "folder-github-skills", "folder-claude-skills", "user-agents-skills", "user-copilot-skills", "user-claude-skills", "plugin-skills", "extension-skills"]
 competition = { block = "exact-name" }
-checks = ["frontmatter", "rules", "disable", "precedence"]
+checks = ["frontmatter", "rules", "disable", "plugin-load", "precedence"]
 
 # VS Code has no switch that keeps a skill from its model. The profile's
 # `chat.disabledPromptFiles.skill` is the JSON text of a list of the URIs of

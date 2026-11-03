@@ -7,12 +7,12 @@ use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
-    Locate, Locator, LookUp, Malformed, ManifestCause, ManifestFailure, ManifestSkills, McpbCache,
-    NAME_KEY, NameFrom, NameRuleOn, NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError,
-    PluginCache, PluginFolders, PluginList, PluginPlace, PluginRecord, PluginRegistry,
-    ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
-    SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList, Spelling, StoreClass,
-    Unlisted, is_entry_key,
+    ListedIn, ListedMarketplaces, Locate, Locator, LookUp, Malformed, ManifestCause,
+    ManifestFailure, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn, NonceHash,
+    NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList, PluginPlace,
+    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
+    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList,
+    Spelling, StoreClass, Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -4145,6 +4145,20 @@ impl Scanner<'_> {
                 Some(Err(failure)) => (folder, Some(failure)),
                 None => (folder, None),
             };
+            // A plugin its marketplace's list names is named by its entry;
+            // one the list leaves out fails to load.
+            let listing = plugins
+                .registry
+                .listed_marketplaces()
+                .zip(record.listed_in.as_ref())
+                .and_then(|(marketplaces, listed_in)| {
+                    self.marketplace_listing(marketplaces, listed_in, &folder)
+                });
+            let (listed_name, manifest_failure) = match listing {
+                Some(Ok(name)) => (Some(name), manifest_failure),
+                Some(Err(failure)) => (None, Some(failure)),
+                None => (None, manifest_failure),
+            };
             let installed = record.installed.as_ref().map_or_else(
                 || folder.clone(),
                 |installed| paths::lexical(Path::new(installed)),
@@ -4158,7 +4172,7 @@ impl Scanner<'_> {
                 None => None,
             };
             let names = plugins.name.iter().flat_map(PluginNames::places);
-            let named = record.name.clone().or_else(|| {
+            let named = listed_name.or_else(|| record.name.clone()).or_else(|| {
                 names.into_iter().find_map(|name| {
                     let document = self.plugin_json(
                         &folder,
@@ -4482,6 +4496,53 @@ impl Scanner<'_> {
         }
     }
 
+    /// The name the list of the marketplace `listed_in` gives the plugin in
+    /// `folder`, or, when the marketplace has a list that names it in no
+    /// entry, what keeps the Agent from loading it; `None` when the
+    /// marketplace has no list. A file read here is no Read failure.
+    fn marketplace_listing(
+        &mut self,
+        marketplaces: &ListedMarketplaces,
+        listed_in: &ListedIn,
+        folder: &Path,
+    ) -> Option<Result<String, ManifestFailure>> {
+        let format = marketplaces.format();
+        let (list, entries) = marketplaces.files.iter().find_map(|file| {
+            let path = blocks::join_relative(&listed_in.clone, file);
+            let text = self.reader.peek(&path).ok()??;
+            let document = if marketplaces.reads_around_error {
+                format.kept_around_error(text)
+            } else {
+                format.parse(text).ok()
+            }?;
+            Some((path, marketplaces.entries(&document, &listed_in.clone)?))
+        })?;
+        if entries.is_empty() {
+            tracing::debug!(path = %list.display(), "the marketplace list has no entry that counts");
+            return None;
+        }
+        let matched = match &listed_in.name {
+            Some(name) => entries.iter().find(|entry| entry.name == *name),
+            None => entries.iter().find(|entry| {
+                entry
+                    .folder
+                    .as_deref()
+                    .is_some_and(|listed| paths::lexical_key(listed) == paths::lexical_key(folder))
+            }),
+        };
+        match matched {
+            Some(entry) => Some(Ok(entry.name.clone())),
+            None => {
+                tracing::debug!(path = %list.display(), plugin = %folder.display(), "the marketplace list does not name the plugin");
+                Some(Err(ManifestFailure {
+                    marketplace: listed_in.marketplace.clone(),
+                    manifest: list,
+                    cause: ManifestCause::DoesNotList,
+                }))
+            }
+        }
+    }
+
     /// A record for each plugin the Project folder `folder`, whose key is
     /// `project`, installs that is in the cache, in the file's order,
     /// applying in that Project. Of several complete versions, the last by
@@ -4552,6 +4613,7 @@ impl Scanner<'_> {
                         .file_name()
                         .map(|name| name.to_string_lossy().into_owned()),
                     not_listed: None,
+                    listed_in: None,
                 })
             })
             .collect()
@@ -4642,6 +4704,7 @@ impl Scanner<'_> {
                     scope: None,
                     project: None,
                     not_listed,
+                    listed_in: None,
                 });
             }
         }
@@ -4694,6 +4757,7 @@ impl Scanner<'_> {
                 project: None,
                 version: None,
                 not_listed: None,
+                listed_in: None,
             })
             .collect()
     }
@@ -4754,6 +4818,7 @@ impl Scanner<'_> {
                     project: None,
                     version: Some(version),
                     not_listed: None,
+                    listed_in: None,
                 });
             }
         }
