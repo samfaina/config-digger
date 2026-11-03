@@ -4059,14 +4059,10 @@ impl Scanner<'_> {
             let Some(anchor) = location.anchor.plugin() else {
                 continue;
             };
-            if definition.read_first(location) {
+            if definition.is_read_first(location) {
                 continue;
             }
-            let first = location
-                .references
-                .as_ref()
-                .and_then(|references| references.first.as_deref())
-                .map(|first| definition.location(first));
+            let first = location.first().map(|first| definition.location(first));
             for plugin in plugins
                 .iter()
                 .filter(|plugin| anchor.plugins.names(&plugin.plugins))
@@ -5027,8 +5023,8 @@ impl Scanner<'_> {
     /// Adds the Entries of one location in the folder of `plugin`, each
     /// named as the location says and part of the plugin. With references,
     /// the value at its root can also point to other files of the plugin,
-    /// whose Entries are read from there. Whether what it read takes the
-    /// place of the file of its references' `first` location.
+    /// whose Entries are read from there. Returns whether what it read
+    /// takes the place of the file of its references' `first` location.
     fn read_plugin_location(
         &mut self,
         home: &FoundHome,
@@ -5221,8 +5217,8 @@ impl Scanner<'_> {
     /// Adds the Entries at the root of the file `path` of `plugin`: an
     /// object of Entries, a path to another file of the plugin holding
     /// them, or a list of either; or else those of the references' default
-    /// file, when the root declares none the Agent reads. Whether the root
-    /// takes the place of the references' `first` location's file.
+    /// file, when the root declares none the Agent reads. Returns whether
+    /// the root takes the place of the references' `first` location's file.
     fn read_references(
         &mut self,
         home: &FoundHome,
@@ -5248,7 +5244,7 @@ impl Scanner<'_> {
         let declared = document
             .as_ref()
             .and_then(|document| lookup(document, &location.root))
-            .filter(|value| !references.ignores(value) && !references.skips(value));
+            .filter(|value| !references.ignores(value));
         let declared = references.declared(declared.or(default.as_ref()));
         for (below, value) in declared.values {
             let mut key_path = location.root.clone();
@@ -5293,7 +5289,7 @@ impl Scanner<'_> {
                 }
                 DeclaredValue::Entries(entries) => {
                     let entries = entries
-                        .iter()
+                        .into_iter()
                         .map(|(key, value)| FoundEntry {
                             key: key.clone(),
                             name: key.clone(),

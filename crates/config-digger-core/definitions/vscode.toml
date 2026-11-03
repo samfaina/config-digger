@@ -343,9 +343,8 @@ risks = ["agent_may_drop_entries"]
 # its manifest [test], unless the manifest's `mcpServers` takes its place,
 # and in the files that `mcpServers` names: `plugin-manifest-mcp` reads it,
 # and reads this location first, through its `references`, in the plugins
-# whose `mcpServers` leaves it read. VS Code reads a
-# `.mcp.json` it cannot parse around the error, and starts the servers it
-# finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
+# whose `mcpServers` leaves it read. VS Code reads a `.mcp.json` it cannot
+# parse around the error, and starts the servers it finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
 # around `,,`, a missing comma, a key with no value, which drops that key,
 # an object left open at the end of the file, and a string left open in a
 # server, which takes the next server into it [test].
@@ -385,7 +384,8 @@ on_read_failure = "reads_around_error"
 # - An object with a `paths` key names files: when `paths` holds a list,
 #   each of its strings, read after the `.mcp.json`, or without it when
 #   `exclusive` holds `true` [test]; when it holds anything else, no file,
-#   the `.mcp.json` read alone [test]. Neither key is a server.
+#   the `.mcp.json` read alone [test]. Neither key is a server, nor is
+#   `exclusive` beside inline servers, which VS Code skips [binary].
 # - A string names a file read after the `.mcp.json` [test].
 # - A list's strings name files read after the `.mcp.json`, and its
 #   objects are skipped, with no error [test], as are its other items

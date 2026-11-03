@@ -1904,17 +1904,13 @@ fn an_inline_object_takes_the_place_of_the_plugin_s_mcp_json_whatever_its_server
             "url",
             r#"{ "cd-throwaway-url-object": { "url": "http://127.0.0.1:9/" } }"#,
         ),
-        ("empty", "{}"),
     ];
     for (tag, inline) in cases {
         let (servers, failures) = manifest_servers(tag, inline);
 
-        let dot = servers.iter().any(|server| server.ends_with(".mcp.json"));
-        assert!(!dot, "{tag}: {servers:?}");
-        let listed = format!("cd-throwaway-{tag}-object ");
-        assert_eq!(
-            servers.iter().any(|server| server.starts_with(&listed)),
-            tag != "empty",
+        assert_eq!(servers.len(), 1, "{tag}: {servers:?}");
+        assert!(
+            servers[0].starts_with(&format!("cd-throwaway-{tag}-object ")),
             "{tag}: {servers:?}"
         );
         assert_eq!(failures, Vec::<PathBuf>::new(), "{tag}");
@@ -1922,13 +1918,31 @@ fn an_inline_object_takes_the_place_of_the_plugin_s_mcp_json_whatever_its_server
 }
 
 #[test]
+fn an_empty_inline_object_leaves_the_plugin_with_no_server() {
+    let (servers, failures) = manifest_servers("empty", "{}");
+
+    assert_eq!(servers, Vec::<String>::new());
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn exclusive_beside_inline_servers_is_no_server() {
+    let inline = r#"{ "exclusive": true, "cd-throwaway-alone-object": { "command": "x" } }"#;
+
+    let (servers, failures) = manifest_servers("alone", inline);
+
+    assert_eq!(servers, ["cd-throwaway-alone-object effective plugin.json"]);
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
 fn a_manifest_s_paths_are_trimmed_and_an_empty_one_names_no_file() {
     // The first is the probe's `trimmed` plugin.
     let both = [
-        "cd-throwaway-trim-dot effective .mcp.json",
-        "cd-throwaway-trim-file effective servers.json",
+        "cd-throwaway-trimmed-dot effective .mcp.json",
+        "cd-throwaway-trimmed-file effective servers.json",
     ];
-    let dot = ["cd-throwaway-trim-dot effective .mcp.json"];
+    let dot = ["cd-throwaway-trimmed-dot effective .mcp.json"];
     let cases: [(&str, &[&str]); 6] = [
         (r#"" ./servers.json ""#, &both),
         (r#""""#, &dot),
@@ -1938,7 +1952,7 @@ fn a_manifest_s_paths_are_trimmed_and_an_empty_one_names_no_file() {
         (r#"{ "paths": [ "" ], "exclusive": true }"#, &[]),
     ];
     for (value, expected) in cases {
-        let (servers, failures) = manifest_servers("trim", value);
+        let (servers, failures) = manifest_servers("trimmed", value);
 
         assert_eq!(servers, expected, "{value}");
         assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");

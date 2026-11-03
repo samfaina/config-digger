@@ -1107,7 +1107,9 @@ pub(crate) struct LocationDefinition {
     /// an object of Entries: a path, relative to the plugin's folder, of
     /// another file in the location's format, or a list of such paths and
     /// objects of Entries, such as a Claude Code plugin manifest's
-    /// `mcpServers`.
+    /// `mcpServers`; and, as its fields say, an object of paths, and
+    /// another location's file read with them unless the value takes its
+    /// place.
     pub references: Option<References>,
     /// How the Agent writes the folder of an Entry's plugin in the values
     /// of a location in plugins, such as Claude Code's
@@ -1155,9 +1157,10 @@ pub(crate) struct References {
     /// reads before the files the value at the root names, and which an
     /// object of Entries there takes the place of, as a VS Code plugin
     /// manifest's inline `mcpServers` takes the place of its `.mcp.json`.
-    /// That location is read only through this one, after it, in each
-    /// plugin; it is read whatever the file of this one holds, unless that
-    /// takes its place.
+    /// config-digger reads that location only through this one, after it,
+    /// in each plugin, the item kind's precedence ranking the two; it is
+    /// read whatever the file of this one holds, unless that takes its
+    /// place.
     pub first: Option<String>,
     /// Whether the Agent skips, with no Read failure, every value it does
     /// not read: a list's items other than paths, objects of Entries
@@ -1203,8 +1206,8 @@ pub(crate) struct Declared<'v> {
 pub(crate) enum DeclaredValue<'v> {
     /// A path to another file, relative to the plugin's folder.
     Path(&'v str),
-    /// An object of Entries.
-    Entries(&'v serde_json::Map<String, serde_json::Value>),
+    /// An object of Entries, each key and its value.
+    Entries(Vec<(&'v String, &'v serde_json::Value)>),
     /// Any other value, which the Agent fails to read.
     Other(&'v serde_json::Value),
 }
@@ -1213,25 +1216,13 @@ impl<'v> DeclaredValue<'v> {
     fn of(value: &'v serde_json::Value) -> Self {
         match value {
             serde_json::Value::String(path) => DeclaredValue::Path(path),
-            serde_json::Value::Object(entries) => DeclaredValue::Entries(entries),
+            serde_json::Value::Object(entries) => DeclaredValue::Entries(entries.iter().collect()),
             other => DeclaredValue::Other(other),
         }
     }
 }
 
 impl References {
-    /// Whether the Agent skips `value`, the value at the location's root,
-    /// with no Read failure, as if it declared nothing there.
-    pub fn skips(&self, value: &serde_json::Value) -> bool {
-        self.skips_other_values
-            && !matches!(
-                value,
-                serde_json::Value::Object(_)
-                    | serde_json::Value::String(_)
-                    | serde_json::Value::Array(_)
-            )
-    }
-
     /// What `value`, the value at the location's root the Agent reads, if
     /// any, declares.
     pub fn declared<'v>(&self, value: Option<&'v serde_json::Value>) -> Declared<'v> {
@@ -1274,6 +1265,15 @@ impl References {
                 replaces_first: self.first.is_some() && value.is_object(),
             },
         };
+        // The keys of a paths object are never Entries, `exclusive` beside
+        // inline Entries included.
+        if let Some(form) = &self.paths_object {
+            for (_, value) in &mut declared.values {
+                if let DeclaredValue::Entries(entries) = value {
+                    entries.retain(|(key, _)| Some(*key) != form.exclusive.as_ref());
+                }
+            }
+        }
         if self.trims {
             declared.values.retain_mut(|(_, value)| match value {
                 DeclaredValue::Path(path) => {
@@ -1287,14 +1287,20 @@ impl References {
     }
 
     /// Whether the Agent ignores `value`, the value at the location's
-    /// root, as if it declared nothing there.
+    /// root, as if it declared nothing there: for `dot_slash`, any value
+    /// but an object or a path starting with `./`; for
+    /// `skips_other_values`, any value but an object, a path or a list.
     pub fn ignores(&self, value: &serde_json::Value) -> bool {
-        self.dot_slash
+        use serde_json::Value;
+        let dot_slash = self.dot_slash
             && match value {
-                serde_json::Value::String(path) => !blocks::is_dot_slash_path(path),
-                serde_json::Value::Object(_) => false,
+                Value::String(path) => !blocks::is_dot_slash_path(path),
+                Value::Object(_) => false,
                 _ => true,
-            }
+            };
+        let skipped = self.skips_other_values
+            && !matches!(value, Value::Object(_) | Value::String(_) | Value::Array(_));
+        dot_slash || skipped
     }
 }
 
@@ -1483,6 +1489,11 @@ impl Validate for SecretFields {
 }
 
 impl LocationDefinition {
+    /// The id of the location its references read `first`, if any.
+    pub fn first(&self) -> Option<&str> {
+        self.references.as_ref()?.first.as_deref()
+    }
+
     /// Whether the Feature gate `gate` changes nothing of the location but
     /// whether its name rule applies.
     pub fn only_rules_names_by(&self, gate: &str) -> bool {
@@ -1778,7 +1789,9 @@ impl AgentDefinition {
             .expect("snapshot location ids come from this definition")
     }
 
-    /// Checks the location `references` name `first`, and what reads it.
+    /// Checks the `paths_object` of `references`, and the location they
+    /// name `first`: one location in the same plugins, of the same kind,
+    /// with no references, that no other location names `first`.
     fn validate_first(
         &self,
         location: &LocationDefinition,
@@ -1801,13 +1814,16 @@ impl AgentDefinition {
             }
             return Ok(());
         };
-        let plugins = location.anchor.plugin().map(|anchor| anchor.plugins.all());
+        fn plugins_of(location: &LocationDefinition) -> Option<&[String]> {
+            location.anchor.plugin().map(|anchor| anchor.plugins.all())
+        }
+        let plugins = plugins_of(location);
         let read = self.locations.iter().find(|other| {
             other.id == *first
                 && other.id != location.id
                 && other.references.is_none()
                 && other.kind == location.kind
-                && other.anchor.plugin().map(|anchor| anchor.plugins.all()) == plugins
+                && plugins_of(other) == plugins
         });
         if read.is_none() {
             return Err(format!(
@@ -1817,13 +1833,7 @@ impl AgentDefinition {
         let readers = self
             .locations
             .iter()
-            .filter(|other| {
-                other
-                    .references
-                    .as_ref()
-                    .and_then(|references| references.first.as_ref())
-                    == Some(first)
-            })
+            .filter(|other| other.first() == Some(first.as_str()))
             .count();
         if readers > 1 {
             return Err(format!("first `{first}` is read first by two locations"));
@@ -1833,14 +1843,10 @@ impl AgentDefinition {
 
     /// Whether `location` is read only through the references of another
     /// location that name it `first`.
-    pub fn read_first(&self, location: &LocationDefinition) -> bool {
-        self.locations.iter().any(|other| {
-            other
-                .references
-                .as_ref()
-                .and_then(|references| references.first.as_deref())
-                == Some(location.id.as_str())
-        })
+    pub fn is_read_first(&self, location: &LocationDefinition) -> bool {
+        self.locations
+            .iter()
+            .any(|other| other.first() == Some(location.id.as_str()))
     }
 
     fn validate(&self) -> Result<(), String> {

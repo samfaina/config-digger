@@ -2868,7 +2868,7 @@
           ]
         },
         "references": {
-          "description": "What the value at `root` of a location in plugins may hold besides\nan object of Entries: a path, relative to the plugin's folder, of\nanother file in the location's format, or a list of such paths and\nobjects of Entries, such as a Claude Code plugin manifest's\n`mcpServers`.",
+          "description": "What the value at `root` of a location in plugins may hold besides\nan object of Entries: a path, relative to the plugin's folder, of\nanother file in the location's format, or a list of such paths and\nobjects of Entries, such as a Claude Code plugin manifest's\n`mcpServers`; and, as its fields say, an object of paths, and\nanother location's file read with them unless the value takes its\nplace.",
           "anyOf": [
             {
               "$ref": "#/$defs/References"
@@ -4142,7 +4142,7 @@
           "default": false
         },
         "first": {
-          "description": "The id of another location in the same plugins whose file the Agent\nreads before the files the value at the root names, and which an\nobject of Entries there takes the place of, as a VS Code plugin\nmanifest's inline `mcpServers` takes the place of its `.mcp.json`.\nThat location is read only through this one, after it, in each\nplugin; it is read whatever the file of this one holds, unless that\ntakes its place.",
+          "description": "The id of another location in the same plugins whose file the Agent\nreads before the files the value at the root names, and which an\nobject of Entries there takes the place of, as a VS Code plugin\nmanifest's inline `mcpServers` takes the place of its `.mcp.json`.\nconfig-digger reads that location only through this one, after it,\nin each plugin, the item kind's precedence ranking the two; it is\nread whatever the file of this one holds, unless that takes its\nplace.",
           "type": [
             "string",
             "null"

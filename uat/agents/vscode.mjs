@@ -455,8 +455,8 @@ if (runs("plugins")) {
 // `mcpServers` (#512): `{"paths": [...]}` with `exclusive` and without,
 // `paths` that hold no list, an inline object whose only server VS Code
 // cannot launch, `type: "ws"`, one whose only server is an HTTP server with
-// no `type` at a closed port, a path with spaces around it, and a number. `tests/vscode.rs`
-// reads the same plugins.
+// no `type` at a closed port, a path with spaces around it, and a number.
+// `tests/vscode.rs` reads the same plugins.
 if (runs("manifests")) {
   const dir = fresh("manifests", base);
   const { plugins } = folders(dir);
