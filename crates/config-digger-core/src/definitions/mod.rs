@@ -6339,7 +6339,7 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
     /// A plugin list's marketplaces, `fields` replacing the fields they name.
     fn listed_marketplaces(fields: &[(&str, &str)]) -> String {
         let mut all = vec![
-            ("field", r#""marketplace""#),
+            ("item_marketplace", r#""marketplace""#),
             ("clone", r#""git-url""#),
             ("ref_folder", r#"".marketplace-repositories""#),
             ("item_name", r#""name""#),
@@ -6414,7 +6414,7 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
         }
         for (field, value, message) in [
             (
-                "field",
+                "item_marketplace",
                 r#""""#,
                 "a marketplace list field must not be empty",
             ),
@@ -6433,7 +6433,7 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
                 r#""""#,
                 "a marketplace list field must not be empty",
             ),
-            ("field", "", "missing field `field`"),
+            ("item_marketplace", "", "missing field `item_marketplace`"),
             ("files", "[]", "a marketplace list needs at least one file"),
             (
                 "files",
@@ -6441,20 +6441,16 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
                 "must be a relative path",
             ),
             ("ref_folder", r#""../clones""#, "must be a relative path"),
-            (
-                "plugins",
-                "[]",
-                "a marketplace list needs a key path, with no empty key",
-            ),
+            ("plugins", "[]", "key_path needs keys, none of them empty"),
             (
                 "plugins",
                 r#"["plugins", ""]"#,
-                "a marketplace list needs a key path, with no empty key",
+                "key_path needs keys, none of them empty",
             ),
             (
                 "plugin_root",
                 r#"["metadata", ""]"#,
-                "plugin_root must have no empty key",
+                "key_path needs keys, none of them empty",
             ),
             (
                 "source_objects",

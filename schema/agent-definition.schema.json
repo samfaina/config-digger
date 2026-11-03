@@ -2507,10 +2507,10 @@
       ]
     },
     "ListedMarketplaces": {
-      "description": "The marketplaces the items of a plugin list come from, as far as each\none's list names its plugins, such as the marketplaces VS Code installs\nagent plugins from. An item whose `field` names a marketplace sits in\nthe marketplace's clone, which `clone` places below the plugin list's\nfolder, and the first of `files` at the clone's root whose `plugins`\nkey path holds a list is the marketplace's list. Of its entries, those\nwhose `name` holds a non-empty string and whose `source` names a plugin\ncount. The entry an item matches names its plugin: the entry whose\n`name` is the item's `item_name`, exactly, whatever its source, or, for\nan item without one, the entry whose source is a path to the plugin's\nfolder. A plugin whose marketplace has a list that it matches no entry\nof fails to load. A marketplace with no list, no file holding one or a\nlist with no entry that counts, leaves its plugins named as their\n`[[plugins]]` says.",
+      "description": "The marketplaces the items of a plugin list come from, as far as each\none's list names its plugins, such as the marketplaces VS Code installs\nagent plugins from. An item whose `item_marketplace` names a\nmarketplace sits in its clone, which `clone` places below the plugin list's\nfolder, and the first of `files` at the clone's root whose `plugins`\nkey path holds a list is the marketplace's list. Of its entries, those\nwhose `name` holds a non-empty string and whose `source` names a plugin\ncount. The entry an item matches names its plugin: the entry whose\n`name` is the item's `item_name`, exactly, whatever its source, or, for\nan item without one, the entry whose source is a path to the plugin's\nfolder. A plugin whose marketplace has a list that it matches no entry\nof fails to load. A marketplace with no list, no file holding one or a\nlist with no entry that counts, leaves its plugins named as their\n`[[plugins]]` says.",
       "type": "object",
       "properties": {
-        "field": {
+        "item_marketplace": {
           "description": "The field of an item that names its marketplace.",
           "type": "string"
         },
@@ -2592,7 +2592,7 @@
       },
       "additionalProperties": false,
       "required": [
-        "field",
+        "item_marketplace",
         "clone",
         "item_name",
         "files",

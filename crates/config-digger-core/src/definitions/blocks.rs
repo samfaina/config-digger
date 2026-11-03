@@ -2653,9 +2653,10 @@ pub(crate) enum PluginPlace {
 /// A plugin the manifest of its marketplace keeps the Agent from loading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ManifestFailure {
-    /// The marketplace's name.
+    /// The marketplace, as the plugin's record names it: its name, or the
+    /// URL a plugin list's item gives.
     pub marketplace: String,
-    /// The marketplace's manifest.
+    /// The marketplace's manifest, or the file that holds its list.
     pub manifest: PathBuf,
     /// What keeps the manifest from listing the plugin.
     pub cause: ManifestCause,
@@ -2945,8 +2946,8 @@ impl Validate for JsonPluginList {
 
 /// The marketplaces the items of a plugin list come from, as far as each
 /// one's list names its plugins, such as the marketplaces VS Code installs
-/// agent plugins from. An item whose `field` names a marketplace sits in
-/// the marketplace's clone, which `clone` places below the plugin list's
+/// agent plugins from. An item whose `item_marketplace` names a
+/// marketplace sits in its clone, which `clone` places below the plugin list's
 /// folder, and the first of `files` at the clone's root whose `plugins`
 /// key path holds a list is the marketplace's list. Of its entries, those
 /// whose `name` holds a non-empty string and whose `source` names a plugin
@@ -2961,7 +2962,7 @@ impl Validate for JsonPluginList {
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListedMarketplaces {
     /// The field of an item that names its marketplace.
-    pub field: String,
+    pub item_marketplace: String,
     /// How that field places the marketplace's clone below the folder of
     /// the plugin list.
     pub clone: CloneSpelling,
@@ -3029,7 +3030,12 @@ pub(crate) enum CloneSpelling {
 
 impl Validate for ListedMarketplaces {
     fn validate(&self) -> Result<(), String> {
-        for field in [&self.field, &self.item_name, &self.name, &self.source] {
+        for field in [
+            &self.item_marketplace,
+            &self.item_name,
+            &self.name,
+            &self.source,
+        ] {
             if field.is_empty() {
                 return Err("a marketplace list field must not be empty".into());
             }
@@ -3040,11 +3046,9 @@ impl Validate for ListedMarketplaces {
         for file in self.files.iter().chain(&self.ref_folder) {
             validate_relative(file)?;
         }
-        if self.plugins.is_empty() || self.plugins.iter().any(String::is_empty) {
-            return Err("a marketplace list needs a key path, with no empty key".into());
-        }
-        if self.plugin_root.iter().any(String::is_empty) {
-            return Err("a marketplace list's plugin_root must have no empty key".into());
+        validate_key_path(&self.plugins)?;
+        if !self.plugin_root.is_empty() {
+            validate_key_path(&self.plugin_root)?;
         }
         if let Some(objects) = &self.source_objects
             && (objects.kind.is_empty()
@@ -3062,10 +3066,28 @@ impl Validate for ListedMarketplaces {
 pub(crate) struct ListedIn {
     /// The marketplace, as the item names it.
     pub marketplace: String,
-    /// The marketplace's clone.
-    pub clone: PathBuf,
+    /// The folder of the marketplace's clone.
+    pub clone_folder: PathBuf,
     /// The plugin's name in the marketplace's list, when the item gives one.
     pub name: Option<String>,
+}
+
+impl ListedIn {
+    /// The entry of `entries`, those of the marketplace's list that count,
+    /// that the item of the plugin in `folder` matches: the first whose
+    /// name is the item's, exactly, or, when the item gives none, the first
+    /// whose source is a path to `folder`.
+    pub fn matching<'e>(&self, entries: &'e [ListEntry], folder: &Path) -> Option<&'e ListEntry> {
+        match &self.name {
+            Some(name) => entries.iter().find(|entry| entry.name == *name),
+            None => entries.iter().find(|entry| {
+                entry
+                    .folder
+                    .as_deref()
+                    .is_some_and(|listed| paths::lexical_key(listed) == paths::lexical_key(folder))
+            }),
+        }
+    }
 }
 
 /// An entry of a marketplace's list that counts.
@@ -3081,8 +3103,8 @@ impl ListedMarketplaces {
     /// The marketplace `item` names, in a plugin list whose folder is
     /// `base`, when the clone of what it names can be placed.
     pub fn listed_in(&self, item: &Value, base: &Path) -> Option<ListedIn> {
-        let marketplace = item.get(&self.field)?.as_str()?;
-        let clone = match self.clone {
+        let marketplace = item.get(&self.item_marketplace)?.as_str()?;
+        let clone_folder = match self.clone {
             CloneSpelling::GitUrl => git_clone(marketplace, base, self.ref_folder.as_deref())?,
         };
         let name = item
@@ -3092,7 +3114,7 @@ impl ListedMarketplaces {
             .map(str::to_owned);
         Some(ListedIn {
             marketplace: marketplace.to_owned(),
-            clone,
+            clone_folder,
             name,
         })
     }
@@ -3129,14 +3151,9 @@ impl ListedMarketplaces {
                     let folder = match entry.get(&self.source) {
                         None | Some(Value::Null) => Some(listed_folder(clone, root, "")),
                         Some(Value::String(source)) => Some(listed_folder(clone, root, source)),
-                        Some(Value::Object(object)) => {
-                            let objects = self.source_objects.as_ref()?;
-                            let kind = object.get(&objects.kind)?.as_str()?;
-                            if !objects.kinds.iter().any(|known| known == kind) {
-                                return None;
-                            }
-                            None
-                        }
+                        // A plugin elsewhere, which has no folder in the clone.
+                        Some(Value::Object(object)) if self.names_elsewhere(object) => None,
+                        // An entry that does not count.
                         Some(_) => return None,
                     };
                     Some(ListEntry {
@@ -3146,6 +3163,19 @@ impl ListedMarketplaces {
                 })
                 .collect(),
         )
+    }
+}
+
+impl ListedMarketplaces {
+    /// Whether the object `source` an entry's source holds names a plugin
+    /// elsewhere, as `source_objects` says.
+    fn names_elsewhere(&self, source: &serde_json::Map<String, Value>) -> bool {
+        self.source_objects.as_ref().is_some_and(|objects| {
+            source
+                .get(&objects.kind)
+                .and_then(Value::as_str)
+                .is_some_and(|kind| objects.kinds.iter().any(|known| known == kind))
+        })
     }
 }
 
@@ -3203,7 +3233,7 @@ fn git_clone(url: &str, base: &Path, ref_folder: Option<&str>) -> Option<PathBuf
         return None;
     }
     let (rest, fragment) = match rest.split_once('#') {
-        Some((rest, fragment)) => (rest, Some(percent_decoded(fragment)?)),
+        Some((rest, fragment)) => (rest, Some(paths::percent_decoded(fragment)?)),
         None => (rest, None),
     };
     let rest = rest.split_once('?').map_or(rest, |(rest, _)| rest);
@@ -3212,7 +3242,7 @@ fn git_clone(url: &str, base: &Path, ref_folder: Option<&str>) -> Option<PathBuf
         return None;
     }
     let sanitized = |name: &str| name.replace(['\\', '/', ':', '*', '?', '"', '<', '>', '|'], "_");
-    let path = percent_decoded(path)?;
+    let path = paths::percent_decoded(path)?;
     let path = path.trim_matches('/');
     let path = match path.len().checked_sub(4) {
         Some(at) if path.is_char_boundary(at) && path[at..].eq_ignore_ascii_case(".git") => {
@@ -3236,30 +3266,6 @@ fn git_clone(url: &str, base: &Path, ref_folder: Option<&str>) -> Option<PathBuf
             .iter()
             .fold(folder, |path, segment| path.join(segment)),
     )
-}
-
-/// `text` with each `%` and two hex digits decoded; `None` when the bytes
-/// are not UTF-8.
-fn percent_decoded(text: &str) -> Option<String> {
-    let bytes = text.as_bytes();
-    let mut decoded = Vec::with_capacity(bytes.len());
-    let mut at = 0;
-    while at < bytes.len() {
-        let hex = bytes
-            .get(at + 1..at + 3)
-            .and_then(|hex| u8::from_str_radix(std::str::from_utf8(hex).ok()?, 16).ok());
-        match (bytes[at], hex) {
-            (b'%', Some(byte)) => {
-                decoded.push(byte);
-                at += 3;
-            }
-            (byte, _) => {
-                decoded.push(byte);
-                at += 1;
-            }
-        }
-    }
-    String::from_utf8(decoded).ok()
 }
 
 /// `text` encoded as JavaScript's `encodeURIComponent` encodes it.

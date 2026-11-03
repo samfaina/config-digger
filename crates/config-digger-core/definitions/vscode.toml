@@ -130,6 +130,9 @@ workspace_files = true
 # clone of the marketplace, which it places from the item's `marketplace`
 # URL: `<host>\<owner>\<repo>`, or, for a URL whose fragment names a ref,
 # `.marketplace-repositories\<host>\<owner>\<repo>\ref_<ref>` [binary].
+# VS Code first looks the marketplace up in an index its store keeps of
+# the clones it made [binary]; config-digger reads the clone the URL
+# places, where VS Code clones a marketplace it has no entry for.
 # The list is the first of `marketplace.json`, `.plugin\marketplace.json`,
 # `.github\plugin\marketplace.json` and `.claude-plugin\marketplace.json`
 # at the clone's root whose `plugins` holds a list, each read with VS
@@ -137,14 +140,13 @@ workspace_files = true
 # `name` is a non-empty string and its `source` names a plugin: a path
 # below the clone's root, within the list's `metadata.pluginRoot`, the
 # root itself when it has no `source`, or an object of a known kind, a
-# plugin elsewhere [binary]; VS Code also skips an object missing a field
-# its kind needs, which config-digger counts. An item matches the entry
-# whose `name` is its own, exactly, whatever its source [test], or, with
-# no `name`, the entry whose source is its folder [test]. A plugin whose
-# marketplace has a list it matches no entry of is not loaded, with no log
-# line [test]: every Entry of it is Invalid, the plugin named from its
-# manifests. A list with no entry that counts is no list [binary]. VS Code
-# 1.129.1 and 1.135.0 read the manifest of a plugin of a marketplace with
+# plugin elsewhere [binary]. An item matches the entry whose `name` is its
+# own [test], exactly and whatever its source [binary], or, with no
+# `name`, the entry whose source is its folder [test]. A plugin whose
+# marketplace has a list it matches no entry of is not loaded [test], with
+# no log line [binary]: every Entry of it is Invalid, the plugin named from
+# its manifests. A list with no entry that counts is no list [binary]. VS
+# Code 1.129.1 and 1.135.0 read the manifest of a plugin of a marketplace with
 # no list at the clone's root, and skip the plugin when that manifest's
 # name is not its item's [test]; this definition follows 1.141.0 and
 # later. config-digger reads no list for a marketplace named by the
@@ -156,8 +158,11 @@ workspace_files = true
 # [binary]; config-digger does not read it.
 [[plugins]]
 id = "agent-plugins"
-unverified = "A manifest whose error leaves no `name` before or after it is taken to pass the name on to the next manifest, as one with no `name` does; in VS Code's code, the plugin is then named by its marketplace when what parses is an object, and by the next manifest when it is not. A probe check of a manifest broken before its `name` would test it."
-registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true, marketplaces = { field = "marketplace", clone = "git-url", ref_folder = ".marketplace-repositories", item_name = "name", files = ["marketplace.json", ".plugin/marketplace.json", ".github/plugin/marketplace.json", ".claude-plugin/marketplace.json"], dialect = "jsonc", reads_around_error = true, plugins = ["plugins"], name = "name", source = "source", plugin_root = ["metadata", "pluginRoot"], source_objects = { kind = "source", kinds = ["github", "url", "git-subdir", "npm", "pip"] } } }
+unverified = [
+  "A manifest whose error leaves no `name` before or after it is taken to pass the name on to the next manifest, as one with no `name` does; in VS Code's code, the plugin is then named by its marketplace when what parses is an object, and by the next manifest when it is not. A probe check of a manifest broken before its `name` would test it.",
+  "An entry of a marketplace's list whose `source` is an object of a known kind is taken to count whatever its other fields, and never to match an item with no `name`; in VS Code's code, such an entry missing a field its kind needs, or with one of the wrong form, is skipped, and an item with no `name` matches it by the folder VS Code installs it in. A probe check of a list holding such entries would test it.",
+]
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true, marketplaces = { item_marketplace = "marketplace", clone = "git-url", ref_folder = ".marketplace-repositories", item_name = "name", files = ["marketplace.json", ".plugin/marketplace.json", ".github/plugin/marketplace.json", ".claude-plugin/marketplace.json"], dialect = "jsonc", reads_around_error = true, plugins = ["plugins"], name = "name", source = "source", plugin_root = ["metadata", "pluginRoot"], source_objects = { kind = "source", kinds = ["github", "url", "git-subdir", "npm", "pip"] } } }
 name = [
   { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
   { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },

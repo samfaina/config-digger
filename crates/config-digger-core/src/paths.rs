@@ -127,7 +127,20 @@ pub(crate) fn from_file_uri(uri: &str) -> Option<PathBuf> {
         .get(..7)
         .filter(|scheme| scheme.eq_ignore_ascii_case("file://"))
         .map(|_| &uri[7..])?;
-    let bytes = rest.as_bytes();
+    let path = percent_decoded(rest)?;
+    // `file:///E:/x` has an empty authority; `file://server/share` names a share.
+    let spelling = match path.strip_prefix('/') {
+        Some(local) => local.to_owned(),
+        None => format!("//{path}"),
+    };
+    let path = lexical(Path::new(&spelling));
+    is_absolute(&path).then_some(path)
+}
+
+/// `text` with each `%` followed by two hex digits decoded; `None` when
+/// the bytes decoded are not UTF-8.
+pub(crate) fn percent_decoded(text: &str) -> Option<String> {
+    let bytes = text.as_bytes();
     let mut decoded = Vec::with_capacity(bytes.len());
     let mut at = 0;
     while at < bytes.len() {
@@ -145,14 +158,7 @@ pub(crate) fn from_file_uri(uri: &str) -> Option<PathBuf> {
             }
         }
     }
-    let path = String::from_utf8(decoded).ok()?;
-    // `file:///E:/x` has an empty authority; `file://server/share` names a share.
-    let spelling = match path.strip_prefix('/') {
-        Some(local) => local.to_owned(),
-        None => format!("//{path}"),
-    };
-    let path = lexical(Path::new(&spelling));
-    is_absolute(&path).then_some(path)
+    String::from_utf8(decoded).ok()
 }
 
 /// The path a `file:` URI names, as VS Code stores one: as text, or as an

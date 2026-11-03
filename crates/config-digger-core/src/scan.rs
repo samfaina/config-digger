@@ -4506,31 +4506,19 @@ impl Scanner<'_> {
         listed_in: &ListedIn,
         folder: &Path,
     ) -> Option<Result<String, ManifestFailure>> {
+        let clone = &listed_in.clone_folder;
         let format = marketplaces.format();
         let (list, entries) = marketplaces.files.iter().find_map(|file| {
-            let path = blocks::join_relative(&listed_in.clone, file);
-            let text = self.reader.peek(&path).ok()??;
-            let document = if marketplaces.reads_around_error {
-                format.kept_around_error(text)
-            } else {
-                format.parse(text).ok()
-            }?;
-            Some((path, marketplaces.entries(&document, &listed_in.clone)?))
+            let document =
+                self.plugin_json(clone, file, &format, marketplaces.reads_around_error)?;
+            let entries = marketplaces.entries(&document, clone)?;
+            Some((blocks::join_relative(clone, file), entries))
         })?;
         if entries.is_empty() {
             tracing::debug!(path = %list.display(), "the marketplace list has no entry that counts");
             return None;
         }
-        let matched = match &listed_in.name {
-            Some(name) => entries.iter().find(|entry| entry.name == *name),
-            None => entries.iter().find(|entry| {
-                entry
-                    .folder
-                    .as_deref()
-                    .is_some_and(|listed| paths::lexical_key(listed) == paths::lexical_key(folder))
-            }),
-        };
-        match matched {
+        match listed_in.matching(&entries, folder) {
             Some(entry) => Some(Ok(entry.name.clone())),
             None => {
                 tracing::debug!(path = %list.display(), plugin = %folder.display(), "the marketplace list does not name the plugin");
