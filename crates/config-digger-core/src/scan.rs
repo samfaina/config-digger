@@ -16,8 +16,8 @@ use crate::definitions::blocks::{
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
-    ANY_KEY, AgentDefinition, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition, ItemKind,
-    LocationDefinition, NameParts, PLUGIN_NAME, PLUGIN_URI, PROJECT_KEY, PluginNames,
+    ANY_KEY, AgentDefinition, DeclaredValue, Definitions, ENTRY_NAME, FOLDER_INDEX, HomeDefinition,
+    ItemKind, LocationDefinition, NameParts, PLUGIN_NAME, PLUGIN_URI, PROJECT_KEY, PluginNames,
     PluginsDefinition, ReadFailureReaction, References, Replaces,
 };
 use crate::folders::{self, AsIf, PlannedFolder};
@@ -4059,11 +4059,25 @@ impl Scanner<'_> {
             let Some(anchor) = location.anchor.plugin() else {
                 continue;
             };
+            if definition.read_first(location) {
+                continue;
+            }
+            let first = location
+                .references
+                .as_ref()
+                .and_then(|references| references.first.as_deref())
+                .map(|first| definition.location(first));
             for plugin in plugins
                 .iter()
                 .filter(|plugin| anchor.plugins.names(&plugin.plugins))
             {
-                self.read_plugin_location(home, definition, location, plugin, &anchor.path);
+                let replaced =
+                    self.read_plugin_location(home, definition, location, plugin, &anchor.path);
+                if let Some(first) = first.filter(|_| !replaced)
+                    && let Some(first_anchor) = first.anchor.plugin()
+                {
+                    self.read_plugin_location(home, definition, first, plugin, &first_anchor.path);
+                }
             }
         }
     }
@@ -5013,7 +5027,8 @@ impl Scanner<'_> {
     /// Adds the Entries of one location in the folder of `plugin`, each
     /// named as the location says and part of the plugin. With references,
     /// the value at its root can also point to other files of the plugin,
-    /// whose Entries are read from there.
+    /// whose Entries are read from there. Whether what it read takes the
+    /// place of the file of its references' `first` location.
     fn read_plugin_location(
         &mut self,
         home: &FoundHome,
@@ -5021,24 +5036,26 @@ impl Scanner<'_> {
         location: &LocationDefinition,
         plugin: &ScannedPlugin,
         relative: &RelativePaths,
-    ) {
+    ) -> bool {
         let start = self.entries.len();
         let failures = self.reader.failures.len();
         let path = self.plugin_path(home, location, plugin, relative);
-        match (&location.references, path) {
+        let replaces_first = match (&location.references, path) {
             (None, path) if let Format::ManifestSkills(block) = &location.format => {
                 self.read_manifest_skills(home, location, block, plugin, path);
+                false
             }
             // Every path that exists is a Read failure the Agent reads past.
-            (_, None) => {}
+            (_, None) => false,
             (None, Some(path)) => {
                 let project = plugin.project.clone();
                 self.read_location(home, definition, location, path, project, 0);
+                false
             }
             (Some(references), Some(path)) => {
-                self.read_references(home, definition, location, references, plugin, path);
+                self.read_references(home, definition, location, references, plugin, path)
             }
-        }
+        };
         for failure in &mut self.reader.failures[failures..] {
             failure.plugin = Some(plugin.clone());
         }
@@ -5059,6 +5076,7 @@ impl Scanner<'_> {
             }
             entry.plugin = Some(plugin.clone());
         }
+        replaces_first
     }
 
     /// The path of `plugin` that `location` reads of those `relative`
@@ -5203,7 +5221,8 @@ impl Scanner<'_> {
     /// Adds the Entries at the root of the file `path` of `plugin`: an
     /// object of Entries, a path to another file of the plugin holding
     /// them, or a list of either; or else those of the references' default
-    /// file, when the root declares none the Agent reads.
+    /// file, when the root declares none the Agent reads. Whether the root
+    /// takes the place of the references' `first` location's file.
     fn read_references(
         &mut self,
         home: &FoundHome,
@@ -5212,13 +5231,13 @@ impl Scanner<'_> {
         references: &References,
         plugin: &ScannedPlugin,
         path: PathBuf,
-    ) {
+    ) -> bool {
         self.add_reader(home, location, &path);
         let project = plugin.project.as_deref();
         let document = match self.reader.fs.exists(&path) {
             true => match self.document(home, location, &path, project) {
                 Some(document) => Some(document),
-                None => return,
+                None => return false,
             },
             false => None,
         };
@@ -5229,19 +5248,13 @@ impl Scanner<'_> {
         let declared = document
             .as_ref()
             .and_then(|document| lookup(document, &location.root))
-            .filter(|value| !references.ignores(value));
-        let values: Vec<(Option<usize>, &serde_json::Value)> = match declared.or(default.as_ref()) {
-            None => Vec::new(),
-            Some(serde_json::Value::Array(values)) => values
-                .iter()
-                .enumerate()
-                .map(|(i, v)| (Some(i), v))
-                .collect(),
-            Some(value) => vec![(None, value)],
-        };
-        for (index, value) in values {
+            .filter(|value| !references.ignores(value) && !references.skips(value));
+        let declared = references.declared(declared.or(default.as_ref()));
+        for (below, value) in declared.values {
+            let mut key_path = location.root.clone();
+            key_path.extend(below);
             match value {
-                serde_json::Value::String(relative) => {
+                DeclaredValue::Path(relative) => {
                     if let Some(Bundles::McpbCache(bundles)) = &references.bundles
                         && bundles.names_bundle(relative)
                     {
@@ -5278,9 +5291,7 @@ impl Scanner<'_> {
                     let owned = plugin.project.clone();
                     self.add_objects(home, definition, location, &file, owned, 0, objects);
                 }
-                serde_json::Value::Object(entries) => {
-                    let mut key_path = location.root.clone();
-                    key_path.extend(index.map(|index| index.to_string()));
+                DeclaredValue::Entries(entries) => {
                     let entries = entries
                         .iter()
                         .map(|(key, value)| FoundEntry {
@@ -5297,14 +5308,13 @@ impl Scanner<'_> {
                     let owned = plugin.project.clone();
                     self.add_objects(home, definition, location, &path, owned, 0, objects);
                 }
-                _ => {
-                    let mut key_path = location.root.clone();
-                    key_path.extend(index.map(|index| index.to_string()));
+                DeclaredValue::Other(value) => {
                     let failure = NotEnumerable::new(value, key_path, None, Expected::ObjectOrPath);
                     self.fail_shapes(home, location, &path, project, vec![failure]);
                 }
             }
         }
+        declared.replaces_first
     }
 
     /// Adds the server of the bundle named `source` in a file of `plugin`,

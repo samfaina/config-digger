@@ -4141,6 +4141,34 @@
           "type": "boolean",
           "default": false
         },
+        "first": {
+          "description": "The id of another location in the same plugins whose file the Agent\nreads before the files the value at the root names, and which an\nobject of Entries there takes the place of, as a VS Code plugin\nmanifest's inline `mcpServers` takes the place of its `.mcp.json`.\nThat location is read only through this one, after it, in each\nplugin; it is read whatever the file of this one holds, unless that\ntakes its place.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "skips_other_values": {
+          "description": "Whether the Agent skips, with no Read failure, every value it does\nnot read: a list's items other than paths, objects of Entries\nincluded, and a value at the root that is neither an object, a path\nnor a list, as VS Code reads a plugin manifest's `mcpServers`.",
+          "type": "boolean",
+          "default": false
+        },
+        "trims": {
+          "description": "Whether the Agent trims the white space around each path, and reads\nno file for one left empty, as VS Code does.",
+          "type": "boolean",
+          "default": false
+        },
+        "paths_object": {
+          "description": "The object at the root that is not an object of Entries but a list\nof paths, as VS Code reads a plugin manifest's `mcpServers` that\nholds `paths`.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PathsObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -4183,6 +4211,30 @@
             "cache"
           ]
         }
+      ]
+    },
+    "PathsObject": {
+      "description": "An object that holds a list of paths, read as a list at the root is,\nrather than Entries, such as `{\"paths\": [\"./servers.json\"],\n\"exclusive\": true}`. Its keys are never Entries.",
+      "type": "object",
+      "properties": {
+        "paths": {
+          "description": "The key whose value makes the object one: when it holds a list, the\npaths; when it holds anything else, no path at all.",
+          "type": "string"
+        },
+        "exclusive": {
+          "description": "The key that, holding `true` beside a list of paths, leaves out the\nfile of the references' `first` location.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "paths"
       ]
     },
     "PluginRoot": {
