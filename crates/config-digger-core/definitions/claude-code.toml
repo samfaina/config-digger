@@ -1025,12 +1025,12 @@ on_read_failure = "fails_plugin"
 # skills there while its claude.ai sync gate is on, and reads the folder
 # whatever the gate, a skill `manifest.json` does not list included [test].
 # While the folder holds `.last-complete-round`, it does not download again
-# a skill deleted by hand [test]; a sync round that lists the account's
-# skills deletes that file as it starts and writes it again once every
-# skill it downloads has landed [binary].
-# It reads no skill directly under
-# `synced/` or deeper than a skill folder, and a sync round that downloads
-# deletes what sits directly under `synced/` [test]. A synced skill is named
+# a skill deleted by hand [test]: a sync round that starts while that file
+# is recent reuses the last round and lists nothing, and one that lists the
+# account's skills deletes the file as it starts and writes it again once
+# every skill it downloads has landed [binary]. It reads no skill directly
+# under `synced/` or deeper than a skill folder, and a sync round that
+# downloads deletes what sits directly under `synced/` [test]. A synced skill is named
 # `anthropic-skills:<folder>`, its frontmatter `name` an alias with the same
 # prefix [test]. It reads only the Signed-in account's folder, leaving
 # another `<org>_<account>` unread [test], and none while signed in to no

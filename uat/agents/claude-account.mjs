@@ -76,18 +76,21 @@ const noFetch = { DISABLE_GROWTHBOOK: "1" };
 // One `claude -p` run, on `on`, the signed-in home or a copy of it: the
 // skills, plugins and servers its init event lists, the skill lines of the
 // request its model gets, and that request. With `until`, the model holds
-// its replies until `until()` holds or `roundWait` has gone by, which keeps
-// the session alive meanwhile: a `-p` session that has its reply exits, and
-// a sync round it started stops where it was.
+// its replies until `until()` holds or `wait` has gone by, which keeps the
+// session alive meanwhile: a `-p` session that has its reply exits, and a
+// sync round it started stops where it was.
 const roundWait = 90_000;
-async function session({ prompt = "hi", env = {}, on = home, timeout, until } = {}) {
-  const end = Date.now() + roundWait;
-  const held = async () => {
-    while (!until() && Date.now() < end) await sleep(250);
-    return reply;
-  };
-  const model = await modelServer(until ? held : reply);
-  const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: on, ANTHROPIC_BASE_URL: model.url, ...env }, timeout: timeout ?? (until ? roundWait + 60_000 : undefined) });
+async function session({ prompt = "hi", env = {}, on = home, timeout, until, wait = roundWait } = {}) {
+  let answer = reply;
+  if (until) {
+    const end = Date.now() + wait;
+    answer = async () => {
+      while (!until() && Date.now() < end) await sleep(250);
+      return reply;
+    };
+  }
+  const model = await modelServer(answer);
+  const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: on, ANTHROPIC_BASE_URL: model.url, ...env }, timeout: timeout ?? (until ? wait + 60_000 : undefined) });
   model.close();
   const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
   return { skills: init.skills, plugins: init.plugins.map((x) => x.name), servers: init.mcp_servers.map((x) => x.name), listed: listedIn(model.bodies), sent: model.bodies.join("\n") };
@@ -175,29 +178,32 @@ const syncedListed = (s) => s.skills.filter((n) => n.startsWith("anthropic-skill
 // stands, Claude Code does not download again a skill deleted by hand.
 const roundMark = path.join(bucket, ".last-complete-round");
 function clearDownloaded() {
-  for (const x of [...downloaded(), "manifest.json", ".last-complete-round", ".staging"]) fs.rmSync(path.join(bucket, x), { recursive: true, force: true });
+  for (const x of [...downloaded(), "manifest.json", path.basename(roundMark), ".staging"]) fs.rmSync(path.join(bucket, x), { recursive: true, force: true });
 }
 // What the account's folder holds of the last sync round. It completed
 // when `.last-complete-round` stands and `manifest.json` lists the skill
-// folders on disk, no more and no fewer; `skills` is then their count.
-// `claims` are the `pendingClaims` of rounds that did not finish, and
-// `staging` the `.staging` folders they left.
+// folders on disk, no more and no fewer; `skills` is then their count, and
+// `round` says whether it completed. `listed` is the count `manifest.json`
+// lists, `folders` the count on disk, `claims` the `pendingClaims` of
+// rounds that did not finish, and `staging` the `.staging` folders they
+// left.
 function lastRound() {
   let manifest = null;
   try {
     manifest = json(path.join(bucket, "manifest.json"));
   } catch {}
-  const listed = (manifest?.skills ?? []).map((s) => s.name).sort();
+  const names = (manifest?.skills ?? []).map((s) => s.name).sort();
+  const folders = downloaded();
   const staging = path.join(bucket, ".staging");
   const seen = {
     marked: fs.existsSync(roundMark),
-    listed: listed.length,
-    folders: downloaded().length,
+    listed: names.length,
+    folders: folders.length,
     claims: manifest?.pendingClaims?.length ?? 0,
     staging: fs.existsSync(staging) ? fs.readdirSync(staging).length : 0,
   };
-  const complete = seen.marked && listed.length > 0 && same(listed, downloaded()).pass;
-  return complete ? { round: "complete", skills: listed.length, ...seen } : { round: "incomplete", ...seen };
+  const complete = seen.marked && names.length > 0 && same(names, folders).pass;
+  return complete ? { round: "complete", skills: names.length, ...seen } : { round: "incomplete", ...seen };
 }
 // The synced plugins: the account's folder, which the probe makes when the
 // account has none, and another account's.
@@ -243,6 +249,11 @@ async function syncAgain() {
   for (let i = 0; i < 3 && !complete(); i++) await session({ until: complete });
   return lastRound();
 }
+// `syncAgain()` on the copy cleared as a new sign-in finds it.
+async function syncFresh() {
+  clearDownloaded();
+  return syncAgain();
+}
 
 // ---------------------------------------------------------------- the sync
 
@@ -250,8 +261,7 @@ unplant();
 try {
   // The account's skills, counted from a round that completed on a copy
   // cleared as a new sign-in finds it.
-  clearDownloaded();
-  const firstRound = await syncAgain();
+  const firstRound = await syncFresh();
   const accountSkills = firstRound.skills ?? 0;
   await p.check("locations[synced-skills]", "with the gate on, Claude Code downloads the account's skills to `synced/<org>_<account>` and lists each as `anthropic-skills:<folder>`", async () => {
     if (firstRound.round !== "complete") return { pass: false, observed: JSON.stringify(firstRound) };
@@ -263,13 +273,17 @@ try {
   await p.check("locations[synced-skills]", "while `.last-complete-round` stands, a synced skill deleted by hand is not downloaded again", async () => {
     const before = lastRound();
     if (before.round !== "complete") return { pass: false, observed: JSON.stringify(before) };
+    const mark = fs.readFileSync(roundMark, "utf8");
     const gone = downloaded()[0];
     fs.rmSync(path.join(bucket, gone), { recursive: true });
-    await session();
-    const seen = { back: downloaded().includes(gone), marked: fs.existsSync(roundMark) };
-    clearDownloaded();
-    const restored = await syncAgain();
-    return same({ ...seen, restored: restored.skills ?? restored }, { back: false, marked: true, restored: accountSkills });
+    // Held, so a round that would download the skill again has the time:
+    // one takes two or three seconds.
+    await session({ until: () => downloaded().includes(gone), wait: 20_000 });
+    const back = downloaded().includes(gone);
+    const sameMark = fs.existsSync(roundMark) && fs.readFileSync(roundMark, "utf8") === mark;
+    const restored = await syncFresh();
+    if (restored.round !== "complete") return { pass: false, observed: JSON.stringify({ back, sameMark, restored }) };
+    return same({ back, sameMark, restored: restored.skills }, { back: false, sameMark: true, restored: accountSkills });
   });
 
   skill(path.join(bucket, "fold-s"), ["name: cd-throwaway-sname", "description: planted in the bucket"], "body-of-synced-fold-s");
@@ -678,8 +692,7 @@ try {
   putBackSettings();
   putBackState();
   for (const dir of copies) fs.rmSync(dir, { recursive: true, force: true });
-  clearDownloaded();
-  const putBack = await syncAgain();
+  const putBack = await syncFresh();
   console.log(`\nput back: ${JSON.stringify(putBack)}, gate cached ${cachedGate()}`);
 }
 
