@@ -1954,9 +1954,19 @@ pub(crate) struct PluginRecord {
     pub project: Option<String>,
     /// Its version, as recorded.
     pub version: Option<String>,
-    /// The file listing the plugins the Agent loads, when it leaves this
-    /// one out, so that the Agent does not load it.
-    pub left_out_by: Option<PathBuf>,
+    /// What leaves it out of the plugins the Agent loads, when something does.
+    pub not_listed: Option<NotListed>,
+}
+
+/// A plugin the file listing the plugins the Agent loads leaves out, so
+/// that the Agent does not load it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NotListed {
+    /// The file, such as a Claude Code account's `manifest.json`.
+    pub list: PathBuf,
+    /// Whether the Agent deletes the plugin's folder the next time it
+    /// updates its plugins.
+    pub deleted: bool,
 }
 
 /// Lists the plugins an Agent installed.
@@ -2258,7 +2268,8 @@ pub(crate) struct PluginFolders {
 /// folder, and one whose generation is no whole number is taken to have
 /// none. The Agent loads no plugin of a folder no row names, the file
 /// being missing or not parsing too, and the plugin's Entries are Unread.
-/// Folder names are compared without regard to case.
+/// Folder names are compared as Windows compares them, without regard to
+/// case.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct PluginList {
@@ -2759,7 +2770,6 @@ impl JsonPluginRecords {
                     continue;
                 };
                 records.push(PluginRecord {
-                    left_out_by: None,
                     id: id.clone(),
                     name: None,
                     folder,
@@ -2767,6 +2777,7 @@ impl JsonPluginRecords {
                     scope: text_of(record, self.scope.as_ref()),
                     project: text_of(record, self.project.as_ref()),
                     version: text_of(record, self.version.as_ref()),
+                    not_listed: None,
                 });
             }
         }
@@ -2852,7 +2863,6 @@ impl JsonPluginList {
                 };
                 let folder = paths::lexical(&folder);
                 Some(PluginRecord {
-                    left_out_by: None,
                     id: id_below(&folder, &base),
                     name: text_of(item, self.name.as_ref()),
                     folder: folder.display().to_string(),
@@ -2860,6 +2870,7 @@ impl JsonPluginList {
                     scope: None,
                     project: None,
                     version: text_of(item, self.version.as_ref()),
+                    not_listed: None,
                 })
             })
             .collect())

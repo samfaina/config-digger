@@ -221,7 +221,7 @@ fn only_the_signed_in_accounts_synced_plugins_servers_and_skills_are_read() {
 }
 
 #[test]
-fn another_accounts_synced_plugin_its_manifest_does_not_list_is_another_accounts() {
+fn another_accounts_unlisted_synced_plugin_is_unread_as_another_accounts() {
     let fs = with_synced_plugin(signed_in(FakeFileSystem::new()), "org-b_acct-b", "theirs");
     fs.delete_file(account_folder("org-b_acct-b").join("manifest.json"));
 

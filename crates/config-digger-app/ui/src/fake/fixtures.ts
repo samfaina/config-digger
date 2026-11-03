@@ -2560,7 +2560,7 @@ export const fixtures: Fixtures = {
                   "code": "plugin_not_listed",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them."
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
                 },
                 "secondary": [],
                 "what_if": null,
@@ -6273,7 +6273,7 @@ export const fixtures: Fixtures = {
                   "code": "plugin_not_listed",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them."
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
                 },
                 "secondary": [],
                 "what_if": null,
@@ -10178,7 +10178,7 @@ export const fixtures: Fixtures = {
                   "code": "plugin_not_listed",
                   "effective": null,
                   "switch": null,
-                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them."
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
                 },
                 "secondary": [],
                 "what_if": null,

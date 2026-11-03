@@ -7,8 +7,8 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, RefusedChars, SettingIs,
-    SkillDefect, Unlisted, UnseenServers,
+    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, NotListed, RefusedChars,
+    SettingIs, SkillDefect, Unlisted, UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
@@ -2110,12 +2110,11 @@ pub(crate) fn other_account(agent_name: &str, account: &str, folder: &str) -> Re
     }
 }
 
-/// An Unread Entry's reason: `agent_name` loads only the plugins the file
-/// `list` lists, which leaves out the Entry's, and with `deleted` deletes
-/// its folder.
-pub(crate) fn plugin_not_listed(agent_name: &str, list: &Path, deleted: bool) -> Reason {
-    let deletes = if deleted {
-        ", and deletes its folder the next time it updates them"
+/// An Unread Entry's reason: `agent_name` loads only the plugins a file
+/// lists, which leaves out the Entry's, as `not_listed` says.
+pub(crate) fn plugin_not_listed(agent_name: &str, not_listed: &NotListed) -> Reason {
+    let deletes = if not_listed.deleted {
+        ", and deletes its folder the next time it updates its plugins"
     } else {
         ""
     };
@@ -2125,7 +2124,7 @@ pub(crate) fn plugin_not_listed(agent_name: &str, list: &Path, deleted: bool) ->
         switch: None,
         sentence: format!(
             "{agent_name} loads only the plugins that {} lists, and it does not list this one: {agent_name} does not load it{deletes}.",
-            list.display()
+            not_listed.list.display()
         ),
     }
 }
@@ -2844,4 +2843,32 @@ pub(crate) fn cli_running(cli: &Path) -> String {
          let it finish or close it, then try again",
         cli.display()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_plugin_left_out_of_the_list_is_deleted_only_when_the_agent_deletes_it() {
+        let list = PathBuf::from(r"C:\agent\plugins\list.json");
+        for (deleted, sentence) in [
+            (
+                true,
+                r"Agent loads only the plugins that C:\agent\plugins\list.json lists, and it does not list this one: Agent does not load it, and deletes its folder the next time it updates its plugins.",
+            ),
+            (
+                false,
+                r"Agent loads only the plugins that C:\agent\plugins\list.json lists, and it does not list this one: Agent does not load it.",
+            ),
+        ] {
+            let not_listed = NotListed {
+                list: list.clone(),
+                deleted,
+            };
+            let reason = plugin_not_listed("Agent", &not_listed);
+            assert_eq!(reason.code, ReasonCode::PluginNotListed);
+            assert_eq!(reason.sentence, sentence, "{deleted}");
+        }
+    }
 }

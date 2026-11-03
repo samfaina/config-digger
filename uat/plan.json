@@ -2306,7 +2306,7 @@
             "El Item «cd-throwaway-synced:cd-throwaway-synced-skill» sale «Effective».",
             "El Item «cd-throwaway-unlisted:cd-throwaway-unlisted-skill» sale «Unread».",
             "Su tarjeta tiene la etiqueta «cloud mirror».",
-            "Su tarjeta dice «Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them.».",
+            "Su tarjeta dice «Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins.».",
             "El botón Disable de su tarjeta está desactivado.",
             "El botón Remove de su tarjeta está desactivado."
           ],

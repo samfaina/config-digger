@@ -8,8 +8,8 @@ use crate::definitions::blocks::{
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
     Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
-    NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList, PluginRecord,
-    PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
+    NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList,
+    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
     RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList,
     Spelling, StoreClass, Unlisted, is_entry_key,
 };
@@ -249,9 +249,8 @@ pub(crate) struct ScannedPlugin {
     /// keeping it out wherever it applies and no switch turns it off. Empty
     /// when none has its name.
     pub winners: Vec<ScannedPlugin>,
-    /// The file listing the plugins the Agent loads, when it leaves this
-    /// one out, so that the Agent does not load it.
-    pub left_out_by: Option<PathBuf>,
+    /// What leaves it out of the plugins the Agent loads, when something does.
+    pub not_listed: Option<NotListed>,
 }
 
 /// A plugin's id, lowercased, and version, as a list's `replaces` compares
@@ -4192,7 +4191,7 @@ impl Scanner<'_> {
                 version: record.version,
                 shared_with: Vec::new(),
                 winners: Vec::new(),
-                left_out_by: record.left_out_by,
+                not_listed: record.not_listed,
             });
         }
         if plugins.same_names_invalid {
@@ -4487,7 +4486,6 @@ impl Scanner<'_> {
                     return None;
                 };
                 Some(PluginRecord {
-                    left_out_by: None,
                     id: plugin.key,
                     name: Some(plugin.name),
                     folder: version.display().to_string(),
@@ -4497,6 +4495,7 @@ impl Scanner<'_> {
                     version: version
                         .file_name()
                         .map(|name| name.to_string_lossy().into_owned()),
+                    not_listed: None,
                 })
             })
             .collect()
@@ -4563,17 +4562,22 @@ impl Scanner<'_> {
                     tracing::debug!(plugin = %id, "plugin folder marked for deletion");
                     continue;
                 }
-                let left_out_by = listed
+                let not_listed = listed
                     .as_ref()
                     .filter(|(_, folders)| !folders.contains(&id.to_lowercase()))
-                    .map(|(path, _)| path.clone());
+                    .map(|(list, _)| NotListed {
+                        list: list.clone(),
+                        deleted: block
+                            .listed
+                            .as_ref()
+                            .is_some_and(|listed| listed.deletes_unlisted),
+                    });
                 let linked = block.linked.as_ref().and_then(|linked| {
                     let file = blocks::join_relative(&child, &linked.file);
                     let text = String::from_utf8(fs.read(&file).ok()?).ok()?;
                     linked.target(&text)
                 });
                 records.push(PluginRecord {
-                    left_out_by,
                     version: versions.get(&id).cloned(),
                     folder: linked.as_ref().unwrap_or(&child).display().to_string(),
                     installed: linked.is_some().then(|| child.display().to_string()),
@@ -4581,6 +4585,7 @@ impl Scanner<'_> {
                     name: None,
                     scope: None,
                     project: None,
+                    not_listed,
                 });
             }
         }
@@ -4625,7 +4630,6 @@ impl Scanner<'_> {
             .flat_map(|installation| paths::expand_relative(fs, installation, &block.folder))
             .flat_map(|folder| marked_folders(fs, &folder, Some(&block.marker)))
             .map(|(id, folder)| PluginRecord {
-                left_out_by: None,
                 id,
                 name: None,
                 folder: folder.display().to_string(),
@@ -4633,6 +4637,7 @@ impl Scanner<'_> {
                 scope: None,
                 project: None,
                 version: None,
+                not_listed: None,
             })
             .collect()
     }
@@ -4685,7 +4690,6 @@ impl Scanner<'_> {
                     continue;
                 };
                 records.push(PluginRecord {
-                    left_out_by: None,
                     id: format!("{name}{}{marketplace}", block.separator),
                     name: Some(name),
                     folder: folder.display().to_string(),
@@ -4693,6 +4697,7 @@ impl Scanner<'_> {
                     scope: None,
                     project: None,
                     version: Some(version),
+                    not_listed: None,
                 });
             }
         }
@@ -6584,7 +6589,7 @@ mod tests {
                 version: None,
                 shared_with: Vec::new(),
                 winners: Vec::new(),
-                left_out_by: None,
+                not_listed: None,
             }),
             switch_id: None,
             own_name: None,

@@ -263,7 +263,7 @@ fn a_synced_plugin_folder_the_accounts_manifest_does_not_list_is_unread() {
     assert_eq!(
         stray["reason"]["sentence"],
         format!(
-            "Claude Code loads only the plugins that {} lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them.",
+            "Claude Code loads only the plugins that {} lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins.",
             in_account("manifest.json").display()
         )
     );
