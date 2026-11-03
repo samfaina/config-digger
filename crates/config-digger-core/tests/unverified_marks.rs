@@ -391,6 +391,21 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "plugins[installed].registry.marketplaces",
             "cannot open or decode",
         ),
+        (
+            "claude-code.toml",
+            "items.skill.disable[0]",
+            "`<subfolder>:<name>` is taken to decide",
+        ),
+        (
+            "claude-code.toml",
+            "items.skill.disable[1]",
+            "`<subfolder>:<name>` is taken to decide",
+        ),
+        (
+            "claude-code.toml",
+            "items.skill.disable[2]",
+            "`<subfolder>:<name>` is taken to decide",
+        ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         (
             "claude-code.toml",
@@ -427,6 +442,12 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         let line = text.lines().nth(mark.line - 1).unwrap();
         assert!(line.contains(word), "{file}:{}: {line}", mark.line);
     }
+    // #510 shows two `skillOverrides` keys that disagree as Claude Code
+    // reads them, so no mark names it.
+    assert!(
+        !marks.iter().any(|mark| mark.sentence.contains("#510")),
+        "{marks:#?}"
+    );
 }
 
 #[test]

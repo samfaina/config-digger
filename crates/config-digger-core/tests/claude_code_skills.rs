@@ -1071,21 +1071,67 @@ fn a_partial_value_under_a_synced_skill_s_folder_alone_limits_it_as_under_its_fu
     assert_eq!(notes("pdf"), [("partial_switch".to_owned(), switch("pdf"))]);
 }
 
+/// The three settings files whose `skillOverrides` config-digger reads:
+/// the Project's local settings, its shared settings and the user settings.
+fn every_settings_file() -> [PathBuf; 3] {
+    [
+        settings_local(),
+        Path::new(PROJECT).join(r".claude\settings.json"),
+        in_home(r".claude\settings.json"),
+    ]
+}
+
+/// The synced skill `pdf` with `prefixed` under `anthropic-skills:pdf` and
+/// `bare` under `pdf` in the file at `settings`, each held first in turn:
+/// the file, the order it holds the keys in, and the skill's Entry.
+fn synced_pdf_under_both_keys(settings: &Path, prefixed: &str, bare: &str) -> Vec<(String, Entry)> {
+    // `serde_json` keeps the keys in the order they are given.
+    let orders = [
+        json!({ "anthropic-skills:pdf": prefixed, "pdf": bare }),
+        json!({ "pdf": bare, "anthropic-skills:pdf": prefixed }),
+    ];
+    orders
+        .into_iter()
+        .map(|overrides| {
+            let case = format!("{} {overrides}", settings.display());
+            let fs = synced_pdf_overridden(settings, overrides);
+            let inventory = inventory(&core(&fs), &in_project());
+            (
+                case,
+                skill(&inventory, "anthropic-skills:pdf").entries[0].clone(),
+            )
+        })
+        .collect()
+}
+
 #[test]
-fn off_under_either_key_of_a_synced_skill_disables_it_whatever_the_other_holds() {
-    let fs = synced_pdf_overridden(
-        &settings_local(),
-        json!({ "anthropic-skills:pdf": "on", "pdf": "off" }),
-    );
+fn a_synced_skill_on_under_its_anthropic_skills_name_is_effective_whatever_its_folder_alone_holds()
+{
+    for settings in every_settings_file() {
+        for (case, entry) in synced_pdf_under_both_keys(&settings, "on", "off") {
+            assert_eq!(code(entry.state), "effective", "{case}");
+            assert_eq!(entry.reason, None, "{case}");
+            assert_eq!(entry.notes, [], "{case}");
+        }
+    }
+}
 
-    let inventory = inventory(&core(&fs), &in_project());
-
-    let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
-    assert_eq!(code(entry.state), "disabled");
-    assert_eq!(
-        entry.reason.as_ref().unwrap().switch.as_deref(),
-        Some(r"E:\projects\app\.claude\settings.local.json#skillOverrides.pdf")
-    );
+#[test]
+fn a_synced_skill_off_under_its_anthropic_skills_name_is_disabled_by_that_key_whatever_its_folder_alone_holds()
+ {
+    for settings in every_settings_file() {
+        for (case, entry) in synced_pdf_under_both_keys(&settings, "off", "on") {
+            assert_eq!(code(entry.state), "disabled", "{case}");
+            assert_eq!(
+                entry.reason.as_ref().unwrap().switch,
+                Some(format!(
+                    "{}#skillOverrides.anthropic-skills:pdf",
+                    settings.display()
+                )),
+                "{case}"
+            );
+        }
+    }
 }
 
 #[test]

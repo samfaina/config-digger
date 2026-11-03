@@ -7181,9 +7181,12 @@ pub(crate) struct Switch {
     /// before its location's `name_template` renamed it, such as `{own_name}` for Claude Code's
     /// `skillOverrides`, which turns a synced skill off by
     /// `anthropic-skills:<folder>` or by `<folder>`. A key that comes out as
-    /// another is one key. The Entry is Disabled when any of its keys holds
-    /// the disabled value; Disable writes `{name}`, and Enable lifts every
-    /// key that Disables it.
+    /// another is one key. The switch reads the keys in order, `{name}`
+    /// first, then each of these in the order given, and the first that
+    /// holds a value decides, `on` and partial values too: a later key is
+    /// read only while every earlier one holds nothing. Disable writes
+    /// `{name}`, and Enable lifts the key that decides and every later key
+    /// that holds the disabled value, so that none Disables it again.
     #[serde(default)]
     pub also_names: Vec<String>,
     /// Whether the Agent reads the switch, in a Project's file, only when it

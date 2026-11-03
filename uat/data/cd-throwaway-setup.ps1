@@ -289,6 +289,21 @@ description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
 
+# A skill synced in claude-code-synced-home's account, whose user settings
+# hold `on` under its `anthropic-skills:` name beside `off` under its folder
+# alone: the prefixed key decides, so Claude Code reads it. Step 35.1 walks
+# it.
+Write-TestFile "$Root\claude-code-synced-home\.claude\skills\synced\cd-org_cd-acct\cd-throwaway-overridden-skill\SKILL.md" @"
+---
+name: cd-throwaway-overridden-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+$syncedOverrides = '"skillOverrides": { "anthropic-skills:cd-throwaway-overridden-skill": "on", "cd-throwaway-overridden-skill": "off" }'
+Write-TestFile "$Root\claude-code-synced-home\.claude\settings.json" @"
+{ $syncedOverrides }
+"@
+
 # A second Claude Code home with 30 user servers and 30 Projects, so that the
 # Items, the Projects and the Project dropdown scroll in the smallest window,
 # and a missing Project with 12 leftovers, so that the What changes of their
@@ -535,7 +550,8 @@ description: Throwaway skill for testing config-digger. Does nothing.
 
 # With -InstalledSynced, the synced home also installs a plugin of the synced
 # plugin's name from a marketplace, which its user settings turn on, with a
-# skill of its own. Claude Code then loads nothing of the synced plugin.
+# skill of its own. Claude Code then loads nothing of the synced plugin. The
+# user settings keep the synced skill's `skillOverrides`.
 if ($InstalledSynced) {
     $installed = "$Root\claude-code-synced-home\.claude\plugins\cache\cd-throwaway\cd-throwaway-synced\1.0.0"
     $installedJson = $installed -replace '\\', '\\'
@@ -557,7 +573,7 @@ description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
     Write-TestFile "$Root\claude-code-synced-home\.claude\settings.json" @"
-{ "enabledPlugins": { "cd-throwaway-synced@cd-throwaway": true } }
+{ "enabledPlugins": { "cd-throwaway-synced@cd-throwaway": true }, $syncedOverrides }
 "@
 }
 

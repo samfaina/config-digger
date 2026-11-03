@@ -253,3 +253,28 @@ fn a_directory_marketplace_s_listed_plugin_is_read_and_its_unlisted_one_fails() 
         "{unlisted:#}"
     );
 }
+
+#[test]
+fn a_synced_skill_on_under_its_anthropic_skills_name_beside_its_folder_off_is_effective() {
+    let (_, fixtures) = recorded();
+
+    let inventory = &fixtures["inventories"][0]["inventory"];
+    let item = inventory["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| {
+            item["name"] == "anthropic-skills:cd-throwaway-overridden-skill"
+                && item["home"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("claude-code-synced-home")
+        })
+        .expect("the overridden synced skill");
+    assert_eq!(item["state"], "effective", "{item:#}");
+    assert_eq!(
+        item["entries"][0]["notes"],
+        serde_json::json!([]),
+        "{item:#}"
+    );
+}
