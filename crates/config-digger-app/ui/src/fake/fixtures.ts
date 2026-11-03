@@ -743,7 +743,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 3,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -2630,6 +2630,60 @@ export const fixtures: Fixtures = {
             "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-synced-home",
             "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
             "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
             "state": "effective",
             "entries": [
@@ -4068,7 +4122,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 3,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -6573,6 +6627,60 @@ export const fixtures: Fixtures = {
             "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-synced-home",
             "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
             "name": "cd-throwaway-project-skill",
             "state": "effective",
             "entries": [
@@ -8555,7 +8663,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 3,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -10772,6 +10880,60 @@ export const fixtures: Fixtures = {
                     "sentence": "Also read by VS Code (home default): Blocked."
                   }
                 ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
                 "copied_from": null
               }
             ],
@@ -13107,7 +13269,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 3,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -14856,7 +15018,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 2,
+              "entries": 3,
               "notes": [
                 {
                   "code": "cloud_connectors_not_on_disk",
@@ -15197,7 +15359,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-643",
+      "id": "20261001-120000-948",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15223,7 +15385,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-406",
+      "id": "20261001-120000-3a8",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15246,10 +15408,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8"
     },
     {
-      "id": "20261001-120000-a66",
+      "id": "20261001-120000-b2d",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15277,7 +15439,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-643",
+        "id": "20261001-120000-948",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -15737,7 +15899,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -15757,7 +15919,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -15776,7 +15938,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -15785,7 +15947,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-406",
+        "id": "20261001-120000-3a8",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -15808,7 +15970,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8"
       },
       "project": null,
       "changes": [
@@ -16245,7 +16407,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -16283,16 +16445,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -16307,7 +16469,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-a66",
+        "id": "20261001-120000-b2d",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -16766,7 +16928,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -16786,7 +16948,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -16799,10 +16961,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-a66",
+          "operation": "20261001-120000-b2d",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d\\1-config.toml"
         }
       ]
     },
@@ -16810,10 +16972,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-643",
+          "operation": "20261001-120000-948",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948\\2-manifest.json"
         }
       ]
     }
@@ -22680,14 +22842,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-643"
+        "operation": "20261001-120000-948"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-643 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-643",
+          "title": "Undo 20261001-120000-948 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-948",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -22743,15 +22905,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-643"
+        "operation": "20261001-120000-948"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-643 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-948 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-643",
+          "backup_of": "20261001-120000-948",
           "project": null,
           "changes": [],
           "effective": [],
@@ -22759,11 +22921,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-643 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-948",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-948 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -22772,15 +22934,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-406"
+        "operation": "20261001-120000-3a8"
       },
       "preview": {
         "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-406 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-3a8 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-406",
+          "backup_of": "20261001-120000-3a8",
           "project": null,
           "changes": [],
           "effective": [],
@@ -22788,10 +22950,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-406 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3a8",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-3a8 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -22800,14 +22962,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-a66"
+        "operation": "20261001-120000-b2d"
       },
       "preview": {
         "plan_id": "plan-58",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-a66 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-a66",
+          "title": "Undo 20261001-120000-b2d \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-b2d",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -23293,15 +23455,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-a66"
+        "operation": "20261001-120000-b2d"
       },
       "preview": {
         "plan_id": "plan-59",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-a66 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-b2d \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-a66",
+          "backup_of": "20261001-120000-b2d",
           "project": null,
           "changes": [],
           "effective": [],
@@ -23309,10 +23471,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a66 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-b2d can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -23322,11 +23484,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-a66",
+      "operation": "20261001-120000-b2d",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-a66: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-b2d",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-b2d: verified.",
       "hints": []
     }
   },
@@ -23374,7 +23536,7 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "b406aa2",
+    "commit": "4f00093",
     "date": "2026-11-03",
     "platform": "Windows x64",
     "pages": [

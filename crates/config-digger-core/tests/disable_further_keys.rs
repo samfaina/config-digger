@@ -204,6 +204,45 @@ fn disable_writes_the_first_key_alone() {
 }
 
 #[test]
+fn disable_of_an_entry_on_under_its_name_beside_its_own_name_off_writes_off_over_on() {
+    let fs = fixture(false, json!({ "synced:pdf": "on", "pdf": "off" }));
+    let core = core(&fs);
+    assert_eq!(
+        code(entry(&inventory(&core), "synced:pdf").state),
+        "effective"
+    );
+
+    let disable = plan(&core, Action::Disable, "synced:pdf");
+    core.execute(disable, &[]).unwrap();
+
+    assert_eq!(
+        settings_json(&fs),
+        json!({ "overrides": { "synced:pdf": "off", "pdf": "off" } })
+    );
+    let pdf = entry(&inventory(&core), "synced:pdf");
+    assert_eq!(code(pdf.state), "disabled");
+    assert_eq!(
+        pdf.reason.unwrap().switch,
+        Some(format!("{}#overrides.synced:pdf", settings().display()))
+    );
+}
+
+#[test]
+fn enable_of_an_entry_off_under_its_name_beside_its_own_name_on_deletes_that_key_alone() {
+    let fs = fixture(false, json!({ "synced:pdf": "off", "pdf": "on" }));
+    let core = core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+    core.execute(enable, &[]).unwrap();
+
+    assert_eq!(settings_json(&fs), json!({ "overrides": { "pdf": "on" } }));
+    assert_eq!(
+        code(entry(&inventory(&core), "synced:pdf").state),
+        "effective"
+    );
+}
+
+#[test]
 fn enable_deletes_every_key_that_disables_the_entry() {
     let fs = fixture(false, json!({ "synced:pdf": "off", "pdf": "off" }));
     let core = core(&fs);
@@ -349,4 +388,41 @@ fn enable_of_a_switch_read_everywhere_names_only_the_entry_s_name_that_disables(
     assert!(!sentence.contains("`pdf`"), "{sentence}");
     core.execute(enable, &[WarningClass::WideReach]).unwrap();
     assert_eq!(home_overrides_json(&fs), json!({ "overrides": {} }));
+}
+
+#[test]
+fn enable_of_a_switch_read_everywhere_off_under_both_keys_leaves_the_entry_effective() {
+    let fs = everywhere_fixture(json!({ "synced:pdf": "off", "pdf": "off" }));
+    let core = everywhere_core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+    core.execute(enable, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(home_overrides_json(&fs), json!({ "overrides": {} }));
+    assert_eq!(
+        code(entry(&inventory(&core), "synced:pdf").state),
+        "effective"
+    );
+}
+
+#[test]
+fn enable_of_a_switch_read_everywhere_off_under_the_name_beside_its_own_name_on_deletes_that_key_alone()
+ {
+    let fs = everywhere_fixture(json!({ "pdf": "on", "synced:pdf": "off" }));
+    let core = everywhere_core(&fs);
+
+    let enable = plan(&core, Action::Enable, "synced:pdf");
+
+    let sentence = wide_reach(&enable).expect("a wide-reach warning");
+    assert!(sentence.contains("`synced:pdf`"), "{sentence}");
+    assert!(!sentence.contains("`pdf`"), "{sentence}");
+    core.execute(enable, &[WarningClass::WideReach]).unwrap();
+    assert_eq!(
+        home_overrides_json(&fs),
+        json!({ "overrides": { "pdf": "on" } })
+    );
+    assert_eq!(
+        code(entry(&inventory(&core), "synced:pdf").state),
+        "effective"
+    );
 }

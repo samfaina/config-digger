@@ -271,34 +271,44 @@ fn set_for<'a>(
             .switches_of(entry, location.kind, index)
             .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project);
         let keys = switch_keys(mechanism, entry);
-        for (switch, key) in switches.flat_map(|switch| keys.iter().map(move |key| (switch, key))) {
-            // Of the files of one layer, such as merged managed settings,
-            // the first that holds a value decides too.
-            if mechanism.layered() && layer_decided {
-                break;
-            }
-            let value = switch.value_for(key);
-            // Enable taking a switch away leaves the next layer to decide.
-            let unset =
-                every_layer && mechanism.enable_unsets() && mechanism.disables(value, key, folder);
-            layer_decided |= mechanism.layered() && value.is_some() && !unset;
-            let hit = Hit {
-                mechanism,
-                switch,
-                key_path: switch.key_path_for(key),
-                value,
-                key: key.clone(),
-                folder,
-            };
-            // A layer that holds nothing leaves the next one to decide.
-            if mechanism.layered() && value.is_none() {
-                by_default = Some(hit);
-                continue;
-            }
-            if mechanism.disables(value, key, folder) {
-                disabling.push(hit);
-            } else if mechanism.partial(value) {
-                partial.push(hit);
+        for switch in switches {
+            // Of the switch's keys, the first that holds a value decides,
+            // and a later key is read only while every earlier one holds
+            // nothing, as Claude Code reads a synced skill's
+            // `anthropic-skills:<folder>` before its bare `<folder>`.
+            let mut key_decided = false;
+            for key in &keys {
+                // Of the files of one layer, such as merged managed settings,
+                // the first that holds a value decides too.
+                if key_decided || (mechanism.layered() && layer_decided) {
+                    break;
+                }
+                let value = switch.value_for(key);
+                // Enable taking a switch away leaves the next layer, or the
+                // switch's next key, to decide.
+                let unset = every_layer
+                    && mechanism.enable_unsets()
+                    && mechanism.disables(value, key, folder);
+                key_decided = value.is_some() && !unset;
+                layer_decided |= mechanism.layered() && key_decided;
+                let hit = Hit {
+                    mechanism,
+                    switch,
+                    key_path: switch.key_path_for(key),
+                    value,
+                    key: key.clone(),
+                    folder,
+                };
+                // A layer that holds nothing leaves the next one to decide.
+                if mechanism.layered() && value.is_none() {
+                    by_default = Some(hit);
+                    continue;
+                }
+                if mechanism.disables(value, key, folder) {
+                    disabling.push(hit);
+                } else if mechanism.partial(value) {
+                    partial.push(hit);
+                }
             }
         }
     }

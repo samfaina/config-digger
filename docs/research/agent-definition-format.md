@@ -173,7 +173,7 @@ docs.windsurf.com redirects to docs.devin.ai/desktop. Source: https://docs.devin
 - Disable mechanisms:
   - `/mcp` toggle: `json-name-list projects.{project}.disabledMcpServers`, reach name per project, first in order.
   - `json-name-list disabledMcpjsonServers` in settings.local.json.
-  - `json-field skillOverrides.<name>="off"`.
+  - `json-field skillOverrides.<name>="off"`, which also reads a synced skill's bare `<folder>` and a nested `<subfolder>:<name>`'s bare `<name>` through `also_names = ["{own_name}"]` (#309, #352). A switch with `also_names` reads the Entry's keys in order, `{name}` first, the key Disable writes, then each `also_names` key in the order given; the first that holds a value decides, `on` and partial values too, and a later key is read only while every earlier one holds nothing, so `"anthropic-skills:<folder>": "on"` beside `"<folder>": "off"` leaves the skill Effective, as Claude Code reads it (#510). Enable deletes the key that decides, then the next key in turn while it holds the disabled value, so that no later key turns the Entry off again; a later key holding another value stops it, and decides.
   - `json-field enabledPlugins.<id>=false`.
   - Rules with Enable not offered: `allow-deny-list` for `deniedMcpServers`/`allowedMcpServers` and `permissions.deny Skill(name)`; `global-switch` for `disableClaudeAiConnectors`, `disableBundledSkills`, `syncClaudeAiSkills`, `syncClaudeAiPlugins`.
 - Conditions: `setting-equals` for `managedSourcesBehavior` and `allowManagedMcpServersOnly`.

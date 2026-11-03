@@ -2435,6 +2435,40 @@
       ]
     },
     {
+      "id": "35",
+      "title": "Las dos claves de skillOverrides de una skill sincronizada",
+      "steps": [
+        {
+          "id": "35.1",
+          "title": "Una skill sincronizada con «on» bajo su nombre anthropic-skills: y «off» bajo su carpeta sola",
+          "goal": "De las dos claves de skillOverrides de una skill sincronizada, Claude Code lee primero anthropic-skills:<carpeta>, y la primera que tiene un valor decide: con «on» ahí y «off» bajo la carpeta sola, Claude Code lee la skill, y config-digger la enseña Effective.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "Elige la skill anthropic-skills:cd-throwaway-overridden-skill y lee su tarjeta.",
+            "Abre E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json en el Bloc de notas y mira su skillOverrides."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «anthropic-skills:cd-throwaway-overridden-skill» sale «Effective».",
+            "Su tarjeta no tiene ninguna nota que nombre «skillOverrides».",
+            "Su tarjeta tiene la etiqueta «cloud mirror».",
+            "El fichero tiene «\"anthropic-skills:cd-throwaway-overridden-skill\": \"on\"» y «\"cd-throwaway-overridden-skill\": \"off\"»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#510"
+          ]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

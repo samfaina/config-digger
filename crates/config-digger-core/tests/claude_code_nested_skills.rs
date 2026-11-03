@@ -267,6 +267,26 @@ fn skill_overrides_turn_a_nested_skill_off_by_its_name_and_a_prefixed_one_by_its
     );
 }
 
+#[test]
+fn a_nested_skill_on_under_its_prefixed_name_is_effective_while_its_folder_name_turns_the_project_s_skill_off()
+ {
+    let fs = with_skill(repo(), ".", "deploy");
+    let fs = with_skill(fs, r"apps\web", "deploy");
+
+    for overrides in [
+        json!({ "apps/web:deploy": "on", "deploy": "off" }),
+        json!({ "deploy": "off", "apps/web:deploy": "on" }),
+    ] {
+        let inventory = inventory(&with_overrides(fs.clone(), overrides.clone()));
+
+        assert_eq!(
+            ["apps/web:deploy", "deploy"].map(|name| state(&inventory, name)),
+            ["effective", "disabled"],
+            "{overrides}"
+        );
+    }
+}
+
 /// A Claude Code home, and the Project folder in no git work tree.
 fn outside_git() -> FakeFileSystem {
     claude_code_home().with_folder(PROJECT)
