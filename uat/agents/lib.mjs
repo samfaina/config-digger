@@ -301,19 +301,25 @@ export async function registry(key, name, data) {
 }
 
 // A local server that answers every request with `reply`, or with what
-// `reply` returns for the request's body when it is a function, and keeps
-// each request's body, and in `headers` its headers, so an Agent's request
-// to its model never leaves the machine.
+// `reply` returns for the request's body when it is a function, once that
+// settles when it is a promise, and keeps each request's body, and in
+// `headers` its headers, so an Agent's request to its model never leaves the
+// machine. A `reply` that throws or rejects answers 500 with the error.
 export async function modelServer(reply) {
   const bodies = [];
   const headers = [];
   const server = http.createServer((req, res) => {
     let body = "";
-    req.on("data", (d) => (body += d)).on("end", () => {
+    req.on("data", (d) => (body += d)).on("end", async () => {
       bodies.push(body);
       headers.push(req.headers);
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify(typeof reply === "function" ? reply(body) : reply));
+      try {
+        const answer = await (typeof reply === "function" ? reply(body) : reply);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(answer));
+      } catch (error) {
+        res.writeHead(500).end(String(error));
+      }
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
