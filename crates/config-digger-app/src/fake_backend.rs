@@ -118,8 +118,9 @@ pub fn record(root: &Path) -> Result<Value, Error> {
 
 /// Adds the Claude Desktop home, three more Claude Code homes, whose last
 /// parts fill a tile in the smallest window, the signed-out Claude Code
-/// home, the extra Project and the user's folder as a Project, then hides a
-/// Project, as the UAT does: what the last change did.
+/// home, the one with plugins of a `directory` marketplace, the extra
+/// Project and the user's folder as a Project, then hides a Project, as the
+/// UAT does: what the last change did.
 fn change_lists(root: &Path) -> Result<ListChanged, Error> {
     let kept = SessionState::default();
     let scanned = root.to_path_buf();
@@ -143,6 +144,10 @@ fn change_lists(root: &Path) -> Result<ListChanged, Error> {
         },
         ListChange::AddHome {
             folder: root.join("claude-code-logout-home"),
+            agent: "claude-code".to_owned(),
+        },
+        ListChange::AddHome {
+            folder: root.join("claude-code-market-home"),
             agent: "claude-code".to_owned(),
         },
         ListChange::AddProject {

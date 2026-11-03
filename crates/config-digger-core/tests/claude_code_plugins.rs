@@ -1768,52 +1768,174 @@ fn a_plugin_of_a_marketplace_of_another_kind_is_read_from_its_install_path() {
     );
 }
 
-// Claude Code reads the cache copy too for an object source. With no
-// manifest, one that does not parse or no entry of the plugin's name, it
-// loads the plugin from neither copy, and config-digger reads the cache copy
-// until #506.
 #[test]
-fn a_plugin_the_directory_marketplace_names_no_folder_for_is_read_from_its_install_path() {
-    let manifest = PathBuf::from(MARKET).join(r".claude-plugin\marketplace.json");
-    let object = json!({ "source": "github", "repo": "me/localp" });
-    for (case, fs) in [
-        ("an object source", with_localp(object)),
-        ("no manifest", {
-            let fs = with_localp(json!("./plugins/localp"));
-            fs.delete_file(&manifest);
-            fs
-        }),
-        (
-            "a manifest that does not parse",
-            with_localp(json!("./plugins/localp")).with_file(&manifest, r#"{ "plugins": ["#),
-        ),
-        (
-            "no entry of its name",
-            with_localp(json!("./plugins/localp")).with_file(
-                &manifest,
-                json!({ "plugins": [{ "name": "other", "source": "./plugins/localp" }] })
-                    .to_string(),
-            ),
-        ),
-    ] {
-        fs.put_file(
-            known_marketplaces(),
-            json!({ "my-market": my_market_record() }).to_string(),
-        );
+fn a_plugin_whose_entry_has_an_object_source_is_read_from_its_install_path() {
+    let fs = with_localp(json!({ "source": "github", "repo": "me/localp" })).with_file(
+        known_marketplaces(),
+        json!({ "my-market": my_market_record() }).to_string(),
+    );
 
-        let inventory = no_project(&fs);
+    let inventory = no_project(&fs);
 
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:cached-skill", "plugin:localp:cached"]
+    );
+    for name in ["localp:cached-skill", "plugin:localp:cached"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+    assert!(
+        inventory.read_failures.is_empty(),
+        "{:?}",
+        inventory.read_failures
+    );
+}
+
+fn my_market_manifest() -> PathBuf {
+    PathBuf::from(MARKET).join(r".claude-plugin\marketplace.json")
+}
+
+/// The sentence of every Entry of localp, read from its copy in the cache,
+/// when Claude Code does not load it since the manifest of `my-market`
+/// fails as `cause` says.
+fn assert_localp_fails(inventory: &Inventory, cause: &str) {
+    assert_eq!(
+        localp_items(inventory),
+        ["localp:cached-skill", "plugin:localp:cached"]
+    );
+    for name in ["localp:cached-skill", "plugin:localp:cached"] {
+        let localp = item(inventory, name);
+        assert_eq!(code(localp.state), "invalid", "{name}");
+        let reason = localp.entries[0].reason.as_ref().unwrap();
+        assert_eq!(code(reason.code), "plugin_failed_to_load", "{name}");
         assert_eq!(
-            localp_items(&inventory),
-            ["localp:cached-skill", "plugin:localp:cached"],
-            "{case}"
-        );
-        assert!(
-            inventory.read_failures.is_empty(),
-            "{case}: {:?}",
-            inventory.read_failures
+            reason.sentence,
+            format!(
+                "Invalid: Claude Code does not load the plugin `localp`, since the manifest of its marketplace `my-market`, {}, {cause}.",
+                my_market_manifest().display()
+            ),
+            "{name}"
         );
     }
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_with_no_manifest_fails_to_load() {
+    let fs = localp_in_market();
+    fs.delete_file(my_market_manifest());
+
+    let inventory = no_project(&fs);
+
+    assert_localp_fails(&inventory, "is missing");
+    assert!(
+        inventory.read_failures.is_empty(),
+        "{:?}",
+        inventory.read_failures
+    );
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_whose_folder_is_missing_is_read_from_its_install_path() {
+    let fs = localp_in_market();
+    for file in [
+        my_market_manifest(),
+        localp_market().join(".mcp.json"),
+        localp_market().join(r"skills\live-skill\SKILL.md"),
+    ] {
+        fs.delete_file(file);
+    }
+
+    let inventory = no_project(&fs);
+
+    assert_eq!(
+        localp_items(&inventory),
+        ["localp:cached-skill", "plugin:localp:cached"]
+    );
+    for name in ["localp:cached-skill", "plugin:localp:cached"] {
+        assert_eq!(code(item(&inventory, name).state), "effective", "{name}");
+    }
+}
+
+/// `fs` with a second plugin of `my-market` installed and on, `otherp`,
+/// whose copy in the cache carries the server `other-cached`.
+fn with_otherp(fs: FakeFileSystem) -> FakeFileSystem {
+    let registry = PathBuf::from(HOME).join(r".claude\plugins\installed_plugins.json");
+    let otherp_cache = in_cache(r"my-market\otherp\1.0.0");
+    let mut installed = json_of(&fs, &registry);
+    installed["plugins"]["otherp@my-market"] = json!([{
+        "scope": "user",
+        "installPath": otherp_cache.display().to_string(),
+        "version": "1.0.0",
+    }]);
+    let mut settings = json_of(&fs, user_settings());
+    settings["enabledPlugins"]["otherp@my-market"] = json!(true);
+    fs.with_file(registry, installed.to_string())
+        .with_file(user_settings(), settings.to_string())
+        .with_file(
+            otherp_cache.join(".mcp.json"),
+            json!({ "mcpServers": { "other-cached": { "command": "other" } } }).to_string(),
+        )
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_whose_manifest_does_not_parse_fails_to_load() {
+    let fs = with_otherp(localp_in_market()).with_file(my_market_manifest(), r#"{ "plugins": ["#);
+
+    let inventory = no_project(&fs);
+
+    assert_localp_fails(
+        &inventory,
+        "does not parse as strict JSON (line 1, column 14)",
+    );
+    assert_eq!(
+        code(item(&inventory, "plugin:otherp:other-cached").state),
+        "invalid"
+    );
+    let failures: Vec<&Path> = inventory
+        .read_failures
+        .iter()
+        .map(|failure| failure.path.as_path())
+        .collect();
+    assert_eq!(failures, [my_market_manifest()]);
+    assert_eq!(code(inventory.read_failures[0].kind), "parse");
+}
+
+#[test]
+fn a_plugin_the_manifest_of_its_directory_marketplace_does_not_list_fails_to_load() {
+    let otherp_market = PathBuf::from(MARKET).join(r"plugins\otherp");
+    let fs = with_otherp(localp_in_market())
+        .with_file(
+            my_market_manifest(),
+            json!({ "plugins": [{ "name": "otherp", "source": "./plugins/otherp" }] }).to_string(),
+        )
+        .with_file(
+            otherp_market.join(".mcp.json"),
+            json!({ "mcpServers": { "other-live": { "command": "other" } } }).to_string(),
+        );
+
+    let inventory = no_project(&fs);
+
+    assert_localp_fails(&inventory, "does not list it");
+    let other = item(&inventory, "plugin:otherp:other-live");
+    assert_eq!(other.entries[0].path, otherp_market.join(".mcp.json"));
+    assert_eq!(code(other.state), "effective");
+    assert!(
+        inventory.read_failures.is_empty(),
+        "{:?}",
+        inventory.read_failures
+    );
+}
+
+#[test]
+fn a_plugin_of_a_directory_marketplace_whose_manifest_holds_no_list_of_plugins_fails_to_load() {
+    let fs = localp_in_market().with_file(
+        my_market_manifest(),
+        json!({ "plugins": { "localp": { "source": "./plugins/localp" } } }).to_string(),
+    );
+
+    let inventory = no_project(&fs);
+
+    assert_localp_fails(&inventory, "does not list it");
 }
 
 /// The fixture with localp of a `directory` marketplace that

@@ -4,8 +4,8 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Disables, FolderTrust, Gate,
-    Holds, JsonFormat, ListPlugins, Malformed, Merge, NonceTrust, NotListed, Parse, PolicyField,
-    Provenance, SettingIs, SkillDefect, SkillFallback,
+    Holds, JsonFormat, ListPlugins, Malformed, ManifestFailure, Merge, NonceTrust, NotListed,
+    Parse, PolicyField, Provenance, SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::Strength;
 use crate::definitions::{
@@ -321,9 +321,8 @@ pub(crate) fn resolve(
                         }
                     })
                     .unzip();
-            // The Read failure of a file of each Entry's plugin that keeps
-            // the Agent from loading the plugin, with what the Agent does.
-            let plugin_failures: Vec<Option<(&ScannedReadFailure, &Reaction)>> = entries
+            // What keeps the Agent from loading each Entry's plugin.
+            let plugin_failures: Vec<Option<PluginFailure>> = entries
                 .iter()
                 .map(|entry| plugin_failure(snapshot, &reactions, entry))
                 .collect();
@@ -752,14 +751,21 @@ pub(crate) fn resolve(
                                 }
                             }
                             Check::PluginLoad => {
-                                if let (Some((failure, reaction)), Some(plugin)) =
+                                if let (Some(failure), Some(plugin)) =
                                     (plugin_failures[index], entry.plugin.as_ref())
                                 {
-                                    let cause = explain::file_failure_cause(
-                                        agent_name,
-                                        failure,
-                                        reaction.dialect,
-                                    );
+                                    let cause = match failure {
+                                        PluginFailure::Manifest(failure) => {
+                                            explain::manifest_failure_cause(agent_name, failure)
+                                        }
+                                        PluginFailure::File(failure, reaction) => {
+                                            explain::file_failure_cause(
+                                                agent_name,
+                                                failure,
+                                                reaction.dialect,
+                                            )
+                                        }
+                                    };
                                     failed.push((
                                         check,
                                         api::State::Invalid,
@@ -2109,15 +2115,19 @@ fn kept_out_by<'e>(
     })
 }
 
-/// The Read failure, with what the Agent does about it, of a file of the
-/// plugin `entry` is part of, for which the Agent does not load the plugin
-/// in the Entry's Agent home, if any.
+/// What keeps the Agent from loading the plugin `entry` is part of in the
+/// Entry's Agent home, if anything does: the manifest of the plugin's
+/// marketplace, or else the Read failure of a file of the plugin, with
+/// what the Agent does about it.
 fn plugin_failure<'s>(
     snapshot: &'s Snapshot,
     reactions: &'s [Reaction],
-    entry: &ScannedEntry,
-) -> Option<(&'s ScannedReadFailure, &'s Reaction)> {
+    entry: &'s ScannedEntry,
+) -> Option<PluginFailure<'s>> {
     let plugin = entry.plugin.as_ref()?;
+    if let Some(failure) = &plugin.manifest_failure {
+        return Some(PluginFailure::Manifest(failure));
+    }
     snapshot
         .read_failures
         .iter()
@@ -2130,6 +2140,16 @@ fn plugin_failure<'s>(
                     failed.plugins == plugin.plugins && failed.folder == plugin.folder
                 })
         })
+        .map(|(failure, reaction)| PluginFailure::File(failure, reaction))
+}
+
+/// What keeps an Agent from loading a plugin.
+#[derive(Clone, Copy)]
+enum PluginFailure<'s> {
+    /// The manifest of the plugin's marketplace.
+    Manifest(&'s ManifestFailure),
+    /// The Read failure of a file of the plugin, with what the Agent does.
+    File(&'s ScannedReadFailure, &'s Reaction),
 }
 
 /// The path of the scanned Project whose key is `key`.

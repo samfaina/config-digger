@@ -389,9 +389,9 @@ uatStep("4.6", async ({ page, open, check }) => {
     expect(new Set(tiles.map(({ tail }) => tail.text)).size).toBe(tiles.length);
   });
   await check("Un nombre que no cabe en su ficha se corta con «…» en la parte de la carpeta que va antes de ese final.", async () => {
-    // The shape, synced, many and logout homes, each with and without the tag and the badge.
+    // The shape, synced, many, logout and market homes, each with and without the tag and the badge.
     const long = [...tiles, ...marked].filter(({ head }) => head !== null);
-    expect(long).toHaveLength(2 * 4);
+    expect(long).toHaveLength(2 * 5);
     for (const { head } of long) expect(head).toEqual({ text: ROOT, cut: true, ellipsis: "ellipsis" });
   });
   await check("Un nombre que cabe en su ficha, como «default» cuando sale, se ve entero, sin «…».", async () => {

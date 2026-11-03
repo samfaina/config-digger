@@ -7,8 +7,9 @@ use crate::api::{
 };
 use crate::definitions::ItemKind;
 use crate::definitions::blocks::{
-    ApprovalPrompt, FieldType, Malformed, MatchedBy, NameChars, NameRule, NotListed, RefusedChars,
-    SettingIs, SkillDefect, Unlisted, UnseenServers,
+    ApprovalPrompt, FieldType, JsonFormat, Malformed, ManifestCause, ManifestFailure, MatchedBy,
+    NameChars, NameRule, NotListed, Parse, RefusedChars, SettingIs, SkillDefect, Unlisted,
+    UnseenServers,
 };
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
@@ -242,6 +243,36 @@ pub(crate) fn file_failure_cause(
             format!("config-digger cannot read {path}, and {agent_name} is taken not to either")
         }
     }
+}
+
+/// Why `agent_name` does not load a plugin whose marketplace's manifest
+/// fails as `failure` says.
+pub(crate) fn manifest_failure_cause(agent_name: &str, failure: &ManifestFailure) -> String {
+    let what = match failure.cause {
+        ManifestCause::Missing => "is missing".to_owned(),
+        ManifestCause::DoesNotList => "does not list it".to_owned(),
+        ManifestCause::ReadFailure(ReadFailureKind::Decode, _) => {
+            format!("is not text {agent_name} can decode")
+        }
+        ManifestCause::ReadFailure(ReadFailureKind::Permission, _) => format!(
+            "cannot be read: config-digger has no permission to read it, and {agent_name} is taken to have none either"
+        ),
+        ManifestCause::ReadFailure(ReadFailureKind::Io | ReadFailureKind::Sqlite, _) => format!(
+            "cannot be read: config-digger cannot read it, and {agent_name} is taken not to either"
+        ),
+        ManifestCause::ReadFailure(ReadFailureKind::Parse | ReadFailureKind::Shape, position) => {
+            format!(
+                "does not parse as {}{}",
+                JsonFormat::STRICT.dialect(),
+                position_at(position)
+            )
+        }
+    };
+    format!(
+        "the manifest of its marketplace `{}`, {}, {what}",
+        failure.marketplace,
+        failure.manifest.display()
+    )
 }
 
 /// Where in a file a parse error is, as a sentence puts it after the file.
@@ -2848,6 +2879,36 @@ pub(crate) fn cli_running(cli: &Path) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_marketplace_manifest_that_fails_says_how() {
+        for (cause, how) in [
+            (
+                ManifestCause::ReadFailure(ReadFailureKind::Decode, None),
+                "is not text Agent can decode",
+            ),
+            (
+                ManifestCause::ReadFailure(ReadFailureKind::Permission, None),
+                "cannot be read: config-digger has no permission to read it, and Agent is taken to have none either",
+            ),
+            (
+                ManifestCause::ReadFailure(ReadFailureKind::Parse, Some((2, 5))),
+                "does not parse as strict JSON (line 2, column 5)",
+            ),
+        ] {
+            let failure = ManifestFailure {
+                marketplace: "market".to_owned(),
+                manifest: PathBuf::from(r"C:\market\marketplace.json"),
+                cause,
+            };
+            assert_eq!(
+                manifest_failure_cause("Agent", &failure),
+                format!(
+                    r"the manifest of its marketplace `market`, C:\market\marketplace.json, {how}"
+                )
+            );
+        }
+    }
 
     #[test]
     fn a_plugin_left_out_of_the_list_is_deleted_only_when_the_agent_deletes_it() {

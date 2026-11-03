@@ -2381,7 +2381,7 @@
       ]
     },
     "FolderMarketplaces": {
-      "description": "The marketplaces plugins are installed from, as far as they say where a\nplugin's files are, such as Claude Code's `directory` marketplaces: a\nplugin whose id names a marketplace in a folder, after the plugins'\n`id_separator`, is read from the folder its entry in the marketplace's\nmanifest names, a path relative to the marketplace's folder. A plugin\nof a marketplace of another kind, or one whose manifest is missing,\ndoes not parse, does not list it or names no folder below the\nmarketplace's for it, is read from its record's folder.",
+      "description": "The marketplaces plugins are installed from, as far as they say where a\nplugin's files are, such as Claude Code's `directory` marketplaces: a\nplugin whose id names a marketplace in a folder, after the plugins'\n`id_separator`, is read from the folder its entry in the marketplace's\nmanifest names, a path relative to the marketplace's folder. A plugin\nof a marketplace of another kind, or one whose entry names no folder\nbelow the marketplace's, is read from its record's folder; so is one\nwhose manifest is missing, does not parse or does not list it, unless\n`on_manifest_failure` says the Agent fails it.",
       "type": "object",
       "properties": {
         "anchor": {
@@ -2435,6 +2435,10 @@
           "description": "The field of an entry that holds where the plugin's files are: as a\nrelative path, a folder below the marketplace's or that folder.",
           "type": "string"
         },
+        "on_manifest_failure": {
+          "description": "What the Agent does with a plugin of a marketplace in a folder whose\nmanifest is missing, does not parse or does not list it, a manifest\nwhose `plugins` key path holds no list listing none.",
+          "$ref": "#/$defs/OnManifestFailure"
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -2474,6 +2478,21 @@
       "required": [
         "anchor",
         "key_path"
+      ]
+    },
+    "OnManifestFailure": {
+      "description": "What an Agent does with a plugin of a marketplace in a folder whose\nmanifest is missing, does not parse or does not list it.",
+      "oneOf": [
+        {
+          "description": "It reads the plugin from its record's folder.",
+          "type": "string",
+          "const": "reads_record_folder"
+        },
+        {
+          "description": "It fails to load the plugin: every Entry of the plugin, read from\nits record's folder, is Invalid, and a manifest that cannot be read\nor does not parse is a Read failure.",
+          "type": "string",
+          "const": "fails_plugin"
+        }
       ]
     },
     "InstallRecords": {
