@@ -340,11 +340,11 @@ on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries"]
 
 # An agent plugin's servers are in the `.mcp.json` at its root, whatever
-# its manifest [test], and in the file a manifest's `mcpServers` names,
-# which `plugin-manifest-mcp` reads; a manifest's inline `mcpServers` takes
-# the `.mcp.json`'s place (see `plugin-manifest-mcp`). VS Code reads a
-# `.mcp.json` it cannot parse around the error, and starts the servers it
-# finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
+# its manifest [test], unless the manifest's `mcpServers` takes its place,
+# and in the files that `mcpServers` names: `plugin-manifest-mcp` reads it,
+# and reads this location first, through its `references`, in the plugins
+# whose `mcpServers` leaves it read. VS Code reads a `.mcp.json` it cannot
+# parse around the error, and starts the servers it finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
 # around `,,`, a missing comma, a key with no value, which drops that key,
 # an object left open at the end of the file, and a string left open in a
 # server, which takes the next server into it [test].
@@ -361,29 +361,46 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "reads_around_error"
 
-# The servers of the file an agent plugin's manifest names in `mcpServers`,
-# such as `"./servers.json"`, which VS Code reads after the plugin's
-# `.mcp.json`, the manifest at its root, in `.claude-plugin` or in
-# `.plugin` [test]. A manifest in `.github\plugin` is not read: its
-# `mcpServers` adds nothing [test], though VS Code 1.143.1 reads it
-# [test]. VS Code takes the first of `.plugin`, `.claude-plugin` and the
-# root that exists for the manifest, the one the plugin's name comes from
-# (see `agent-plugins`), and reads it around its error when it does not
-# parse: of a plugin whose `.claude-plugin\plugin.json` does not parse and
-# whose `plugin.json` does, the file the broken manifest names before its
-# error starts, the root's does not; of one whose `plugin.json` does not
-# parse, the file its `.claude-plugin\plugin.json` names starts [test].
-# Of a server the two files both name, VS Code starts
-# the `.mcp.json`'s only, the named file's never [test], so the
-# `.mcp.json`'s ranks first. An inline object of servers in `mcpServers`
-# takes the place of the `.mcp.json`, whose servers do not start, and a
-# list's objects are skipped, its paths read after the `.mcp.json` [test];
-# config-digger lists both files' servers, and a list's objects too,
-# ticket [#512](https://github.com/samfaina/config-digger/issues/512).
+# The servers an agent plugin's manifest gives in `mcpServers`, the
+# manifest at its root, in `.claude-plugin` or in `.plugin` [test]. A
+# manifest in `.github\plugin` is not read: its `mcpServers` adds nothing
+# [test], though VS Code 1.143.1 reads it [test]. VS Code takes the first
+# of `.plugin`, `.claude-plugin` and the root that exists for the
+# manifest, the one the plugin's name comes from (see `agent-plugins`),
+# and reads it around its error when it does not parse: of a plugin whose
+# `.claude-plugin\plugin.json` does not parse and whose `plugin.json`
+# does, the file the broken manifest names before its error starts, the
+# root's does not; of one whose `plugin.json` does not parse, the file its
+# `.claude-plugin\plugin.json` names starts [test].
+#
+# VS Code 1.129.1 to 1.143.1 read `mcpServers` alike (#512):
+# - An object with no `paths` key holds the plugin's servers, and takes the
+#   place of the `.mcp.json`, whose servers do not start [test], whatever
+#   it holds: with only a server VS Code cannot launch, `type: "ws"`,
+#   nothing starts [test], and so with `{}` [binary]. VS Code 1.141.0's
+#   code holds a reader that would fall back on the `.mcp.json` when no
+#   inline server can launch, but the window reads plugins through another,
+#   which never does [binary], so `references` has no test of a launch.
+# - An object with a `paths` key names files: when `paths` holds a list,
+#   each of its strings, read after the `.mcp.json`, or without it when
+#   `exclusive` holds `true` [test]; when it holds anything else, no file,
+#   the `.mcp.json` read alone [test]. Neither key is a server, nor is
+#   `exclusive` beside inline servers, which VS Code skips [binary].
+# - A string names a file read after the `.mcp.json` [test].
+# - A list's strings name files read after the `.mcp.json`, and its
+#   objects are skipped, with no error [test], as are its other items
+#   [binary].
+# - A number leaves the `.mcp.json` read alone, with no error [test], as
+#   do `true`, `false`, `null` and no `mcpServers` [binary].
+# Each path is trimmed [test], and an empty one names no file [binary].
+# VS Code drops a file outside the plugin's folder [binary]. Of a server
+# the `.mcp.json` and a named file both name, VS Code starts the
+# `.mcp.json`'s only, the named file's never [test], so `plugin-mcp` ranks
+# first. The servers VS Code does not read are not listed.
 [[locations]]
 id = "plugin-manifest-mcp"
 anchor = { block = "plugin", plugins = "agent-plugins", path = [".plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
-references = { root = ["mcpServers"] }
+references = { root = ["mcpServers"], first = "plugin-mcp", skips_other_values = true, trims = true, paths_object = { paths = "paths", exclusive = "exclusive" } }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 kind = "mcp"

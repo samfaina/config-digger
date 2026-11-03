@@ -1769,6 +1769,196 @@ fn a_plugin_s_mcp_json_server_shadows_the_one_of_its_name_in_the_file_its_manife
     );
 }
 
+/// The plugin `tag` of `vscode.mjs`'s `manifests` launch, whose
+/// `plugin.json` holds `mcp_servers` in `mcpServers`, beside a `.mcp.json`
+/// with the server `cd-throwaway-<tag>-dot` and a `servers.json` with
+/// `cd-throwaway-<tag>-file`: its server Entries, each `<name> <state>
+/// <file name>`, sorted, and the Read failures of its folder.
+fn manifest_servers(tag: &str, mcp_servers: &str) -> (Vec<String>, Vec<PathBuf>) {
+    let manifest = format!(r#"{{ "name": "cd-throwaway-{tag}", "mcpServers": {mcp_servers} }}"#);
+    let servers = |file: &str| {
+        format!(r#"{{ "mcpServers": {{ "cd-throwaway-{tag}-{file}": {{ "command": "x" }} }} }}"#)
+    };
+    let (dot, file) = (servers("dot"), servers("file"));
+    let fs = with_listed(
+        with_home(vscode()),
+        &[(
+            tag,
+            &[
+                ("plugin.json", &manifest),
+                (".mcp.json", &dot),
+                ("servers.json", &file),
+            ],
+        )],
+    );
+    let inventory = inventory(&fs);
+    let folder = review_kit().with_file_name(tag);
+    let failures = inventory
+        .read_failures
+        .iter()
+        .filter(|failure| failure.path.starts_with(&folder))
+        .map(|failure| failure.path.clone())
+        .collect();
+    (plugin_server_states(&inventory), failures)
+}
+
+#[test]
+fn a_manifest_s_inline_object_of_servers_takes_the_place_of_the_plugin_s_mcp_json() {
+    // The probe's `inline` plugin.
+    let inline = r#"{ "cd-throwaway-inline-object": { "command": "x" } }"#;
+
+    let (servers, failures) = manifest_servers("inline", inline);
+
+    assert_eq!(
+        servers,
+        ["cd-throwaway-inline-object effective plugin.json"]
+    );
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn a_manifest_s_list_keeps_only_its_paths_read_after_the_plugin_s_mcp_json() {
+    // The probe's `list` plugin.
+    let list = r#"[ "./servers.json", { "cd-throwaway-list-object": { "command": "x" } } ]"#;
+
+    let (servers, failures) = manifest_servers("list", list);
+
+    assert_eq!(
+        servers,
+        [
+            "cd-throwaway-list-dot effective .mcp.json",
+            "cd-throwaway-list-file effective servers.json",
+        ]
+    );
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn a_manifest_s_number_boolean_or_null_leaves_the_plugin_s_mcp_json_read_with_no_read_failure() {
+    // The first is the probe's `number` plugin.
+    for value in ["42", "true", "false", "null"] {
+        let (servers, failures) = manifest_servers("number", value);
+
+        assert_eq!(
+            servers,
+            ["cd-throwaway-number-dot effective .mcp.json"],
+            "{value}"
+        );
+        assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");
+    }
+}
+
+#[test]
+fn a_manifest_s_paths_are_files_read_after_the_plugin_s_mcp_json_unless_exclusive() {
+    // The probe's `exclusive` and `paths` plugins.
+    let (exclusive, failures) = manifest_servers(
+        "exclusive",
+        r#"{ "paths": ["./servers.json"], "exclusive": true }"#,
+    );
+    assert_eq!(
+        exclusive,
+        ["cd-throwaway-exclusive-file effective servers.json"]
+    );
+    assert_eq!(failures, Vec::<PathBuf>::new());
+
+    let (paths, failures) = manifest_servers("paths", r#"{ "paths": ["./servers.json"] }"#);
+    assert_eq!(
+        paths,
+        [
+            "cd-throwaway-paths-dot effective .mcp.json",
+            "cd-throwaway-paths-file effective servers.json",
+        ]
+    );
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn a_manifest_s_paths_that_are_no_list_leave_the_plugin_s_mcp_json_read_alone() {
+    // The first is the probe's `notlist` plugin.
+    for value in [
+        r#"{ "paths": "./servers.json", "exclusive": true }"#,
+        r#"{ "paths": null }"#,
+    ] {
+        let (servers, failures) = manifest_servers("notlist", value);
+
+        assert_eq!(
+            servers,
+            ["cd-throwaway-notlist-dot effective .mcp.json"],
+            "{value}"
+        );
+        assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");
+    }
+}
+
+#[test]
+fn an_inline_object_takes_the_place_of_the_plugin_s_mcp_json_whatever_its_servers() {
+    // The probe's `ws` and `url` plugins: VS Code 1.129.1 to 1.143.1 start
+    // neither the `.mcp.json`'s server nor the `ws` one, which it cannot
+    // launch.
+    let cases = [
+        (
+            "ws",
+            r#"{ "cd-throwaway-ws-object": { "type": "ws", "url": "ws://127.0.0.1:9/" } }"#,
+        ),
+        (
+            "url",
+            r#"{ "cd-throwaway-url-object": { "url": "http://127.0.0.1:9/" } }"#,
+        ),
+    ];
+    for (tag, inline) in cases {
+        let (servers, failures) = manifest_servers(tag, inline);
+
+        assert_eq!(servers.len(), 1, "{tag}: {servers:?}");
+        assert!(
+            servers[0].starts_with(&format!("cd-throwaway-{tag}-object ")),
+            "{tag}: {servers:?}"
+        );
+        assert_eq!(failures, Vec::<PathBuf>::new(), "{tag}");
+    }
+}
+
+#[test]
+fn an_empty_inline_object_leaves_the_plugin_with_no_server() {
+    let (servers, failures) = manifest_servers("empty", "{}");
+
+    assert_eq!(servers, Vec::<String>::new());
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn exclusive_beside_inline_servers_is_no_server() {
+    let inline = r#"{ "exclusive": true, "cd-throwaway-alone-object": { "command": "x" } }"#;
+
+    let (servers, failures) = manifest_servers("alone", inline);
+
+    assert_eq!(servers, ["cd-throwaway-alone-object effective plugin.json"]);
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn a_manifest_s_paths_are_trimmed_and_an_empty_one_names_no_file() {
+    // The first is the probe's `trimmed` plugin.
+    let both = [
+        "cd-throwaway-trimmed-dot effective .mcp.json",
+        "cd-throwaway-trimmed-file effective servers.json",
+    ];
+    let dot = ["cd-throwaway-trimmed-dot effective .mcp.json"];
+    let cases: [(&str, &[&str]); 6] = [
+        (r#"" ./servers.json ""#, &both),
+        (r#""""#, &dot),
+        (r#""   ""#, &dot),
+        (r#"[ " ./servers.json ", "", " " ]"#, &both),
+        (r#"{ "paths": [ " ./servers.json ", "" ] }"#, &both),
+        (r#"{ "paths": [ "" ], "exclusive": true }"#, &[]),
+    ];
+    for (value, expected) in cases {
+        let (servers, failures) = manifest_servers("trimmed", value);
+
+        assert_eq!(servers, expected, "{value}");
+        assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");
+    }
+}
+
 /// Whether a VS Code server Item of an agent plugin is listed.
 fn any_plugin_server(inventory: &Inventory) -> bool {
     inventory

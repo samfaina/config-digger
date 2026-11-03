@@ -449,14 +449,20 @@ if (runs("plugins")) {
 // Plugins like `plugin-named` of the `plugins` launch, each with a
 // `.mcp.json`: one per other place of the manifest, naming a file; one
 // whose manifest holds its servers inline, one a list of a path and an
-// object; and one whose `.mcp.json` and named file both name
+// object; one whose `.mcp.json` and named file both name
 // `cd-throwaway-clash`, with `chat.mcp.collisionBehavior` at `disable`, so
-// that only one of the two can run. `tests/vscode.rs` reads the same
-// plugins.
+// that only one of the two can run; and one per other form of
+// `mcpServers` (#512): `{"paths": [...]}` with `exclusive` and without,
+// `paths` that hold no list, an inline object whose only server VS Code
+// cannot launch, `type: "ws"`, one whose only server is an HTTP server with
+// no `type` at a closed port, a path with spaces around it, and a number.
+// `tests/vscode.rs` reads the same plugins.
 if (runs("manifests")) {
   const dir = fresh("manifests", base);
   const { plugins } = folders(dir);
   const named = (tag, place) => [tag, { [place]: manifest(tag, { mcpServers: "./servers.json" }), ".mcp.json": dotMcp(`${tag}-dot`), "servers.json": dotMcp(`${tag}-file`) }];
+  // A plugin whose root manifest's `mcpServers` is `value`.
+  const declaring = (tag, value) => [tag, { "plugin.json": manifest(tag, { mcpServers: value }), ".mcp.json": dotMcp(`${tag}-dot`), "servers.json": dotMcp(`${tag}-file`) }];
   marketplace(plugins, [
     named("github", ".github/plugin/plugin.json"),
     named("claude", ".claude-plugin/plugin.json"),
@@ -471,6 +477,14 @@ if (runs("manifests")) {
         "servers.json": { mcpServers: { "cd-throwaway-clash": server("clash-file") } },
       },
     ],
+    declaring("exclusive", { paths: ["./servers.json"], exclusive: true }),
+    declaring("paths", { paths: ["./servers.json"] }),
+    declaring("notlist", { paths: "./servers.json", exclusive: true }),
+    declaring("ws", { "cd-throwaway-ws-object": { type: "ws", url: "ws://127.0.0.1:9/" } }),
+    // A closed local port: VS Code launches the server, which fails to connect.
+    declaring("url", { "cd-throwaway-url-object": { url: "http://127.0.0.1:9/" } }),
+    declaring("trimmed", " ./servers.json "),
+    declaring("number", 42),
   ]);
   const seen = await launch(dir, fresh("proj", dir), { settings: { "chat.mcp.collisionBehavior": "disable" } });
   const of = (tag) => seen.tags.filter((t) => t.startsWith(`${tag}-`));
@@ -490,6 +504,18 @@ if (runs("manifests")) {
   );
   await p.check("locations[plugin-manifest-mcp]", "of a server the plugin's `.mcp.json` and the file its manifest names both name, the `.mcp.json`'s starts, and the named file's does not", async () =>
     same(of("clash"), ["clash-dot"]),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "a manifest's `{\"paths\": [...]}` names files, read after the `.mcp.json`, and with `exclusive: true` without it; `paths` that hold no list leave the `.mcp.json` alone", async () =>
+    same({ exclusive: of("exclusive"), paths: of("paths"), notlist: of("notlist") }, { exclusive: ["exclusive-file"], paths: ["paths-dot", "paths-file"], notlist: ["notlist-dot"] }),
+  );
+  // In VS Code's code, the window reads an inline object, any object with
+  // no `paths` key, in place of the `.mcp.json`, whatever servers it holds
+  // [binary].
+  await p.check("locations[plugin-manifest-mcp]", "an inline object takes the place of the `.mcp.json` whatever its servers: with only a server VS Code cannot launch, `type: \"ws\"`, nothing starts, and with only an HTTP server with no `type`, the `.mcp.json`'s server does not start", async () =>
+    same({ ws: of("ws"), url: of("url") }, { ws: [], url: [] }),
+  );
+  await p.check("locations[plugin-manifest-mcp]", "a path with spaces around it names the file, after the `.mcp.json`; a number leaves the `.mcp.json` alone", async () =>
+    same({ trimmed: of("trimmed"), number: of("number") }, { trimmed: ["trimmed-dot", "trimmed-file"], number: ["number-dot"] }),
   );
 }
 

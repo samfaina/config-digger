@@ -1107,7 +1107,9 @@ pub(crate) struct LocationDefinition {
     /// an object of Entries: a path, relative to the plugin's folder, of
     /// another file in the location's format, or a list of such paths and
     /// objects of Entries, such as a Claude Code plugin manifest's
-    /// `mcpServers`.
+    /// `mcpServers`; and, as its fields say, an object of paths, and
+    /// another location's file read with them unless the value takes its
+    /// place.
     pub references: Option<References>,
     /// How the Agent writes the folder of an Entry's plugin in the values
     /// of a location in plugins, such as Claude Code's
@@ -1151,18 +1153,154 @@ pub(crate) struct References {
     /// bare object of servers.
     #[serde(default)]
     pub bare: bool,
+    /// The id of another location in the same plugins whose file the Agent
+    /// reads before the files the value at the root names, and which an
+    /// object of Entries there takes the place of, as a VS Code plugin
+    /// manifest's inline `mcpServers` takes the place of its `.mcp.json`.
+    /// config-digger reads that location only through this one, after it,
+    /// in each plugin, the item kind's precedence ranking the two; it is
+    /// read whatever the file of this one holds, unless that takes its
+    /// place.
+    pub first: Option<String>,
+    /// Whether the Agent skips, with no Read failure, every value it does
+    /// not read: a list's items other than paths, objects of Entries
+    /// included, and a value at the root that is neither an object, a path
+    /// nor a list, as VS Code reads a plugin manifest's `mcpServers`.
+    #[serde(default)]
+    pub skips_other_values: bool,
+    /// Whether the Agent trims the white space around each path, and reads
+    /// no file for one left empty, as VS Code does.
+    #[serde(default)]
+    pub trims: bool,
+    /// The object at the root that is not an object of Entries but a list
+    /// of paths, as VS Code reads a plugin manifest's `mcpServers` that
+    /// holds `paths`.
+    pub paths_object: Option<PathsObject>,
+}
+
+/// An object that holds a list of paths, read as a list at the root is,
+/// rather than Entries, such as `{"paths": ["./servers.json"],
+/// "exclusive": true}`. Its keys are never Entries.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PathsObject {
+    /// The key whose value makes the object one: when it holds a list, the
+    /// paths; when it holds anything else, no path at all.
+    pub paths: String,
+    /// The key that, holding `true` beside a list of paths, leaves out the
+    /// file of the references' `first` location.
+    pub exclusive: Option<String>,
+}
+
+/// What the value at a location's root declares, as its references read it.
+#[derive(Default)]
+pub(crate) struct Declared<'v> {
+    /// Each value read, with its key path below the root.
+    pub values: Vec<(Vec<String>, DeclaredValue<'v>)>,
+    /// Whether it takes the place of the file of the references' `first`
+    /// location.
+    pub replaces_first: bool,
+}
+
+/// One value the root declares.
+pub(crate) enum DeclaredValue<'v> {
+    /// A path to another file, relative to the plugin's folder.
+    Path(&'v str),
+    /// An object of Entries, each key and its value.
+    Entries(Vec<(&'v String, &'v serde_json::Value)>),
+    /// Any other value, which the Agent fails to read.
+    Other(&'v serde_json::Value),
+}
+
+impl<'v> DeclaredValue<'v> {
+    fn of(value: &'v serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::String(path) => DeclaredValue::Path(path),
+            serde_json::Value::Object(entries) => DeclaredValue::Entries(entries.iter().collect()),
+            other => DeclaredValue::Other(other),
+        }
+    }
 }
 
 impl References {
-    /// Whether the Agent ignores `value`, the value at the location's
-    /// root, as if it declared nothing there.
-    pub fn ignores(&self, value: &serde_json::Value) -> bool {
-        self.dot_slash
-            && match value {
-                serde_json::Value::String(path) => !blocks::is_dot_slash_path(path),
-                serde_json::Value::Object(_) => false,
-                _ => true,
+    /// What `value`, the value at the location's root the Agent reads, if
+    /// any, declares.
+    pub fn declared<'v>(&self, value: Option<&'v serde_json::Value>) -> Declared<'v> {
+        use serde_json::Value;
+        let listed = |items: &'v [Value], below: &[String]| {
+            items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| !self.skips_other_values || item.is_string())
+                .map(|(index, item)| {
+                    let mut key_path = below.to_vec();
+                    key_path.push(index.to_string());
+                    (key_path, DeclaredValue::of(item))
+                })
+                .collect()
+        };
+        let mut declared = match value {
+            None => Declared::default(),
+            Some(Value::Array(items)) => Declared {
+                values: listed(items, &[]),
+                replaces_first: false,
+            },
+            Some(Value::Object(object))
+                if let Some(form) = &self.paths_object
+                    && let Some(paths) = object.get(&form.paths) =>
+            {
+                match paths {
+                    Value::Array(items) => Declared {
+                        values: listed(items, std::slice::from_ref(&form.paths)),
+                        replaces_first: form
+                            .exclusive
+                            .as_ref()
+                            .is_some_and(|key| object.get(key) == Some(&Value::Bool(true))),
+                    },
+                    _ => Declared::default(),
+                }
             }
+            Some(value) => Declared {
+                values: vec![(Vec::new(), DeclaredValue::of(value))],
+                replaces_first: self.first.is_some() && value.is_object(),
+            },
+        };
+        // The keys of a paths object are never Entries, `exclusive` beside
+        // inline Entries included.
+        if let Some(form) = &self.paths_object {
+            for (_, value) in &mut declared.values {
+                if let DeclaredValue::Entries(entries) = value {
+                    entries.retain(|(key, _)| Some(*key) != form.exclusive.as_ref());
+                }
+            }
+        }
+        if self.trims {
+            declared.values.retain_mut(|(_, value)| match value {
+                DeclaredValue::Path(path) => {
+                    *path = path.trim();
+                    !path.is_empty()
+                }
+                _ => true,
+            });
+        }
+        declared
+    }
+
+    /// Whether the Agent ignores `value`, the value at the location's
+    /// root, as if it declared nothing there: for `dot_slash`, any value
+    /// but an object or a path starting with `./`; for
+    /// `skips_other_values`, any value but an object, a path or a list.
+    pub fn ignores(&self, value: &serde_json::Value) -> bool {
+        use serde_json::Value;
+        let dot_slash = self.dot_slash
+            && match value {
+                Value::String(path) => !blocks::is_dot_slash_path(path),
+                Value::Object(_) => false,
+                _ => true,
+            };
+        let skipped = self.skips_other_values
+            && !matches!(value, Value::Object(_) | Value::String(_) | Value::Array(_));
+        dot_slash || skipped
     }
 }
 
@@ -1351,6 +1489,11 @@ impl Validate for SecretFields {
 }
 
 impl LocationDefinition {
+    /// The id of the location its references read `first`, if any.
+    pub fn first(&self) -> Option<&str> {
+        self.references.as_ref()?.first.as_deref()
+    }
+
     /// Whether the Feature gate `gate` changes nothing of the location but
     /// whether its name rule applies.
     pub fn only_rules_names_by(&self, gate: &str) -> bool {
@@ -1644,6 +1787,66 @@ impl AgentDefinition {
             .iter()
             .find(|location| location.id == id)
             .expect("snapshot location ids come from this definition")
+    }
+
+    /// Checks the `paths_object` of `references`, and the location they
+    /// name `first`: one location in the same plugins, of the same kind,
+    /// with no references, that no other location names `first`.
+    fn validate_first(
+        &self,
+        location: &LocationDefinition,
+        references: &References,
+    ) -> Result<(), String> {
+        if let Some(form) = &references.paths_object
+            && (form.paths.is_empty() || form.exclusive.as_ref().is_some_and(String::is_empty))
+        {
+            return Err(
+                "a paths_object needs its paths key, and an exclusive key not empty".into(),
+            );
+        }
+        let Some(first) = &references.first else {
+            if references
+                .paths_object
+                .as_ref()
+                .is_some_and(|form| form.exclusive.is_some())
+            {
+                return Err("a paths_object's exclusive needs first".into());
+            }
+            return Ok(());
+        };
+        fn plugins_of(location: &LocationDefinition) -> Option<&[String]> {
+            location.anchor.plugin().map(|anchor| anchor.plugins.all())
+        }
+        let plugins = plugins_of(location);
+        let read = self.locations.iter().find(|other| {
+            other.id == *first
+                && other.id != location.id
+                && other.references.is_none()
+                && other.kind == location.kind
+                && plugins_of(other) == plugins
+        });
+        if read.is_none() {
+            return Err(format!(
+                "first `{first}` must be a location in the same plugins, of the same kind and with no references"
+            ));
+        }
+        let readers = self
+            .locations
+            .iter()
+            .filter(|other| other.first() == Some(first.as_str()))
+            .count();
+        if readers > 1 {
+            return Err(format!("first `{first}` is read first by two locations"));
+        }
+        Ok(())
+    }
+
+    /// Whether `location` is read only through the references of another
+    /// location that name it `first`.
+    pub fn is_read_first(&self, location: &LocationDefinition) -> bool {
+        self.locations
+            .iter()
+            .any(|other| other.first() == Some(location.id.as_str()))
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -2163,6 +2366,7 @@ impl AgentDefinition {
                 if let Some(default) = &references.default {
                     blocks::validate_relative(default).map_err(context)?;
                 }
+                self.validate_first(location, references).map_err(context)?;
             }
             if let Some(root) = &location.plugin_root {
                 if location.anchor.plugin().is_none() {
@@ -5378,6 +5582,63 @@ plugin_entries = true
         ));
         assert!(text.contains(template), "`plugin-mcp` has no `{template}`");
         text.replace(template, &format!("{template}switch_id = \"{id}\"\n"))
+    }
+
+    /// `with_plugins` plus a manifest location whose references add
+    /// `extra` to their `root`.
+    fn with_manifest_references(extra: &str) -> String {
+        with_plugins(&format!(
+            r#"
+[[locations]]
+id = "plugin-manifest-mcp"
+anchor = {{ block = "plugin", plugins = "installed", path = "plugin.json" }}
+references = {{ root = ["servers"]{extra} }}
+format = {{ block = "json", dialect = "strict" }}
+root = ["servers"]
+kind = "mcp"
+scope = "user"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "ignores_file"
+"#
+        ))
+        .replace(
+            r#"precedence = ["user-mcp", "plugin-mcp"]"#,
+            r#"precedence = ["user-mcp", "plugin-mcp", "plugin-manifest-mcp"]"#,
+        )
+    }
+
+    #[test]
+    fn references_read_first_another_location_of_the_same_plugins() {
+        for extra in [
+            r#", first = "plugin-mcp""#,
+            r#", first = "plugin-mcp", paths_object = { paths = "paths", exclusive = "exclusive" }"#,
+            r#", paths_object = { paths = "paths" }"#,
+        ] {
+            let text = with_manifest_references(extra);
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+
+        for (extra, message) in [
+            (r#", first = "nowhere""#, "a location in the same plugins"),
+            (r#", first = "user-mcp""#, "a location in the same plugins"),
+            (
+                r#", first = "plugin-manifest-mcp""#,
+                "a location in the same plugins",
+            ),
+            (
+                r#", paths_object = { paths = "paths", exclusive = "exclusive" }"#,
+                "exclusive needs first",
+            ),
+            (r#", paths_object = { paths = "" }"#, "paths_object needs"),
+        ] {
+            let text = with_manifest_references(extra);
+            assert!(error(&text).contains(message), "{extra}: {}", error(&text));
+        }
     }
 
     #[test]
