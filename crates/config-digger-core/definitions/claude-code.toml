@@ -99,12 +99,13 @@ credentials = { block = "home", root = "credentials_file" }
 # or in the environment, takes it off; an empty one leaves it on [test].
 # A non-empty `CLAUDE_CODE_OAUTH_TOKEN` takes it off in the user settings'
 # `env` and in the environment [test], and in the managed settings' `env`,
-# which ranks above the user's [docs]. In the `env` of a Project's `.claude/settings.json`
-# or `.claude/settings.local.json` it leaves Claude Code on the account,
-# which reads the synced skills and plugins there, on 2.1.314, 2.1.316 and
-# 2.1.317 [test]: neither map is a source of it. 2.1.299 to 2.1.309 took
-# only the synced skills off in the Project's `.claude/settings.json` and
-# kept the synced plugins [test]; config-digger does not model that.
+# which ranks above the user's [docs]. In the `env` of a Project's
+# `.claude/settings.json` or `.claude/settings.local.json` it leaves Claude
+# Code on the account, which reads the synced skills and plugins there, on
+# 2.1.314, 2.1.316 and 2.1.317 [test]: neither map is a source of it.
+# 2.1.299 to 2.1.309 took only the synced skills off in the Project's
+# `.claude/settings.json` and kept the synced plugins [test]; config-digger
+# does not model that, as #493 decided.
 # Settings files rank managed (every source), local, Project, user, and a
 # higher file's variable wins [docs]. Set in the environment config-digger
 # runs in, those variables only may: Claude Code can start in another.

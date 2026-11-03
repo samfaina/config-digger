@@ -4042,6 +4042,8 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
             "{}",
             error(&text)
         );
+        let text = with_maps(r#"["user"]"#).replace(r#"id = "user", anchor"#, r#"id = "", anchor"#);
+        assert!(error(&text).contains("env map id"), "{}", error(&text));
     }
 
     #[test]
@@ -4821,7 +4823,8 @@ trusted = \"trusted\"
             r#"bypass = { block = "env", variables = [{ name = "NO_FLAGS", values = "truthy", env_maps = ["user"] }], env_maps = [{ id = "user", anchor = { block = "home", root = "state" }, key_path = ["env"] }] }"#,
         );
         assert!(
-            error(&text).contains("only what takes an Agent off its account"),
+            error(&text)
+                .contains("`env_maps` is only for a variable that takes an Agent off its account"),
             "{}",
             error(&text)
         );

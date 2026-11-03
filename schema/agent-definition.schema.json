@@ -914,7 +914,7 @@
           }
         },
         "variables": {
-          "description": "Variables that take it off when a map of `env_maps` sets one. Set in\nthe environment config-digger runs in, they only may: the Agent can\nstart in another, and its Entries keep their State, with a caveat.",
+          "description": "Variables that take it off when a map of `env_maps` sets one, or\none of the maps a variable's own `env_maps` names. Set in the\nenvironment config-digger runs in, they only may: the Agent can\nstart in another, and its Entries keep their State, with a caveat.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/BypassVariable"

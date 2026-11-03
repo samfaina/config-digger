@@ -2381,7 +2381,8 @@ fn read_accounts(
 /// Project folder `project`, or else everywhere. A setting a file sets,
 /// then a variable a map sets, take it off; one of those variables set in
 /// config-digger's environment, where no map replaces it, or a variable
-/// that only may take it off, set anywhere, only may.
+/// that only may take it off, set anywhere, only may. A variable whose
+/// `env_maps` names some maps is read from those alone.
 fn on_account(
     off: &blocks::OffAccount,
     home: &FoundHome,
@@ -2411,8 +2412,9 @@ fn on_account(
                 .filter_map(move |(path, value)| Some((map, path, value.as_object()?.clone())))
         })
         .collect();
-    // The variable declared by `name`, which says the maps it is read from;
-    // a name only an `unless` gives is read from every map.
+    // The first variable declared by `name`, whose `env_maps` says the maps
+    // the name is read from, in an `unless` too; a name no variable
+    // declares is read from every map.
     let declared = |name: &str| {
         off.variables
             .iter()

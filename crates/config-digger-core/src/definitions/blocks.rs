@@ -8999,7 +8999,7 @@ impl Validate for EnvBypass {
             }
             if variable.env_maps.is_some() {
                 return Err(format!(
-                    "variable `{}`: only what takes an Agent off its account reads a variable from some env maps",
+                    "variable `{}`: `env_maps` is only for a variable that takes an Agent off its account",
                     variable.name
                 ));
             }
@@ -9008,19 +9008,14 @@ impl Validate for EnvBypass {
     }
 }
 
-/// The env maps of one block: each key in its file, and no `id` twice.
+/// The env maps of one block: each key in its file, and each `id`
+/// non-empty and declared once.
 fn validate_env_maps(maps: &[EnvMap]) -> Result<(), String> {
-    let mut ids = std::collections::BTreeSet::new();
     for map in maps {
         validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
             .map_err(|e| format!("env map: {e}"))?;
-        if let Some(id) = &map.id
-            && !ids.insert(id)
-        {
-            return Err(format!("env map `{id}` is declared twice"));
-        }
     }
-    Ok(())
+    super::unique("env map", maps.iter().filter_map(|map| map.id.as_deref()))
 }
 
 /// A key in one file, or in the files of settings, as an env map or a
@@ -9104,8 +9099,9 @@ pub(crate) struct OffAccount {
     /// value other than `null` or an empty string, highest first.
     #[serde(default)]
     pub settings: Vec<SettingKey>,
-    /// Variables that take it off when a map of `env_maps` sets one. Set in
-    /// the environment config-digger runs in, they only may: the Agent can
+    /// Variables that take it off when a map of `env_maps` sets one, or
+    /// one of the maps a variable's own `env_maps` names. Set in the
+    /// environment config-digger runs in, they only may: the Agent can
     /// start in another, and its Entries keep their State, with a caveat.
     #[serde(default)]
     pub variables: Vec<BypassVariable>,
@@ -9136,6 +9132,12 @@ impl Validate for OffAccount {
         if !self.variables.is_empty() && self.env_maps.is_empty() {
             return Err("off variables need env maps to be read from".into());
         }
+        for key in &self.settings {
+            validate_key_in_file("a setting", &key.anchor, &key.key_path, key.every_source)
+                .map_err(|e| format!("setting: {e}"))?;
+        }
+        // The variables name the maps, so the maps come first.
+        validate_env_maps(&self.env_maps)?;
         for variable in self.variables.iter().chain(&self.may_be_off) {
             for name in std::iter::once(&variable.name).chain(&variable.unless) {
                 validate_variable(name)?;
@@ -9155,11 +9157,7 @@ impl Validate for OffAccount {
                 None => {}
             }
         }
-        for key in &self.settings {
-            validate_key_in_file("a setting", &key.anchor, &key.key_path, key.every_source)
-                .map_err(|e| format!("setting: {e}"))?;
-        }
-        validate_env_maps(&self.env_maps)
+        Ok(())
     }
 }
 
