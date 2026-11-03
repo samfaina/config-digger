@@ -382,7 +382,6 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "fails several",
         ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
-        ("claude-code.toml", "account.off", "interactive session"),
         (
             "claude-code.toml",
             "locations[plugin-skills]",

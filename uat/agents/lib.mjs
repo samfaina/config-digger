@@ -112,6 +112,161 @@ export function run(command, args, { cwd, env = {}, input, timeout = 120_000 } =
   });
 }
 
+// A Windows pseudo console, driven from Windows PowerShell's `Add-Type`
+// rather than a native npm package. The C# below starts the command line in
+// it, copies the keys it reads on its standard input to the console, and
+// what the console renders to its standard output, and returns the
+// command's exit code once it exits. The two variables that carry it are
+// taken out before the command starts. `STARTF_USESTDHANDLES` with no
+// handles keeps the command off PowerShell's redirected pipes.
+const pseudoConsoleSource = String.raw`
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using Microsoft.Win32.SafeHandles;
+
+public static class CdPseudoConsole {
+  [StructLayout(LayoutKind.Sequential)] struct Coord { public short X; public short Y; }
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+  struct StartupInfo {
+    public int cb; public string lpReserved; public string lpDesktop; public string lpTitle;
+    public int dwX, dwY, dwXSize, dwYSize, dwXCountChars, dwYCountChars, dwFillAttribute, dwFlags;
+    public short wShowWindow, cbReserved2; public IntPtr lpReserved2, hStdInput, hStdOutput, hStdError;
+  }
+  [StructLayout(LayoutKind.Sequential)] struct StartupInfoEx { public StartupInfo StartupInfo; public IntPtr lpAttributeList; }
+  [StructLayout(LayoutKind.Sequential)] struct ProcessInformation { public IntPtr hProcess, hThread; public int dwProcessId, dwThreadId; }
+
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool CreatePipe(out SafeFileHandle read, out SafeFileHandle write, IntPtr attributes, int size);
+  [DllImport("kernel32.dll")] static extern int CreatePseudoConsole(Coord size, SafeFileHandle input, SafeFileHandle output, uint flags, out IntPtr console);
+  [DllImport("kernel32.dll")] static extern void ClosePseudoConsole(IntPtr console);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref IntPtr size);
+  [DllImport("kernel32.dll")] static extern void DeleteProcThreadAttributeList(IntPtr list);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
+  [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+  static extern bool CreateProcessW(string application, string commandLine, IntPtr processAttributes, IntPtr threadAttributes, bool inherit, uint flags, IntPtr environment, string cwd, ref StartupInfoEx info, out ProcessInformation process);
+  [DllImport("kernel32.dll")] static extern uint WaitForSingleObject(IntPtr handle, uint ms);
+  [DllImport("kernel32.dll")] static extern bool GetExitCodeProcess(IntPtr process, out uint code);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
+
+  static Thread Copy(Stream from, Stream to) {
+    Thread t = new Thread(() => {
+      byte[] buffer = new byte[8192];
+      int n;
+      try { while ((n = from.Read(buffer, 0, buffer.Length)) > 0) { to.Write(buffer, 0, n); to.Flush(); } } catch (IOException) { } catch (ObjectDisposedException) { }
+    });
+    t.IsBackground = true;
+    t.Start();
+    return t;
+  }
+
+  public static int Run(string commandLine, string cwd, short cols, short rows) {
+    SafeFileHandle inRead, inWrite, outRead, outWrite;
+    if (!CreatePipe(out inRead, out inWrite, IntPtr.Zero, 0) || !CreatePipe(out outRead, out outWrite, IntPtr.Zero, 0)) throw new Exception("CreatePipe: " + Marshal.GetLastWin32Error());
+    Coord size = new Coord(); size.X = cols; size.Y = rows;
+    IntPtr console;
+    int result = CreatePseudoConsole(size, inRead, outWrite, 0, out console);
+    if (result != 0) throw new Exception("CreatePseudoConsole: " + result);
+    inRead.Dispose();
+    outWrite.Dispose();
+    IntPtr listSize = IntPtr.Zero;
+    InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref listSize);
+    StartupInfoEx info = new StartupInfoEx();
+    info.StartupInfo.cb = Marshal.SizeOf(typeof(StartupInfoEx));
+    info.StartupInfo.dwFlags = 0x100;
+    info.lpAttributeList = Marshal.AllocHGlobal(listSize);
+    if (!InitializeProcThreadAttributeList(info.lpAttributeList, 1, 0, ref listSize)) throw new Exception("InitializeProcThreadAttributeList: " + Marshal.GetLastWin32Error());
+    if (!UpdateProcThreadAttribute(info.lpAttributeList, 0, (IntPtr)0x20016, console, (IntPtr)IntPtr.Size, IntPtr.Zero, IntPtr.Zero)) throw new Exception("UpdateProcThreadAttribute: " + Marshal.GetLastWin32Error());
+    Environment.SetEnvironmentVariable("CD_PSEUDO_CONSOLE", null);
+    Environment.SetEnvironmentVariable("CD_PSEUDO_CONSOLE_LINE", null);
+    ProcessInformation process;
+    if (!CreateProcessW(null, commandLine, IntPtr.Zero, IntPtr.Zero, false, 0x80000, IntPtr.Zero, cwd, ref info, out process)) throw new Exception("CreateProcess: " + Marshal.GetLastWin32Error());
+    DeleteProcThreadAttributeList(info.lpAttributeList);
+    Marshal.FreeHGlobal(info.lpAttributeList);
+    FileStream keys = new FileStream(inWrite, FileAccess.Write);
+    FileStream rendered = new FileStream(outRead, FileAccess.Read);
+    Thread output = Copy(rendered, Console.OpenStandardOutput());
+    Copy(Console.OpenStandardInput(), keys);
+    WaitForSingleObject(process.hProcess, 0xFFFFFFFF);
+    uint code;
+    GetExitCodeProcess(process.hProcess, out code);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    ClosePseudoConsole(console);
+    output.Join(5000);
+    keys.Dispose();
+    rendered.Dispose();
+    return (int)code;
+  }
+}
+`;
+
+// An argument as the command line of `CreateProcess` quotes it.
+function quoteArg(a) {
+  if (a !== "" && !/[\s"]/.test(a)) return a;
+  return `"${a.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\+)$/, "$1$1")}"`;
+}
+
+// What a console's output shows as text: its escape sequences taken out, a
+// cursor moved right written as that many spaces.
+function consoleText(output) {
+  return output
+    .replace(/\x1b\[(\d*)C/g, (_, n) => " ".repeat(Number(n || 1)))
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[()][0-9A-Za-z]|\x1b[0-9=>@-_]/g, "");
+}
+
+// Starts `command`, an executable rather than a `.cmd` shim, in a Windows
+// pseudo console of 120 by 40, with `cwd` and the probe's environment plus
+// `env`, as `run` does. `send` types keys, such as `"\r"`
+// for Enter; `output` is what the console rendered so far, and `text` that
+// without its escape sequences; `until` resolves with the text once `test`
+// holds of it, or with null after `ms`; `exited` resolves with the exit
+// code; `stop` ends the process tree, as `timeout` does. The variables a
+// Claude Code session hands the commands it runs, `CLAUDECODE` and
+// `CLAUDE_*`, are left out unless `env` sets them: an interactive Claude
+// Code would take itself for that session's child, and save no transcript.
+export function pseudoConsole(command, args, { cwd, env = {}, timeout = 180_000 } = {}) {
+  const script = "$ErrorActionPreference = 'Stop'; Add-Type -TypeDefinition $env:CD_PSEUDO_CONSOLE; exit [CdPseudoConsole]::Run($env:CD_PSEUDO_CONSOLE_LINE, (Get-Location).Path, 120, 40)";
+  const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^CLAUDE/i.test(name)));
+  const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], {
+    cwd,
+    env: { ...inherited, ...env, CD_PSEUDO_CONSOLE: pseudoConsoleSource, CD_PSEUDO_CONSOLE_LINE: [command, ...args].map(quoteArg).join(" ") },
+    windowsHide: true,
+  });
+  let output = "";
+  let stderr = "";
+  // A character can come split across two chunks.
+  child.stdout.setEncoding("utf8");
+  child.stdout.on("data", (d) => (output += d));
+  child.stderr.on("data", (d) => (stderr += d));
+  child.stdin.on("error", () => {});
+  const stop = () => spawn("taskkill", ["/pid", String(child.pid), "/t", "/f"], { windowsHide: true });
+  const timer = setTimeout(stop, timeout);
+  const exited = new Promise((resolve) => {
+    child.on("error", (error) => resolve({ code: -1, stderr: stderr + String(error) }));
+    child.on("close", (code) => resolve({ code, stderr }));
+  }).finally(() => clearTimeout(timer));
+  let done = false;
+  exited.then(() => (done = true));
+  return {
+    send: (keys) => child.stdin.write(keys),
+    output: () => output,
+    text: () => consoleText(output),
+    async until(test, ms = 60_000) {
+      for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 200))) {
+        if (test(consoleText(output))) return consoleText(output);
+        if (done) break;
+      }
+      return test(consoleText(output)) ? consoleText(output) : null;
+    },
+    exited,
+    async stop() {
+      if (!done) stop();
+      return exited;
+    },
+  };
+}
+
 // Maps a free drive letter to `folder` with `subst`, so a probe can reach
 // the root of a drive without writing a real one, and resolves with the
 // letter. `unsubst` takes it off again.
@@ -146,20 +301,22 @@ export async function registry(key, name, data) {
 
 // A local server that answers every request with `reply`, or with what
 // `reply` returns for the request's body when it is a function, and keeps
-// each request's body, so an Agent's request to its model never leaves the
-// machine.
+// each request's body, and in `headers` its headers, so an Agent's request
+// to its model never leaves the machine.
 export async function modelServer(reply) {
   const bodies = [];
+  const headers = [];
   const server = http.createServer((req, res) => {
     let body = "";
     req.on("data", (d) => (body += d)).on("end", () => {
       bodies.push(body);
+      headers.push(req.headers);
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(typeof reply === "function" ? reply(body) : reply));
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { url: `http://127.0.0.1:${server.address().port}`, bodies, close: () => server.close() };
+  return { url: `http://127.0.0.1:${server.address().port}`, bodies, headers, close: () => server.close() };
 }
 
 // A local proxy that refuses every request, and an ssh command for git that
