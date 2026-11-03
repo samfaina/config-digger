@@ -381,6 +381,40 @@ try {
     });
   }
 
+  // The two keys in two settings files: Claude Code merges `skillOverrides`
+  // across them, then reads `anthropic-skills:<folder>` before the bare
+  // `<folder>` (#530). Whether the session reads the synced skill.
+  const settingsFiles = { local: path.join(proj, ".claude", "settings.local.json"), project: path.join(proj, ".claude", "settings.json"), user: userSettings };
+  const spread = async (byFile) => {
+    for (const [label, skillOverrides] of Object.entries(byFile)) {
+      write(settingsFiles[label], { ...(label === "user" && keptSettings ? JSON.parse(keptSettings) : {}), skillOverrides });
+    }
+    try {
+      return (await session({ env: noFetch })).skills.includes("anthropic-skills:fold-s");
+    } finally {
+      if (byFile.user) putBackSettings();
+      fs.rmSync(path.join(proj, ".claude"), { recursive: true, force: true });
+    }
+  };
+  await p.check("items.skill.disable[0]", "of a synced skill's two keys in two settings files, `anthropic-skills:<folder>` decides, whichever file holds it, the bare `<folder>` counting only while `anthropic-skills:<folder>` is missing from every file", async () => {
+    return same(
+      {
+        "prefixed on in user, bare off in local": await spread({ user: { "anthropic-skills:fold-s": "on" }, local: { "fold-s": "off" } }),
+        "prefixed on in local, bare off in user": await spread({ local: { "anthropic-skills:fold-s": "on" }, user: { "fold-s": "off" } }),
+        "prefixed off in user, bare on in local": await spread({ user: { "anthropic-skills:fold-s": "off" }, local: { "fold-s": "on" } }),
+        "prefixed off in local, bare on in project": await spread({ local: { "anthropic-skills:fold-s": "off" }, project: { "fold-s": "on" } }),
+        "prefixed on in project, bare off in local": await spread({ project: { "anthropic-skills:fold-s": "on" }, local: { "fold-s": "off" } }),
+      },
+      {
+        "prefixed on in user, bare off in local": true,
+        "prefixed on in local, bare off in user": true,
+        "prefixed off in user, bare on in local": false,
+        "prefixed off in local, bare on in project": false,
+        "prefixed on in project, bare off in local": true,
+      },
+    );
+  });
+
   // ---------------------------------------------------------------- the account
 
   // Claude Code reads a synced plugin only while the gate

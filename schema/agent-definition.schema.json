@@ -5012,7 +5012,7 @@
               "description": "The value that Disables the Entry."
             },
             "enabled_value": {
-              "description": "The value Enable sets, with `enable_action = \"set\"`."
+              "description": "The value Enable sets, with `enable_action = \"set\"`. With\n`delete-key`, in a layered field config-digger writes, the value\nEnable sets `{name}` to instead of deleting the Entry's keys, when a\nlater layer whose field it only reads would still Disable the Entry\nonce they are gone, such as `\"on\"` in Claude Code's local\n`skillOverrides`, which decides over the shared Project settings and\nthe user settings. Enable then still deletes the Entry's further\nkeys that hold `disabled_value`."
             },
             "default_value": {
               "description": "The value the Agent takes while the field, or its file, is missing,\nsuch as `false` for Claude Desktop's `isEnabled`, which an extension\nwithout a settings file has. Of layered fields, the Agent takes the\nlast one's while no layer holds a value. Omitted, a missing field\nDisables nothing."
@@ -5029,7 +5029,7 @@
               "default": true
             },
             "layered": {
-              "description": "Whether the field is one layer of a setting the Agent merges across\nfiles, such as Claude Code's `enabledPlugins`: among the layered\nmechanisms of the Item kind, in the definition's order, the first\nwhose field holds a value for the Entry decides.",
+              "description": "Whether the field is one layer of a setting the Agent merges across\nfiles, such as Claude Code's `enabledPlugins`: among the layered\nmechanisms of the Item kind, in the definition's order, the first\nwhose field holds a value for the Entry decides. With `also_names`,\nthe layers are read key by key, and within each key layer by layer,\nas Claude Code reads `skillOverrides` merged: the first key that\nholds a value in any layer decides, from the first layer that holds\nit, and a later key is read only while every earlier one is missing\nfrom every layer.",
               "type": "boolean",
               "default": false
             },
@@ -5341,7 +5341,7 @@
           "default": false
         },
         "also_names": {
-          "description": "Further keys the switch holds an Entry under, besides `{name}`: what\nthe `{name}` segment of the key path also takes, each a template of\n`{name}`, the Entry's name, and `{own_name}`, its own name as read,\nbefore its location's `name_template` renamed it, such as `{own_name}` for Claude Code's\n`skillOverrides`, which turns a synced skill off by\n`anthropic-skills:<folder>` or by `<folder>`. A key that comes out as\nanother is one key. The switch reads the keys in order, `{name}`\nfirst, then each of these in the order given, and the first that\nholds a value decides, `on` and partial values too: a later key is\nread only while every earlier one holds nothing. Disable writes\n`{name}`. Enable lifts the key that decides, then the next key in\nturn while it holds the disabled value, so that no later key\nDisables the Entry again.",
+          "description": "Further keys the switch holds an Entry under, besides `{name}`: what\nthe `{name}` segment of the key path also takes, each a template of\n`{name}`, the Entry's name, and `{own_name}`, its own name as read,\nbefore its location's `name_template` renamed it, such as `{own_name}` for Claude Code's\n`skillOverrides`, which turns a synced skill off by\n`anthropic-skills:<folder>` or by `<folder>`. A key that comes out as\nanother is one key. The switch reads the keys in order, `{name}`\nfirst, then each of these in the order given, and the first that\nholds a value decides, `on` and partial values too: a later key is\nread only while every earlier one holds nothing. Of `layered`\nswitches, the first key that holds a value in any layer decides, and\nwithin that key the first layer that holds it. Disable writes\n`{name}`. Enable lifts the key that decides, then the next key in\nturn while it holds the disabled value, so that no later key\nDisables the Entry again.",
           "type": "array",
           "items": {
             "type": "string"

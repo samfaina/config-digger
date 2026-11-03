@@ -299,7 +299,27 @@ name: cd-throwaway-overridden-skill
 description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
-$syncedOverrides = '"skillOverrides": { "anthropic-skills:cd-throwaway-overridden-skill": "on", "cd-throwaway-overridden-skill": "off" }'
+# Claude Code merges `skillOverrides` across the settings files, then
+# reads the prefixed key first: `cd-throwaway-spread-skill`, synced too, is
+# `on` under its `anthropic-skills:` name in these user settings and `off`
+# under its folder alone in the Project's local settings, and Claude Code
+# reads it. Step 36.1 walks it. `cd-throwaway-user-off-skill`, a personal
+# skill of the home, is `off` in these user settings: Enable in the Project
+# writes `on` for it in the Project's local settings, which decides over
+# the user's. Step 36.2 walks it.
+foreach ($folder in "synced\cd-org_cd-acct\cd-throwaway-spread-skill", "cd-throwaway-user-off-skill") {
+    $name = Split-Path $folder -Leaf
+    Write-TestFile "$Root\claude-code-synced-home\.claude\skills\$folder\SKILL.md" @"
+---
+name: $name
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+}
+Write-TestFile "$Root\project\.claude\settings.local.json" @"
+{ "skillOverrides": { "cd-throwaway-spread-skill": "off" } }
+"@
+$syncedOverrides = '"skillOverrides": { "anthropic-skills:cd-throwaway-overridden-skill": "on", "cd-throwaway-overridden-skill": "off", "anthropic-skills:cd-throwaway-spread-skill": "on", "cd-throwaway-user-off-skill": "off" }'
 Write-TestFile "$Root\claude-code-synced-home\.claude\settings.json" @"
 { $syncedOverrides }
 "@

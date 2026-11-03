@@ -868,27 +868,36 @@ fn only_off_disables_a_skill_and_the_other_values_are_notes() {
 }
 
 #[test]
-fn off_in_the_user_settings_disables_the_skill_everywhere_and_is_only_read() {
+fn off_in_the_user_settings_disables_the_skill_everywhere_and_is_enabled_only_from_a_project() {
     let fs = deploy_in_project("{}").with_file(
         in_home(r".claude\settings.json"),
         r#"{ "skillOverrides": { "deploy": "off" } }"#,
     );
     let core = core(&fs);
 
-    for context in [Context::default(), in_project()] {
-        let inventory = inventory(&core, &context);
-        let entry = &skill(&inventory, "deploy").entries[0];
-        assert_eq!(code(entry.state), "disabled");
-        assert!(
-            matches!(&entry.enable, Some(EnableOption::NotOffered { sentence }) if sentence.starts_with("Enable is not offered")),
-            "{:?}",
-            entry.enable
-        );
-    }
-    let refused = plan(&core, &in_project(), Action::Enable, &["deploy"])
+    // Without a Project, no local settings can decide over the user's.
+    let elsewhere = inventory(&core, &Context::default());
+    let entry = &skill(&elsewhere, "deploy").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert!(
+        matches!(&entry.enable, Some(EnableOption::NotOffered { sentence }) if sentence.starts_with("Enable is not offered")),
+        "{:?}",
+        entry.enable
+    );
+    let refused = plan(&core, &Context::default(), Action::Enable, &["deploy"])
         .err()
         .unwrap();
     assert_eq!(code(refused.code), "blocked");
+
+    let in_the_project = inventory(&core, &in_project());
+    let entry = &skill(&in_the_project, "deploy").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert_eq!(
+        entry.enable,
+        Some(EnableOption::Offered {
+            sentence: r#"Enable sets `skillOverrides.deploy` to "on" in E:\projects\app\.claude\settings.local.json for this Project."#.to_owned()
+        })
+    );
 }
 
 #[test]
@@ -1219,4 +1228,248 @@ fn disabling_a_local_skill_also_disables_the_synced_skill_of_its_folder_and_warn
         code(skill(&after, "anthropic-skills:pdf").entries[0].state),
         "disabled"
     );
+}
+
+// `skillOverrides` merged across the three settings files (#530): the
+// first key that holds a value in any of them decides, and of one key in
+// several files, the local settings decide over the Project's shared ones,
+// which decide over the user's.
+
+fn settings_shared() -> PathBuf {
+    Path::new(PROJECT).join(r".claude\settings.json")
+}
+
+fn settings_user() -> PathBuf {
+    in_home(r".claude\settings.json")
+}
+
+/// `fs` with each file of `files` holding its `skillOverrides`.
+fn with_overrides(mut fs: FakeFileSystem, files: &[(&Path, Value)]) -> FakeFileSystem {
+    for (path, overrides) in files {
+        fs = fs.with_file(
+            path.to_path_buf(),
+            json!({ "skillOverrides": overrides }).to_string(),
+        );
+    }
+    fs
+}
+
+/// The personal skill `deploy` in a Project, with `files` holding their
+/// `skillOverrides`.
+fn deploy_overridden(files: &[(&Path, Value)]) -> FakeFileSystem {
+    with_overrides(
+        with_skill(
+            claude_home().with_folder(PROJECT),
+            in_home(r".claude\skills\deploy"),
+            &skill_md("deploy"),
+        ),
+        files,
+    )
+}
+
+/// The State of the first Entry of `name`, and its reason's switch.
+fn state_and_switch(fs: &FakeFileSystem, name: &str) -> (String, Option<String>) {
+    let inventory = inventory(&core(fs), &in_project());
+    let entry = &skill(&inventory, name).entries[0];
+    (
+        code(entry.state),
+        entry
+            .reason
+            .as_ref()
+            .and_then(|reason| reason.switch.clone()),
+    )
+}
+
+#[test]
+fn of_one_key_in_two_settings_files_the_local_then_the_shared_then_the_user_settings_decide() {
+    let local = settings_local();
+    let shared = settings_shared();
+    let user = settings_user();
+    let switch = |path: &Path| Some(format!("{}#skillOverrides.deploy", path.display()));
+    for (upper, lower) in [(&local, &shared), (&local, &user), (&shared, &user)] {
+        let on_over_off = deploy_overridden(&[
+            (upper, json!({ "deploy": "on" })),
+            (lower, json!({ "deploy": "off" })),
+        ]);
+        assert_eq!(
+            state_and_switch(&on_over_off, "deploy"),
+            ("effective".to_owned(), None),
+            "on in {} over off in {}",
+            upper.display(),
+            lower.display()
+        );
+        let off_over_on = deploy_overridden(&[
+            (upper, json!({ "deploy": "off" })),
+            (lower, json!({ "deploy": "on" })),
+        ]);
+        assert_eq!(
+            state_and_switch(&off_over_on, "deploy"),
+            ("disabled".to_owned(), switch(upper)),
+            "off in {} over on in {}",
+            upper.display(),
+            lower.display()
+        );
+    }
+}
+
+/// The synced skill `pdf` with `prefixed` under `anthropic-skills:pdf` in
+/// one settings file and `bare` under `pdf` in another, for each pair of
+/// the three files: the case, and the file holding the prefixed key.
+fn synced_pdf_across_files(prefixed: &str, bare: &str) -> Vec<(String, PathBuf, FakeFileSystem)> {
+    let files = every_settings_file();
+    let mut cases = Vec::new();
+    for with_prefixed in &files {
+        for with_bare in files.iter().filter(|file| *file != with_prefixed) {
+            let fs = with_overrides(
+                with_skill(
+                    claude_home().with_folder(PROJECT),
+                    in_home(r".claude\skills\synced\org_acct\pdf"),
+                    &skill_md("pdf"),
+                ),
+                &[
+                    (with_prefixed, json!({ "anthropic-skills:pdf": prefixed })),
+                    (with_bare, json!({ "pdf": bare })),
+                ],
+            );
+            let case = format!(
+                "{prefixed} in {} beside {bare} in {}",
+                with_prefixed.display(),
+                with_bare.display()
+            );
+            cases.push((case, with_prefixed.clone(), fs));
+        }
+    }
+    cases
+}
+
+#[test]
+fn a_synced_skill_on_under_its_anthropic_skills_name_in_any_file_is_effective_beside_its_folder_alone_off_in_another()
+ {
+    for (case, _, fs) in synced_pdf_across_files("on", "off") {
+        let inventory = inventory(&core(&fs), &in_project());
+        let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
+        assert_eq!(code(entry.state), "effective", "{case}");
+        assert_eq!(entry.notes, [], "{case}");
+    }
+}
+
+#[test]
+fn a_synced_skill_off_under_its_anthropic_skills_name_in_any_file_is_disabled_by_that_key_beside_its_folder_alone_on_in_another()
+ {
+    for (case, with_prefixed, fs) in synced_pdf_across_files("off", "on") {
+        assert_eq!(
+            state_and_switch(&fs, "anthropic-skills:pdf"),
+            (
+                "disabled".to_owned(),
+                Some(format!(
+                    "{}#skillOverrides.anthropic-skills:pdf",
+                    with_prefixed.display()
+                ))
+            ),
+            "{case}"
+        );
+    }
+}
+
+/// What each file holds, `None` for a missing one. Undo restores what the
+/// files held, as an inverse edit, not their bytes (ADR 0003).
+fn values_of(fs: &FakeFileSystem, files: &[&Path]) -> Vec<Option<Value>> {
+    files
+        .iter()
+        .map(|path| {
+            fs.contents(path)
+                .map(|bytes| serde_json::from_slice(&bytes).unwrap())
+        })
+        .collect()
+}
+
+#[test]
+fn enable_of_a_skill_off_in_the_user_settings_writes_on_in_the_local_settings_and_undo_restores_them()
+ {
+    let local = settings_local();
+    let user = settings_user();
+    let fs = deploy_overridden(&[
+        (&local, json!({ "lint": "off" })),
+        (&user, json!({ "deploy": "off" })),
+    ]);
+    let core = core(&fs);
+    let before = values_of(&fs, &[&local, &user]);
+    let inventory_before = inventory(&core, &in_project());
+    let entry = &skill(&inventory_before, "deploy").entries[0];
+    assert_eq!(code(entry.state), "disabled");
+    assert!(
+        matches!(&entry.enable, Some(EnableOption::Offered { sentence }) if sentence.contains("on")),
+        "{:?}",
+        entry.enable
+    );
+
+    let enable = plan(&core, &in_project(), Action::Enable, &["deploy"]).unwrap();
+    let outcome = core.execute(enable, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, &local),
+        json!({ "skillOverrides": { "lint": "off", "deploy": "on" } })
+    );
+    assert_eq!(values_of(&fs, &[&user]), before[1..]);
+    assert_eq!(
+        state_and_switch(&fs, "deploy"),
+        ("effective".to_owned(), None)
+    );
+
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(values_of(&fs, &[&local, &user]), before);
+}
+
+#[test]
+fn enable_of_a_skill_off_in_the_local_and_the_shared_settings_deletes_the_local_off_for_on_and_undo_restores_them()
+ {
+    let local = settings_local();
+    let shared = settings_shared();
+    let fs = deploy_overridden(&[
+        (&local, json!({ "deploy": "off", "lint": "off" })),
+        (&shared, json!({ "deploy": "off" })),
+    ]);
+    let core = core(&fs);
+    let before = values_of(&fs, &[&local, &shared]);
+
+    let enable = plan(&core, &in_project(), Action::Enable, &["deploy"]).unwrap();
+    let outcome = core.execute(enable, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, &local),
+        json!({ "skillOverrides": { "deploy": "on", "lint": "off" } })
+    );
+    assert_eq!(values_of(&fs, &[&shared]), before[1..]);
+    assert_eq!(
+        state_and_switch(&fs, "deploy"),
+        ("effective".to_owned(), None)
+    );
+
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(values_of(&fs, &[&local, &shared]), before);
+}
+
+#[test]
+fn enable_of_a_skill_off_in_the_local_settings_alone_deletes_the_key_and_leaves_no_on() {
+    let local = settings_local();
+    let fs = deploy_overridden(&[(&local, json!({ "deploy": "off", "lint": "off" }))]);
+    let core = core(&fs);
+    let before = values_of(&fs, &[&local]);
+
+    let enable = plan(&core, &in_project(), Action::Enable, &["deploy"]).unwrap();
+    let outcome = core.execute(enable, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, &local),
+        json!({ "skillOverrides": { "lint": "off" } })
+    );
+    assert_eq!(
+        state_and_switch(&fs, "deploy"),
+        ("effective".to_owned(), None)
+    );
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(values_of(&fs, &[&local]), before);
 }

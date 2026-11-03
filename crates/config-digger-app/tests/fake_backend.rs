@@ -278,3 +278,52 @@ fn a_synced_skill_on_under_its_anthropic_skills_name_beside_its_folder_off_is_ef
         "{item:#}"
     );
 }
+
+/// The skill `name` of `claude-code-synced-home` in the Inventory of the
+/// Project `project`, the second context recorded.
+fn synced_home_skill_in_project<'f>(fixtures: &'f Value, name: &str) -> &'f Value {
+    let inventory = &fixtures["inventories"][1]["inventory"];
+    inventory["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| {
+            item["name"] == name
+                && item["home"]
+                    .as_str()
+                    .unwrap()
+                    .ends_with("claude-code-synced-home")
+        })
+        .unwrap_or_else(|| panic!("no skill `{name}`"))
+}
+
+#[test]
+fn a_synced_skill_on_in_the_user_settings_beside_its_folder_off_in_the_project_s_local_settings_is_effective()
+ {
+    let (_, fixtures) = recorded();
+
+    let item = synced_home_skill_in_project(fixtures, "anthropic-skills:cd-throwaway-spread-skill");
+    assert_eq!(item["state"], "effective", "{item:#}");
+    assert_eq!(
+        item["entries"][0]["notes"],
+        serde_json::json!([]),
+        "{item:#}"
+    );
+}
+
+#[test]
+fn enable_of_a_skill_off_in_the_user_settings_writes_on_in_the_project_s_local_settings() {
+    let (_, fixtures) = recorded();
+
+    let item = synced_home_skill_in_project(fixtures, "cd-throwaway-user-off-skill");
+    assert_eq!(item["state"], "disabled", "{item:#}");
+    let enable = &item["entries"][0]["enable"];
+    assert_eq!(enable["status"], "offered", "{item:#}");
+    let sentence = enable["sentence"].as_str().unwrap();
+    assert!(
+        sentence
+            .starts_with(r#"Enable sets `skillOverrides.cd-throwaway-user-off-skill` to "on" in "#)
+            && sentence.ends_with(r"\project\.claude\settings.local.json for this Project."),
+        "{sentence}"
+    );
+}

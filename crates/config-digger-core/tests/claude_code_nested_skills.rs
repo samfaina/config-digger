@@ -4,7 +4,7 @@
 //! git leaves out, how they are named, and Disable through
 //! `skillOverrides`.
 
-use config_digger_core::api::{Context, Core, Inventory, Item, ScanOptions};
+use config_digger_core::api::{Action, Context, Core, Inventory, Item, ScanOptions, Targets};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
@@ -405,4 +405,165 @@ fn outside_a_git_repo_a_project_that_is_not_left_out_has_no_note_though_it_holds
 
     assert_eq!(names(&inventory), Vec::<&str>::new());
     assert_eq!(project_notes(&inventory), json!([]));
+}
+
+// `skillOverrides` merged across the settings files (#530).
+
+fn local_settings() -> PathBuf {
+    Path::new(PROJECT).join(r".claude\settings.local.json")
+}
+
+fn user_settings() -> PathBuf {
+    PathBuf::from(HOME).join(r".claude\settings.json")
+}
+
+/// `fs` with the user settings holding `overrides` as their
+/// `skillOverrides`.
+fn with_user_overrides(fs: FakeFileSystem, overrides: Value) -> FakeFileSystem {
+    fs.with_file(
+        user_settings(),
+        json!({ "skillOverrides": overrides }).to_string(),
+    )
+}
+
+/// The Project's skill `deploy` and the nested one listed as
+/// `apps/web:deploy`.
+fn two_deploys() -> FakeFileSystem {
+    with_skill(with_skill(repo(), ".", "deploy"), r"apps\web", "deploy")
+}
+
+#[test]
+fn of_a_nested_skill_s_two_keys_in_two_settings_files_its_prefixed_name_decides() {
+    let cases = [
+        // (local, user, the nested skill's State)
+        (
+            json!({ "deploy": "off" }),
+            json!({ "apps/web:deploy": "on" }),
+            "effective",
+        ),
+        (
+            json!({ "apps/web:deploy": "on" }),
+            json!({ "deploy": "off" }),
+            "effective",
+        ),
+        (
+            json!({ "deploy": "on" }),
+            json!({ "apps/web:deploy": "off" }),
+            "disabled",
+        ),
+        (
+            json!({ "apps/web:deploy": "off" }),
+            json!({ "deploy": "on" }),
+            "disabled",
+        ),
+    ];
+    for (local, user, expected) in cases {
+        let fs = with_user_overrides(with_overrides(two_deploys(), local.clone()), user.clone());
+        assert_eq!(
+            state(&inventory(&fs), "apps/web:deploy"),
+            expected,
+            "local {local}, user {user}"
+        );
+    }
+}
+
+#[test]
+fn disable_of_a_nested_skill_on_in_the_user_settings_beside_its_folder_name_off_locally_writes_its_listed_name_off_and_undo_restores_it()
+ {
+    let fs = with_user_overrides(
+        with_overrides(two_deploys(), json!({ "deploy": "off" })),
+        json!({ "apps/web:deploy": "on" }),
+    );
+    assert_eq!(state(&inventory(&fs), "apps/web:deploy"), "effective");
+    let core = Core::new(fake::ports(fs.clone(), FakeEnvironment::with_home(HOME))).unwrap();
+    let context = Context {
+        project: Some(PathBuf::from(PROJECT)),
+    };
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+    let targets = Targets {
+        selectors: vec!["apps/web:deploy".to_owned()],
+        ..Targets::default()
+    };
+
+    let before = settings_values(&fs);
+
+    let disable = core
+        .plan(&snapshot, &context, Action::Disable, &targets)
+        .unwrap();
+    let outcome = core.execute(disable, &[]).unwrap();
+
+    let local: Value = serde_json::from_slice(&fs.contents(local_settings()).unwrap()).unwrap();
+    assert_eq!(
+        local,
+        json!({ "skillOverrides": { "deploy": "off", "apps/web:deploy": "off" } })
+    );
+    let after = inventory(&fs);
+    assert_eq!(state(&after, "apps/web:deploy"), "disabled");
+    assert_eq!(
+        entry_json(skill(&after, "apps/web:deploy"))["reason"]["switch"],
+        format!(
+            r"{}#skillOverrides.apps/web:deploy",
+            local_settings().display()
+        )
+    );
+
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(settings_values(&fs), before);
+}
+
+#[test]
+fn enable_of_a_nested_skill_off_by_its_folder_name_in_the_user_settings_writes_its_listed_name_on_locally_and_undo_restores_it()
+ {
+    let fs = with_user_overrides(
+        with_overrides(two_deploys(), json!({})),
+        json!({ "deploy": "off" }),
+    );
+    assert_eq!(state(&inventory(&fs), "apps/web:deploy"), "disabled");
+    let core = Core::new(fake::ports(fs.clone(), FakeEnvironment::with_home(HOME))).unwrap();
+    let context = Context {
+        project: Some(PathBuf::from(PROJECT)),
+    };
+    let snapshot = core
+        .scan(&ScanOptions {
+            projects: vec![PathBuf::from(PROJECT)],
+        })
+        .unwrap();
+    let targets = Targets {
+        selectors: vec!["apps/web:deploy".to_owned()],
+        ..Targets::default()
+    };
+
+    let before = settings_values(&fs);
+
+    let enable = core
+        .plan(&snapshot, &context, Action::Enable, &targets)
+        .unwrap();
+    let outcome = core.execute(enable, &[]).unwrap();
+
+    let local: Value = serde_json::from_slice(&fs.contents(local_settings()).unwrap()).unwrap();
+    assert_eq!(
+        local,
+        json!({ "skillOverrides": { "apps/web:deploy": "on" } })
+    );
+    let after = inventory(&fs);
+    assert_eq!(
+        ["apps/web:deploy", "deploy"].map(|name| state(&after, name)),
+        ["effective", "disabled"]
+    );
+
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(settings_values(&fs), before);
+}
+
+/// What the Project's local settings and the user settings hold, as values:
+/// Undo restores values, not bytes.
+fn settings_values(fs: &FakeFileSystem) -> [Value; 2] {
+    [local_settings(), user_settings()]
+        .map(|path| serde_json::from_slice(&fs.contents(path).unwrap()).unwrap())
 }

@@ -394,17 +394,17 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         (
             "claude-code.toml",
             "items.skill.disable[0]",
-            "`<subfolder>:<name>` is taken to decide",
+            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
         ),
         (
             "claude-code.toml",
             "items.skill.disable[1]",
-            "`<subfolder>:<name>` is taken to decide",
+            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
         ),
         (
             "claude-code.toml",
             "items.skill.disable[2]",
-            "`<subfolder>:<name>` is taken to decide",
+            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
         ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         (

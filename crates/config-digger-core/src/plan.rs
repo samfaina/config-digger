@@ -774,13 +774,28 @@ impl Targeted<'_> {
         // The parked skill folders an Enable brings back, asked about the
         // git index together once they are all planned.
         let mut brought_back: Vec<PlannedFolder> = Vec::new();
+        // Each Entry as its Agent lists it in the context, such as a nested
+        // skill named `<subfolder>:<name>`, whose switches hold it so.
+        let listed: Vec<Cow<ScannedEntry>> = self
+            .entries
+            .iter()
+            .map(|entry| {
+                resolve::named_apart_in_context(
+                    self.definitions,
+                    self.snapshot,
+                    self.scanned(entry),
+                    project.as_ref().map(|(_, key)| key.as_str()),
+                    project.as_ref().map(|(path, _)| path.as_path()),
+                )
+            })
+            .collect();
         let mut lifted: Vec<Hit> = Vec::new();
         let mut parks: Vec<&ScannedEntry> = Vec::new();
         // The names written to switches that hold them in every context.
         let mut by_name: Vec<String> = Vec::new();
         // What the writes do outside the context, as the preview says it.
         let mut elsewhere: Vec<Info> = Vec::new();
-        for entry in self.entries {
+        for (entry, scanned) in self.entries.iter().zip(&listed) {
             // Its switches would be offered as for any Entry of the Project.
             if entry.state == State::Unread {
                 return Err(Error::blocked(explain::only_removed(
@@ -788,7 +803,7 @@ impl Targeted<'_> {
                     &entry.locator,
                 )));
             }
-            let scanned = self.scanned(entry);
+            let scanned: &ScannedEntry = scanned;
             let definition = &self.definitions[scanned.agent_index];
             match self.action {
                 Action::Disable => {

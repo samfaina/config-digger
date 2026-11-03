@@ -3746,10 +3746,9 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     }
 
     #[test]
-    fn further_keys_need_target_name_and_take_no_layers_policy_or_default() {
+    fn further_keys_need_target_name_and_take_no_policy_or_default() {
         for extra in [
             r#", default_value = "off""#,
-            ", layered = true",
             ", policy = true, enable_offered = false",
         ] {
             let text = with_disable(&also_named(OVERRIDES, r#"["{own_name}"]"#, "", extra));
@@ -3765,6 +3764,53 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
         );
         assert!(
             error(&text).contains("also_names needs target `name`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    #[test]
+    fn a_layered_json_field_with_further_keys_loads() {
+        let text = with_disable(&also_named(
+            OVERRIDES,
+            r#"["{own_name}"]"#,
+            "",
+            ", layered = true",
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+    }
+
+    #[test]
+    fn a_json_field_deleted_on_enable_takes_an_enabled_value_only_layered_and_written() {
+        let on = r#", enabled_value = "on""#;
+        let text = with_disable(&also_named(
+            OVERRIDES,
+            r#"["{own_name}"]"#,
+            "",
+            &format!("{on}, layered = true"),
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for extra in ["", ", layered = true, enable_offered = false"] {
+            let text = with_disable(&also_named(
+                OVERRIDES,
+                r#"["{own_name}"]"#,
+                "",
+                &format!("{on}{extra}"),
+            ));
+            assert!(
+                error(&text).contains("takes an enabled_value only in a layered switch"),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+        let text = with_disable(&also_named(
+            OVERRIDES,
+            r#"["{own_name}"]"#,
+            "",
+            r#", enabled_value = "off", layered = true"#,
+        ));
+        assert!(
+            error(&text).contains("enabled_value must differ"),
             "{}",
             error(&text)
         );

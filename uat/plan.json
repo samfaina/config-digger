@@ -2469,6 +2469,77 @@
       ]
     },
     {
+      "id": "36",
+      "title": "skillOverrides en varios ficheros de ajustes",
+      "steps": [
+        {
+          "id": "36.1",
+          "title": "Una skill sincronizada con «on» bajo anthropic-skills: en los ajustes del usuario y «off» bajo su carpeta en los locales",
+          "goal": "Claude Code junta el skillOverrides de los ficheros de ajustes y lee primero anthropic-skills:<carpeta>: con «on» ahí en los ajustes del usuario y «off» bajo la carpeta sola en los ajustes locales del Project, la primera clave que tiene un valor en algún fichero decide, y config-digger enseña la skill Effective.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "En el campo Project, elige E:\\cd-throwaway\\project.",
+            "Elige la skill anthropic-skills:cd-throwaway-spread-skill y lee su tarjeta.",
+            "Abre E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json en el Bloc de notas y mira su skillOverrides.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.local.json en el Bloc de notas y mira su skillOverrides."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «anthropic-skills:cd-throwaway-spread-skill» sale «Effective».",
+            "Su tarjeta no tiene ninguna nota que nombre «skillOverrides».",
+            "Los ajustes del usuario tienen «\"anthropic-skills:cd-throwaway-spread-skill\": \"on\"».",
+            "Los ajustes locales del Project tienen «\"cd-throwaway-spread-skill\": \"off\"»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#530"
+          ]
+        },
+        {
+          "id": "36.2",
+          "title": "Enable de una skill apagada en los ajustes del usuario escribe «on» en los ajustes locales",
+          "goal": "Una skill apagada con «off» en los ajustes del usuario, que config-digger solo lee, se enciende desde un Project: Enable escribe «on» bajo su nombre en los ajustes locales del Project, que deciden sobre los del usuario, y deja los ajustes del usuario como estaban.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "En el campo Project, elige E:\\cd-throwaway\\project.",
+            "Elige la skill cd-throwaway-user-off-skill y lee su tarjeta.",
+            "Pulsa Enable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Enable.",
+            "Pulsa Done.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.local.json en el Bloc de notas y mira su skillOverrides.",
+            "Abre E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json en el Bloc de notas y mira su skillOverrides."
+          ],
+          "commands": [],
+          "expect": [
+            "Antes de Enable, el Item «cd-throwaway-user-off-skill» sale «Disabled».",
+            "Bajo los botones de su tarjeta dice «Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project.».",
+            "Tras Enable, el Item «cd-throwaway-user-off-skill» sale «Effective».",
+            "Los ajustes locales del Project tienen «\"cd-throwaway-user-off-skill\": \"on\"».",
+            "Los ajustes del usuario siguen teniendo «\"cd-throwaway-user-off-skill\": \"off\"»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#530"
+          ]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

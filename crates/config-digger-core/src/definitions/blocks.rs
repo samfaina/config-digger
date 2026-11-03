@@ -6195,6 +6195,13 @@ pub(crate) trait Disables {
     /// value that Enables, so that a later layer then decides.
     fn enable_unsets(&self) -> bool;
 
+    /// The value Enable sets a layered switch to instead of taking it away,
+    /// when a later layer whose switch config-digger only reads would still
+    /// Disable the Entry, so that this layer decides over it.
+    fn enabled_over_later_layers(&self) -> Option<&Value> {
+        None
+    }
+
     /// Whether it holds an Entry only by the id its location's `switch_id`
     /// makes, so that it cannot hold one of a location without it.
     fn by_id(&self) -> bool {
@@ -6417,6 +6424,10 @@ impl Disables for Switched<'_> {
 
     fn enable_unsets(&self) -> bool {
         self.block().enable_unsets()
+    }
+
+    fn enabled_over_later_layers(&self) -> Option<&Value> {
+        self.block().enabled_over_later_layers()
     }
 
     fn by_id(&self) -> bool {
@@ -6764,7 +6775,14 @@ pub(crate) struct JsonField {
     pub reason: DisableReason,
     /// The value that Disables the Entry.
     pub disabled_value: Value,
-    /// The value Enable sets, with `enable_action = "set"`.
+    /// The value Enable sets, with `enable_action = "set"`. With
+    /// `delete-key`, in a layered field config-digger writes, the value
+    /// Enable sets `{name}` to instead of deleting the Entry's keys, when a
+    /// later layer whose field it only reads would still Disable the Entry
+    /// once they are gone, such as `"on"` in Claude Code's local
+    /// `skillOverrides`, which decides over the shared Project settings and
+    /// the user settings. Enable then still deletes the Entry's further
+    /// keys that hold `disabled_value`.
     pub enabled_value: Option<Value>,
     /// The value the Agent takes while the field, or its file, is missing,
     /// such as `false` for Claude Desktop's `isEnabled`, which an extension
@@ -6784,7 +6802,12 @@ pub(crate) struct JsonField {
     /// Whether the field is one layer of a setting the Agent merges across
     /// files, such as Claude Code's `enabledPlugins`: among the layered
     /// mechanisms of the Item kind, in the definition's order, the first
-    /// whose field holds a value for the Entry decides.
+    /// whose field holds a value for the Entry decides. With `also_names`,
+    /// the layers are read key by key, and within each key layer by layer,
+    /// as Claude Code reads `skillOverrides` merged: the first key that
+    /// holds a value in any layer decides, from the first layer that holds
+    /// it, and a later key is read only while every earlier one is missing
+    /// from every layer.
     #[serde(default)]
     pub layered: bool,
     /// Whether the field is managed policy, such as `enabledPlugins` in
@@ -6828,18 +6851,14 @@ impl Validate for JsonField {
         if self.policy && self.enable_offered {
             return Err("a policy switch is only read: enable_offered must be false".into());
         }
-        // Of several keys, none would say which one's layer decides, which
-        // one's missing value the default stands for, or which one policy
-        // forces the Entry on or off by.
+        // Of several keys, none would say which one's missing value the
+        // default stands for, or which one policy forces the Entry on or
+        // off by.
         if !self.switch.also_names.is_empty()
-            && (self.target != MechanismTarget::Name
-                || self.layered
-                || self.policy
-                || self.default_value.is_some())
+            && (self.target != MechanismTarget::Name || self.policy || self.default_value.is_some())
         {
             return Err(
-                "also_names needs target `name`, and takes no layered, no policy and no default_value"
-                    .into(),
+                "also_names needs target `name`, and takes no policy and no default_value".into(),
             );
         }
         match (self.enable_action, &self.enabled_value) {
@@ -6847,10 +6866,11 @@ impl Validate for JsonField {
                 Err("a field's enable_action must be `delete-key` or `set`".into())
             }
             (EnableAction::Set, None) => Err("enable_action `set` needs an enabled_value".into()),
-            (EnableAction::DeleteKey, Some(_)) => {
-                Err("enable_action `delete-key` takes no enabled_value".into())
-            }
-            (EnableAction::Set, Some(enabled)) if *enabled == self.disabled_value => {
+            (EnableAction::DeleteKey, Some(_)) if !self.layered || !self.enable_offered => Err(
+                "enable_action `delete-key` takes an enabled_value only in a layered switch config-digger writes"
+                    .into(),
+            ),
+            (_, Some(enabled)) if *enabled == self.disabled_value => {
                 Err("enabled_value must differ from disabled_value".into())
             }
             _ if self.partial_values.contains(&self.disabled_value) => {
@@ -6895,6 +6915,12 @@ impl Disables for JsonField {
 
     fn enable_unsets(&self) -> bool {
         self.enable_action != EnableAction::Set
+    }
+
+    fn enabled_over_later_layers(&self) -> Option<&Value> {
+        self.enabled_value
+            .as_ref()
+            .filter(|_| self.enable_action == EnableAction::DeleteKey)
     }
 
     fn layered(&self) -> bool {
@@ -7553,7 +7579,9 @@ pub(crate) struct Switch {
     /// another is one key. The switch reads the keys in order, `{name}`
     /// first, then each of these in the order given, and the first that
     /// holds a value decides, `on` and partial values too: a later key is
-    /// read only while every earlier one holds nothing. Disable writes
+    /// read only while every earlier one holds nothing. Of `layered`
+    /// switches, the first key that holds a value in any layer decides, and
+    /// within that key the first layer that holds it. Disable writes
     /// `{name}`. Enable lifts the key that decides, then the next key in
     /// turn while it holds the disabled value, so that no later key
     /// Disables the Entry again.
