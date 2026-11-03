@@ -69,6 +69,7 @@ function putBackState() {
   write(state, s);
 }
 const reply = { id: "msg_x", type: "message", role: "assistant", model: "claude-x", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // Claude Code skips its gate fetch with this set, and holds the gate off.
 const noFetch = { DISABLE_GROWTHBOOK: "1" };
 
@@ -83,12 +84,12 @@ async function session({ prompt = "hi", env = {}, on = home, timeout } = {}) {
   return { skills: init.skills, plugins: init.plugins.map((x) => x.name), servers: init.mcp_servers.map((x) => x.name), listed: listedIn(model.bodies), sent: model.bodies.join("\n") };
 }
 
-// The dialogs an interactive session can raise before its first request,
+// The dialogs an interactive session can raise before its first request
+// once `.claude.json` holds the onboarding done and the Project trusted,
 // each with the text that shows it, and the option and keys that answer
-// it: trust the folder, use an API key or not, and use the Claude in Chrome
-// extension, which comes up once on a machine where Chrome has it.
+// it: use an API key or not, and use the Claude in Chrome extension, which
+// comes up on a machine where Chrome has it.
 const dialogs = {
-  trust: { shows: "Quick safety check", option: "Yes, I trust this folder", keys: "\x1b[B" },
   key: { shows: "Detected a custom API key", option: "No (recommended)", keys: "" },
   chrome: { shows: "Claude in Chrome extension detected", option: "No, keep browser tools off", keys: "" },
 };
@@ -103,36 +104,36 @@ function listedIn(bodies) {
 // signed-in home: what its first request to the model lists, the
 // credentials its requests to the model carry, `api_key` for `x-api-key`
 // and `oauth` for a bearer token, and the dialogs it raised before its
-// first request, each with the number of requests the model had got when
-// it showed. It answers each dialog of `dialogs`, and ends once the model's
+// first request, each with the number of requests of any kind the model
+// had got when it showed. It answers each dialog of `dialogs`, and ends once the model's
 // reply shows, as Ctrl+C twice ends it.
-async function interactive({ env = {} } = {}) {
+async function interactiveSession({ env = {} } = {}) {
   const model = await modelServer(reply);
-  const c = pseudoConsole(bin, ["hi"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_BASE_URL: model.url, ...env }, timeout: 150_000 });
+  const term = pseudoConsole(bin, ["hi"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_BASE_URL: model.url, ...env }, timeout: 240_000 });
   const raised = [];
   try {
     const requested = () => model.bodies.some((b) => b.includes('"messages"'));
-    for (const end = Date.now() + 90_000; !requested() && Date.now() < end; await new Promise((r) => setTimeout(r, 200))) {
-      const text = c.text();
+    for (const end = Date.now() + 90_000; !requested() && Date.now() < end; await sleep(200)) {
+      const text = term.text();
       const shown = Object.entries(dialogs).find(([name, d]) => text.includes(d.shows) && !raised.some((r) => r.dialog === name));
       if (!shown) continue;
       const [name, d] = shown;
       raised.push({ dialog: name, requests: model.bodies.length });
       const from = text.lastIndexOf(d.shows);
       // A key sent as the dialog first draws can come before it listens.
-      await new Promise((r) => setTimeout(r, 1000));
-      c.send(d.keys);
-      if (!(await c.until((t) => t.slice(from).includes(`❯ ${d.option}`), 10_000))) throw new Error(`the ${name} dialog never put ${d.option} first:\n${c.text().slice(from)}`);
-      c.send("\r");
+      await sleep(1000);
+      term.send(d.keys);
+      if (!(await term.until((t) => t.slice(from).includes(`❯ ${d.option}`), 10_000))) throw new Error(`the ${name} dialog never put ${d.option} first:\n${term.text().slice(from)}`);
+      term.send("\r");
     }
-    if (!requested()) throw new Error(`no request reached the model:\n${c.text().slice(-2000)}`);
-    await c.until((t) => /● ok/.test(t), 30_000);
-    c.send("\x03");
-    await new Promise((r) => setTimeout(r, 500));
-    c.send("\x03");
-    await Promise.race([c.exited, new Promise((r) => setTimeout(r, 15_000))]);
+    if (!requested()) throw new Error(`no request reached the model:\n${term.text().slice(-2000)}`);
+    await term.until((t) => /● ok/.test(t), 30_000);
+    term.send("\x03");
+    await sleep(500);
+    term.send("\x03");
+    await Promise.race([term.exited, sleep(15_000)]);
   } finally {
-    await c.stop();
+    await term.stop();
     model.close();
   }
   const credentials = model.headers.filter((_, i) => model.bodies[i].includes('"messages"')).map((h) => (h["x-api-key"] ? "api_key" : /^Bearer /.test(h.authorization ?? "") ? "oauth" : "none"));
@@ -533,10 +534,10 @@ try {
     else delete s.customApiKeyResponses;
     write(state, s);
   }
-  async function interactively(env, customApiKeyResponses) {
+  async function interactiveReads(env, customApiKeyResponses) {
     interactiveState(customApiKeyResponses);
     try {
-      const { listed, credentials, raised } = await interactive({ env: { ...offline, ...env } });
+      const { listed, credentials, raised } = await interactiveSession({ env: { ...offline, ...env } });
       return {
         reads: { skills: listed.some((l) => l.startsWith("- anthropic-skills:")), plugin: listed.some((l) => l.startsWith("- cd-throwaway-synced:")) },
         credentials,
@@ -549,7 +550,7 @@ try {
     }
   }
   // `same` on the keys of `expected`, with all a session saw in `observed`.
-  const sameSeen = (seen, expected) => ({ ...same(Object.fromEntries(Object.keys(expected).map((k) => [k, seen[k]])), expected), observed: JSON.stringify(seen) });
+  const sameOnKeys = (seen, expected) => ({ ...same(Object.fromEntries(Object.keys(expected).map((k) => [k, seen[k]])), expected), observed: JSON.stringify(seen) });
 
   // The controls: the interactive reads must flip as `-p`'s do, or the
   // driver or the read is wrong, and the key's checks below measure nothing.
@@ -557,10 +558,10 @@ try {
   await p.check("account.off", "in an interactive session, as under `-p`, Claude Code with no key reads the synced skills and plugin, and with `CLAUDE_CODE_OAUTH_TOKEN` in the environment reads neither", async () => {
     const seen = {};
     for (const [label, env] of [["no key", {}], ["CLAUDE_CODE_OAUTH_TOKEN", { CLAUDE_CODE_OAUTH_TOKEN: key }]]) {
-      const { reads: interactiveReads, credentials, dialogs } = await interactively(env);
-      seen[label] = { p: reads(await session({ env: { ...offline, ...env } })), interactive: interactiveReads, credentials, dialogs };
+      const { reads: interactiveRead, credentials, asked, dialogs } = await interactiveReads(env);
+      seen[label] = { p: reads(await session({ env: { ...offline, ...env } })), interactive: interactiveRead, asked, credentials, dialogs };
     }
-    const result = sameIn(["p", "interactive"], seen, { "no key": { p: both, interactive: both }, CLAUDE_CODE_OAUTH_TOKEN: { p: none, interactive: none } });
+    const result = sameIn(["p", "interactive", "asked"], seen, { "no key": { p: both, interactive: both, asked: null }, CLAUDE_CODE_OAUTH_TOKEN: { p: none, interactive: none, asked: null } });
     controlsHold = result.pass;
     return { ...result, observed: JSON.stringify(seen) };
   });
@@ -570,13 +571,13 @@ try {
   // holds nothing about it, and the session asks.
   const keyCheck = (title, fn) => p.check("account.off", title, async () => (controlsHold ? fn() : { pass: false, observed: "the interactive controls above do not match `-p`" }));
   await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses.approved` holds leaves Claude Code on the account: it sends the key to the model, yet reads the synced skills and plugin, and does not ask about the key", async () => {
-    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }, { approved: [key], rejected: [] }), { reads: both, credentials: ["api_key"], asked: null });
+    return sameOnKeys(await interactiveReads({ ANTHROPIC_API_KEY: key }, { approved: [key], rejected: [] }), { reads: both, credentials: ["api_key"], asked: null });
   });
   await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses.rejected` holds leaves Claude Code on the account: it sends its claude.ai token to the model, reads the synced skills and plugin, and does not ask about the key", async () => {
-    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }, { approved: [], rejected: [key] }), { reads: both, credentials: ["oauth"], asked: null });
+    return sameOnKeys(await interactiveReads({ ANTHROPIC_API_KEY: key }, { approved: [], rejected: [key] }), { reads: both, credentials: ["oauth"], asked: null });
   });
   await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses` does not answer brings up the key dialog before any request reaches the model; answered No, the key is written to `customApiKeyResponses.rejected` and Claude Code stays on the account: it sends its claude.ai token to the model and reads the synced skills and plugin", async () => {
-    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }), { reads: both, credentials: ["oauth"], asked: 0, responses: { approved: [], rejected: [key] } });
+    return sameOnKeys(await interactiveReads({ ANTHROPIC_API_KEY: key }), { reads: both, credentials: ["oauth"], asked: 0, responses: { approved: [], rejected: [key] } });
   });
 
   unplantPlugins();

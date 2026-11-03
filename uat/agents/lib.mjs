@@ -141,6 +141,7 @@ public static class CdPseudoConsole {
   [DllImport("kernel32.dll")] static extern int CreatePseudoConsole(Coord size, SafeFileHandle input, SafeFileHandle output, uint flags, out IntPtr console);
   [DllImport("kernel32.dll")] static extern void ClosePseudoConsole(IntPtr console);
   [DllImport("kernel32.dll", SetLastError = true)] static extern bool InitializeProcThreadAttributeList(IntPtr list, int count, int flags, ref IntPtr size);
+  [DllImport("kernel32.dll")] static extern void DeleteProcThreadAttributeList(IntPtr list);
   [DllImport("kernel32.dll", SetLastError = true)] static extern bool UpdateProcThreadAttribute(IntPtr list, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returned);
   [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
   static extern bool CreateProcessW(string application, string commandLine, IntPtr processAttributes, IntPtr threadAttributes, bool inherit, uint flags, IntPtr environment, string cwd, ref StartupInfoEx info, out ProcessInformation process);
@@ -180,8 +181,12 @@ public static class CdPseudoConsole {
     Environment.SetEnvironmentVariable("CD_PSEUDO_CONSOLE_LINE", null);
     ProcessInformation process;
     if (!CreateProcessW(null, commandLine, IntPtr.Zero, IntPtr.Zero, false, 0x80000, IntPtr.Zero, cwd, ref info, out process)) throw new Exception("CreateProcess: " + Marshal.GetLastWin32Error());
-    Thread output = Copy(new FileStream(outRead, FileAccess.Read), Console.OpenStandardOutput());
-    Copy(Console.OpenStandardInput(), new FileStream(inWrite, FileAccess.Write));
+    DeleteProcThreadAttributeList(info.lpAttributeList);
+    Marshal.FreeHGlobal(info.lpAttributeList);
+    FileStream keys = new FileStream(inWrite, FileAccess.Write);
+    FileStream rendered = new FileStream(outRead, FileAccess.Read);
+    Thread output = Copy(rendered, Console.OpenStandardOutput());
+    Copy(Console.OpenStandardInput(), keys);
     WaitForSingleObject(process.hProcess, 0xFFFFFFFF);
     uint code;
     GetExitCodeProcess(process.hProcess, out code);
@@ -189,6 +194,8 @@ public static class CdPseudoConsole {
     CloseHandle(process.hProcess);
     ClosePseudoConsole(console);
     output.Join(5000);
+    keys.Dispose();
+    rendered.Dispose();
     return (int)code;
   }
 }
@@ -202,15 +209,15 @@ function quoteArg(a) {
 
 // What a console's output shows as text: its escape sequences taken out, a
 // cursor moved right written as that many spaces.
-export function consoleText(output) {
+function consoleText(output) {
   return output
     .replace(/\x1b\[(\d*)C/g, (_, n) => " ".repeat(Number(n || 1)))
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[()][0-9A-Za-z]|\x1b[@-_]/g, "");
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b\[[0-?]*[ -/]*[@-~]|\x1b[()][0-9A-Za-z]|\x1b[0-9=>@-_]/g, "");
 }
 
 // Starts `command`, an executable rather than a `.cmd` shim, in a Windows
-// pseudo console of `cols` by `rows`, with `cwd` and the probe's
-// environment plus `env`, as `run` does. `send` types keys, such as `"\r"`
+// pseudo console of 120 by 40, with `cwd` and the probe's environment plus
+// `env`, as `run` does. `send` types keys, such as `"\r"`
 // for Enter; `output` is what the console rendered so far, and `text` that
 // without its escape sequences; `until` resolves with the text once `test`
 // holds of it, or with null after `ms`; `exited` resolves with the exit
@@ -218,8 +225,8 @@ export function consoleText(output) {
 // Claude Code session hands the commands it runs, `CLAUDECODE` and
 // `CLAUDE_*`, are left out unless `env` sets them: an interactive Claude
 // Code would take itself for that session's child, and save no transcript.
-export function pseudoConsole(command, args, { cwd, env = {}, cols = 120, rows = 40, timeout = 180_000 } = {}) {
-  const script = "$ErrorActionPreference = 'Stop'; Add-Type -TypeDefinition $env:CD_PSEUDO_CONSOLE; exit [CdPseudoConsole]::Run($env:CD_PSEUDO_CONSOLE_LINE, (Get-Location).Path, " + cols + ", " + rows + ")";
+export function pseudoConsole(command, args, { cwd, env = {}, timeout = 180_000 } = {}) {
+  const script = "$ErrorActionPreference = 'Stop'; Add-Type -TypeDefinition $env:CD_PSEUDO_CONSOLE; exit [CdPseudoConsole]::Run($env:CD_PSEUDO_CONSOLE_LINE, (Get-Location).Path, 120, 40)";
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([name]) => !/^CLAUDE/i.test(name)));
   const child = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script], {
     cwd,
@@ -228,6 +235,8 @@ export function pseudoConsole(command, args, { cwd, env = {}, cols = 120, rows =
   });
   let output = "";
   let stderr = "";
+  // A character can come split across two chunks.
+  child.stdout.setEncoding("utf8");
   child.stdout.on("data", (d) => (output += d));
   child.stderr.on("data", (d) => (stderr += d));
   child.stdin.on("error", () => {});

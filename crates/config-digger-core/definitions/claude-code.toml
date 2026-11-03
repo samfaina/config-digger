@@ -110,9 +110,10 @@ credentials = { block = "home", root = "credentials_file" }
 # other providers leave it on alike [binary], and hold the gate off as its
 # bypass says. `ANTHROPIC_API_KEY` leaves it on under `-p` and in an
 # interactive session, whether `customApiKeyResponses` in `~/.claude.json`
-# approves the key, rejects it or holds nothing, the session then asking
-# before its first request [test]: an approved key goes to the model, and
-# the synced skills and plugins still load. `primaryApiKey` in
+# approves the key, rejects it or holds nothing about it [test]. Holding
+# nothing, the session asks before its first request, and No rejects the
+# key. An approved key goes to the model, and the synced skills and
+# plugins still load. `primaryApiKey` in
 # `~/.claude.json` leaves it on [test].
 [account.off]
 settings = [
