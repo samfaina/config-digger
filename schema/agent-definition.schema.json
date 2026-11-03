@@ -988,6 +988,17 @@
           },
           "default": []
         },
+        "env_maps": {
+          "description": "In what takes an Agent off its account, the `id`s of the env maps\nof the block the Agent reads this variable from, such as Claude\nCode's `CLAUDE_CODE_OAUTH_TOKEN`, which it does not take from a\nProject's settings. A map not named here neither sets the variable\nnor replaces it in the environment. Left out, every map counts.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "default": null
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -1017,6 +1028,14 @@
       "description": "A JSON object of variable names and string values in a file of the\nAgent home, the machine or the Project, or in settings, such as the\n`env` of a settings file. In settings, a later file read overrides an\nearlier one, variable by variable.",
       "type": "object",
       "properties": {
+        "id": {
+          "description": "The name a variable's `env_maps` gives it, unique in its block.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "anchor": {
           "$ref": "#/$defs/Anchor"
         },
