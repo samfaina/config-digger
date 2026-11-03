@@ -499,6 +499,31 @@ function verbatimSkill(dir, folder) {
     fs.rmSync(local);
     return same({ listedWhenOffByFolder: byFolder, listedWhenOffByName: byName }, { listedWhenOffByFolder: false, listedWhenOffByName: true });
   });
+  // One key in two settings files: Claude Code merges `skillOverrides`
+  // across them, the local settings over the Project's shared ones over the
+  // user's (#530).
+  await p.check("items.skill.disable[0]", "of `\"<name>\": \"off\"` in one settings file beside `\"<name>\": \"on\"` in another, the Project's local settings decide over its shared settings and the user settings, and the shared settings over the user settings", async () => {
+    const files = { local: path.join(proj, ".claude", "settings.local.json"), project: path.join(proj, ".claude", "settings.json"), user: path.join(home, "settings.json") };
+    const read = async (byFile) => {
+      for (const [label, value] of Object.entries(byFile)) write(files[label], { skillOverrides: { "fold-a": value } });
+      try {
+        return (await session(home, proj)).skills.includes("fold-a");
+      } finally {
+        for (const file of Object.values(files)) fs.rmSync(file, { force: true });
+      }
+    };
+    return same(
+      {
+        "local off, user on": await read({ local: "off", user: "on" }),
+        "local on, user off": await read({ local: "on", user: "off" }),
+        "local off, project on": await read({ local: "off", project: "on" }),
+        "local on, project off": await read({ local: "on", project: "off" }),
+        "project off, user on": await read({ project: "off", user: "on" }),
+        "project on, user off": await read({ project: "on", user: "off" }),
+      },
+      { "local off, user on": false, "local on, user off": true, "local off, project on": false, "local on, project off": true, "project off, user on": false, "project on, user off": true },
+    );
+  });
 
   const plugin = path.join(dir, "cd-throwaway-pk");
   write(path.join(plugin, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-pk", version: "1.0.0" });
@@ -636,6 +661,46 @@ function verbatimSkill(dir, folder) {
     return same(
       { byName: byName.includes("cd-throwaway-web"), byPrefixed: ["web:cd-throwaway-dupe", "cd-throwaway-dupe"].map((n) => byPrefixed.includes(n)), byFolder: ["web:cd-throwaway-twin", "web/src/deep:cd-throwaway-twin"].map((n) => byFolder.includes(n)) },
       { byName: false, byPrefixed: [false, true], byFolder: [false, false] },
+    );
+  });
+  // Two keys in two settings files: Claude Code merges `skillOverrides`
+  // across them, then reads `<subfolder>:<name>` before the bare `<name>`
+  // (#530).
+  await p.check("items.skill.disable[0]", "of a nested skill's two keys, in one settings file in either order or in two settings files, `<subfolder>:<name>` decides, whichever file holds it, the bare `<name>` counting only while it holds nothing", async () => {
+    const files = { local: path.join(repo, ".claude", "settings.local.json"), project: path.join(repo, ".claude", "settings.json"), user: path.join(home, "settings.json") };
+    const listed = async (byFile) => {
+      for (const [label, overrides] of Object.entries(byFile)) write(files[label], { skillOverrides: overrides });
+      try {
+        return names((await session(home, repo, { read: deepFile })).listedAfter).includes("web:cd-throwaway-dupe");
+      } finally {
+        for (const file of Object.values(files)) fs.rmSync(file, { force: true });
+      }
+    };
+    return same(
+      {
+        "prefixed on in local, bare off in user": await listed({ local: { "web:cd-throwaway-dupe": "on" }, user: { "cd-throwaway-dupe": "off" } }),
+        "bare off in local, prefixed on in user": await listed({ local: { "cd-throwaway-dupe": "off" }, user: { "web:cd-throwaway-dupe": "on" } }),
+        "prefixed off in local, bare on in user": await listed({ local: { "web:cd-throwaway-dupe": "off" }, user: { "cd-throwaway-dupe": "on" } }),
+        "bare on in local, prefixed off in user": await listed({ local: { "cd-throwaway-dupe": "on" }, user: { "web:cd-throwaway-dupe": "off" } }),
+        "bare off in local, prefixed on in project": await listed({ local: { "cd-throwaway-dupe": "off" }, project: { "web:cd-throwaway-dupe": "on" } }),
+        "bare on in local, prefixed off in project": await listed({ local: { "cd-throwaway-dupe": "on" }, project: { "web:cd-throwaway-dupe": "off" } }),
+        "in local, prefixed on first": await listed({ local: { "web:cd-throwaway-dupe": "on", "cd-throwaway-dupe": "off" } }),
+        "in local, bare off first": await listed({ local: { "cd-throwaway-dupe": "off", "web:cd-throwaway-dupe": "on" } }),
+        "in local, prefixed off first": await listed({ local: { "web:cd-throwaway-dupe": "off", "cd-throwaway-dupe": "on" } }),
+        "in local, bare on first": await listed({ local: { "cd-throwaway-dupe": "on", "web:cd-throwaway-dupe": "off" } }),
+      },
+      {
+        "prefixed on in local, bare off in user": true,
+        "bare off in local, prefixed on in user": true,
+        "prefixed off in local, bare on in user": false,
+        "bare on in local, prefixed off in user": false,
+        "bare off in local, prefixed on in project": true,
+        "bare on in local, prefixed off in project": false,
+        "in local, prefixed on first": true,
+        "in local, bare off first": true,
+        "in local, prefixed off first": false,
+        "in local, bare on first": false,
+      },
     );
   });
 

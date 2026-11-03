@@ -195,17 +195,13 @@ pub(crate) fn resolve(
 
     // Entries compete when they share an Agent home, an Item kind and a
     // competition key. The map's order sorts Items by Agent, home and key.
-    let in_context: Vec<Cow<ScannedEntry>> = snapshot
-        .entries
-        .iter()
-        .filter(|entry| entry.project.is_none() || entry.project.as_ref() == project_key)
-        .map(|entry| {
-            let definition = &definitions[entry.agent_index];
-            under_name_rule(definition, snapshot, entry, project_key.map(String::as_str))
-        })
-        .collect();
     let project_folder = context_project.as_ref().map(|project| project.path);
-    let in_context = named_apart(definitions, in_context, project_folder);
+    let in_context = listed(
+        definitions,
+        snapshot,
+        project_key.map(String::as_str),
+        project_folder,
+    );
     let in_context: Vec<&ScannedEntry> = in_context.iter().map(AsRef::as_ref).collect();
     let mut competing: BTreeMap<_, Vec<&ScannedEntry>> = BTreeMap::new();
     for &entry in &in_context {
@@ -1018,17 +1014,17 @@ pub(crate) fn resolve(
                                     false,
                                 )
                             });
-                            // With the partial switches it takes away, such as
-                            // a skill's item in VS Code's
+                            // As Enable lifts them: with the later layers'
+                            // switches, and the partial switches it takes
+                            // away, such as a skill's item in VS Code's
                             // `chat.disabledPromptFiles.skill`.
-                            let lifting: Vec<&Hit> = disabling
-                                .iter()
-                                .chain(
-                                    partial
-                                        .iter()
-                                        .filter(|hit| hit.mechanism.enable_lifts_partial()),
-                                )
-                                .collect();
+                            let lifting = disable::lifted_by_enable(
+                                definition,
+                                snapshot,
+                                entry,
+                                project_key.map(String::as_str),
+                            );
+                            let lifting: Vec<&Hit> = lifting.iter().collect();
                             let lifts = (!lifting.is_empty())
                                 .then(|| disable::enable(location, &lifting))
                                 .transpose();
@@ -1682,6 +1678,50 @@ fn subfolder<'e>(entry: &'e ScannedEntry, project: Option<&Path>) -> Option<&'e 
             .and_then(|project| folder.strip_prefix(project).ok())
             .unwrap_or(folder),
     )
+}
+
+/// The Entries read in the context of the Project with the key `project`,
+/// in the folder `folder`, as the Agent lists them: each named as its name
+/// rule reads it, and one its location names apart, such as a nested skill
+/// of a name another skill has, by its `on_clash` name.
+pub(crate) fn listed<'s>(
+    definitions: &[AgentDefinition],
+    snapshot: &'s Snapshot,
+    project: Option<&str>,
+    folder: Option<&Path>,
+) -> Vec<Cow<'s, ScannedEntry>> {
+    let in_context = snapshot
+        .entries
+        .iter()
+        .filter(|entry| entry.project.is_none() || entry.project.as_deref() == project)
+        .map(|entry| under_name_rule(&definitions[entry.agent_index], snapshot, entry, project))
+        .collect();
+    named_apart(definitions, in_context, folder)
+}
+
+/// The name `entry` is listed under in the context of the Project with the
+/// key `project`, in the folder `folder`, when its location names it apart
+/// from another Entry of its name: `entry` renamed as [`listed`] names it.
+pub(crate) fn named_apart_in_context<'s>(
+    definitions: &[AgentDefinition],
+    snapshot: &'s Snapshot,
+    entry: &'s ScannedEntry,
+    project: Option<&str>,
+    folder: Option<&Path>,
+) -> Cow<'s, ScannedEntry> {
+    if apart_rules(&definitions[entry.agent_index], entry).is_none() {
+        return Cow::Borrowed(entry);
+    }
+    listed(definitions, snapshot, project, folder)
+        .into_iter()
+        .find(|listed| {
+            listed.agent_index == entry.agent_index
+                && listed.home == entry.home
+                && listed.path == entry.path
+                && listed.key_path == entry.key_path
+        })
+        .filter(|listed| listed.name != entry.name)
+        .unwrap_or(Cow::Borrowed(entry))
 }
 
 /// The Entries `entries` of a context, with each that competes with none

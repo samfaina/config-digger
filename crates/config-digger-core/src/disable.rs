@@ -39,9 +39,33 @@ pub(crate) struct Hit<'a> {
     pub key: Cow<'a, str>,
     /// The folder of the context's Project, which path rules are read for.
     pub folder: Option<&'a Path>,
+    /// Whether Enable sets the switch to the value that decides over the
+    /// later layers, rather than lifting it, as it writes `"on"` in Claude
+    /// Code's local `skillOverrides` while the user settings hold `off`.
+    pub sets_over_later_layers: bool,
 }
 
-impl Hit<'_> {
+impl<'a> Hit<'a> {
+    /// The switch of `mechanism` at `switch`, holding `value` for the Entry
+    /// under `key`.
+    fn new(
+        mechanism: Switched<'a>,
+        switch: &'a ScannedSwitch,
+        key: &Cow<'a, str>,
+        value: Option<&'a Value>,
+        folder: Option<&'a Path>,
+    ) -> Self {
+        Hit {
+            mechanism,
+            switch,
+            key_path: switch.key_path_for(key),
+            value,
+            key: key.clone(),
+            folder,
+            sets_over_later_layers: false,
+        }
+    }
+
     /// Whether lifting `other` lifts this one too: the same key of the same
     /// file, for the same key.
     pub fn same_switch(&self, other: &Hit) -> bool {
@@ -174,10 +198,21 @@ impl Hit<'_> {
         self.mechanism.context() == MechanismContext::Project
     }
 
-    /// The edits that lift the switch.
+    /// The edits that lift the switch, or that set it over the later
+    /// layers.
     pub fn enable_edits(&self) -> Vec<Edit> {
-        self.mechanism
-            .enable_edits(self.key_path.clone(), self.value, &self.key, self.folder)
+        match self.mechanism.enabled_over_later_layers() {
+            Some(value) if self.sets_over_later_layers => vec![Edit::Set {
+                key_path: self.key_path.clone(),
+                value: value.clone(),
+            }],
+            _ => self.mechanism.enable_edits(
+                self.key_path.clone(),
+                self.value,
+                &self.key,
+                self.folder,
+            ),
+        }
     }
 
     /// What Enable writes to lift the switch, as a sentence.
@@ -231,6 +266,19 @@ pub(crate) fn lifted_by_enable<'a>(
     disabling
 }
 
+/// A hit with where it stands in the definition's order: its mechanism,
+/// then its switch among those of the mechanism.
+type Placed<'a> = ((usize, usize), Hit<'a>);
+
+/// A layered switch, with its place in the definition's order and the keys
+/// it is read under.
+struct Layer<'a> {
+    place: (usize, usize),
+    mechanism: Switched<'a>,
+    switch: &'a ScannedSwitch,
+    keys: Vec<Cow<'a, str>>,
+}
+
 /// The switches set for `entry`, as [`hits`] finds them, or with
 /// `every_layer`, as [`lifted_by_enable`] finds them.
 fn set_for<'a>(
@@ -241,14 +289,10 @@ fn set_for<'a>(
     every_layer: bool,
 ) -> (Vec<Hit<'a>>, Vec<Hit<'a>>) {
     let location = definition.location(&entry.location);
-    let mut disabling = Vec::new();
-    let mut partial = Vec::new();
-    // Whether a layered switch already holds a value for the Entry, which
-    // the later layers then leave as it is.
-    let mut layer_decided = false;
-    // The last layered switch that holds nothing for the Entry, whose
-    // default the Agent takes when no layer holds a value.
-    let mut by_default: Option<Hit> = None;
+    let mut disabling: Vec<Placed> = Vec::new();
+    let mut partial: Vec<Placed> = Vec::new();
+    // The layered switches, in the definition's order.
+    let mut layers: Vec<Layer> = Vec::new();
     // The folder of the context's Project, which path rules are read for.
     let folder = project
         .and_then(|key| snapshot.project(key))
@@ -263,7 +307,6 @@ fn set_for<'a>(
         if !mechanism.covers(&location.id)
             || !mechanism.covers_plugin(plugin_scope(entry))
             || !switch_read(definition, snapshot, entry, mechanism, project)
-            || (mechanism.layered() && layer_decided)
         {
             continue;
         }
@@ -271,55 +314,158 @@ fn set_for<'a>(
             .switches_of(entry, location.kind, index)
             .filter(|switch| switch.project.is_none() || switch.project.as_deref() == project);
         let keys = switch_keys(mechanism, entry);
-        for switch in switches {
+        for (place, switch) in switches.enumerate() {
+            let place = (index, place);
+            if mechanism.layered() {
+                layers.push(Layer {
+                    place,
+                    mechanism,
+                    switch,
+                    keys: keys.clone(),
+                });
+                continue;
+            }
             // Of the switch's keys, the first that holds a value decides,
             // and a later key is read only while every earlier one holds
             // nothing, as Claude Code reads a synced skill's
             // `anthropic-skills:<folder>` before its bare `<folder>`.
-            let mut key_decided = false;
             for key in &keys {
-                // Of the files of one layer, such as merged managed settings,
-                // the first that holds a value decides too.
-                if key_decided || (mechanism.layered() && layer_decided) {
-                    break;
-                }
                 let value = switch.value_for(key);
-                // Enable taking a switch away leaves the next layer, or the
-                // switch's next key, to decide.
-                let unset = every_layer
-                    && mechanism.enable_unsets()
-                    && mechanism.disables(value, key, folder);
-                key_decided = value.is_some() && !unset;
-                layer_decided |= mechanism.layered() && key_decided;
-                let hit = Hit {
-                    mechanism,
-                    switch,
-                    key_path: switch.key_path_for(key),
-                    value,
-                    key: key.clone(),
-                    folder,
-                };
-                // A layer that holds nothing leaves the next one to decide.
-                if mechanism.layered() && value.is_none() {
-                    by_default = Some(hit);
-                    continue;
-                }
-                if mechanism.disables(value, key, folder) {
-                    disabling.push(hit);
-                } else if mechanism.partial(value) {
-                    partial.push(hit);
+                let hit = Hit::new(mechanism, switch, key, value, folder);
+                let disables = sort_in(place, hit, &mut disabling, &mut partial);
+                // Enable taking a switch away leaves the switch's next key
+                // to decide.
+                let unset = every_layer && mechanism.enable_unsets() && disables;
+                if value.is_some() && !unset {
+                    break;
                 }
             }
         }
     }
-    if let Some(hit) = by_default.filter(|_| !layer_decided) {
-        if hit.mechanism.disables(None, &hit.key, folder) {
-            disabling.push(hit);
-        } else if hit.mechanism.partial(None) {
-            partial.push(hit);
+    read_layers(&layers, every_layer, folder, &mut disabling, &mut partial);
+    // The definition's order; within one switch, its keys' order.
+    disabling.sort_by_key(|(place, _)| *place);
+    partial.sort_by_key(|(place, _)| *place);
+    let hits = |placed: Vec<Placed<'a>>| placed.into_iter().map(|(_, hit)| hit);
+    (hits(disabling).collect(), hits(partial).collect())
+}
+
+/// Reads `layers`, the layered switches of a setting the Agent merges
+/// across files, into `disabling` and `partial`. Key by key, and within
+/// each key layer by layer: the first layer that holds a value under the
+/// first key that holds one in any layer decides, as Claude Code reads a
+/// skill's `skillOverrides` from its settings merged. When none does, the
+/// last layer's default decides. With `every_layer`, as Enable reads them,
+/// a layer whose switch Enable takes away leaves the next to decide; when
+/// that is one config-digger only reads that Disables the Entry, an
+/// earlier layer that Enable can set over the later ones, such as Claude
+/// Code's local `skillOverrides`, is set instead, and decides.
+fn read_layers<'a>(
+    layers: &[Layer<'a>],
+    every_layer: bool,
+    folder: Option<&'a Path>,
+    disabling: &mut Vec<Placed<'a>>,
+    partial: &mut Vec<Placed<'a>>,
+) {
+    let most_keys = layers
+        .iter()
+        .map(|layer| layer.keys.len())
+        .max()
+        .unwrap_or(0);
+    // The first layer Enable can set over the later ones.
+    let over = layers
+        .iter()
+        .position(|layer| {
+            layer.mechanism.enable_offered()
+                && layer.mechanism.enabled_over_later_layers().is_some()
+        })
+        .filter(|_| every_layer);
+    // The last layer that holds nothing for the Entry, whose default the
+    // Agent takes when no layer holds a value.
+    let mut by_default = None;
+    for position in 0..most_keys {
+        for (
+            layer,
+            &Layer {
+                place,
+                mechanism,
+                switch,
+                ref keys,
+            },
+        ) in layers.iter().enumerate()
+        {
+            let Some(key) = keys.get(position) else {
+                continue;
+            };
+            let value = switch.value_for(key);
+            let hit = Hit::new(mechanism, switch, key, value, folder);
+            // A layer that holds nothing leaves the next one to decide.
+            if value.is_none() {
+                by_default = Some((place, hit));
+                continue;
+            }
+            let disables = mechanism.disables(value, key, folder);
+            if let Some(over) =
+                over.filter(|&over| over < layer && disables && !mechanism.enable_offered())
+            {
+                set_over(&layers[over], folder, disabling);
+                return;
+            }
+            sort_in(place, hit, disabling, partial);
+            // Enable taking a switch away leaves the next layer to decide.
+            if !(every_layer && mechanism.enable_unsets() && disables) {
+                return;
+            }
         }
     }
-    (disabling, partial)
+    if let Some((place, hit)) = by_default {
+        sort_in(place, hit, disabling, partial);
+    }
+}
+
+/// Puts `hit`, at `place`, among `disabling` when what it holds Disables
+/// the Entry, and among `partial` when it limits it. Whether it Disables.
+fn sort_in<'a>(
+    place: (usize, usize),
+    hit: Hit<'a>,
+    disabling: &mut Vec<Placed<'a>>,
+    partial: &mut Vec<Placed<'a>>,
+) -> bool {
+    let disables = hit.mechanism.disables(hit.value, &hit.key, hit.folder);
+    if disables {
+        disabling.push((place, hit));
+    } else if hit.mechanism.partial(hit.value) {
+        partial.push((place, hit));
+    }
+    disables
+}
+
+/// Makes Enable set `layer`'s switch, under the key Disable writes, to the
+/// value that decides over the later layers: the hit of that key among
+/// `disabling`, or a new one.
+fn set_over<'a>(
+    &Layer {
+        place,
+        mechanism,
+        switch,
+        ref keys,
+    }: &Layer<'a>,
+    folder: Option<&'a Path>,
+    disabling: &mut Vec<Placed<'a>>,
+) {
+    let Some(key) = keys.first() else {
+        return;
+    };
+    let known = disabling
+        .iter_mut()
+        .find(|(known, hit)| *known == place && hit.key == *key);
+    if let Some((_, hit)) = known {
+        hit.sets_over_later_layers = true;
+    } else {
+        let mut hit = Hit::new(mechanism, switch, key, switch.value_for(key), folder);
+        hit.sets_over_later_layers = true;
+        disabling.push((place, hit));
+    }
 }
 
 /// Whether a switch keyed by plugin turns `plugin`, of the Agent home of
@@ -387,14 +533,7 @@ fn policy_hold<'a>(
                 .find_map(|switch| {
                     keys.iter().find_map(|key| {
                         let value = switch.value_for(key)?;
-                        Some(Hit {
-                            mechanism,
-                            switch,
-                            key_path: switch.key_path_for(key),
-                            value: Some(value),
-                            key: key.clone(),
-                            folder,
-                        })
+                        Some(Hit::new(mechanism, switch, key, Some(value), folder))
                     })
                 })
         })
