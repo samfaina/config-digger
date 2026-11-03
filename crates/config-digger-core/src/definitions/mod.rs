@@ -939,6 +939,13 @@ impl PluginsDefinition {
         if marketplaces && self.id_separator.is_none() {
             return Err("a registry's marketplaces need id_separator to find a plugin's".into());
         }
+        let listed = matches!(
+            &self.registry,
+            PluginRegistry::PluginFolders(block) if block.listed.is_some()
+        );
+        if listed && self.id_separator.is_none() {
+            return Err("a plugin list needs id_separator to name a row's folder".into());
+        }
         if self
             .id_template
             .as_ref()
@@ -5434,6 +5441,41 @@ loses_to = {synced_loses_to}
             assert!(
                 error(&text).contains(refusal),
                 "{installed} {synced}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
+    fn plugin_folders_listed_by_a_file_need_its_fields_and_the_id_separator() {
+        let listed = |file: &str, name: &str, separator: &str| {
+            with_plugins(&format!(
+                r#"
+[[plugins]]
+id = "synced"
+registry = {{ block = "plugin-folders", anchor = {{ block = "home", root = "plugins", path = "synced" }}, depth = 2, listed = {{ file = "{file}", root = ["plugins"], name = "{name}", generation = "generation", deletes_unlisted = true }} }}
+{separator}"#
+            ))
+        };
+        let text = listed("manifest.json", "name", r#"id_separator = "~g""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (text, refusal) in [
+            (
+                listed("../manifest.json", "name", r#"id_separator = "~g""#),
+                "must be a relative path",
+            ),
+            (
+                listed("manifest.json", "", r#"id_separator = "~g""#),
+                "a plugin list needs its name and generation fields",
+            ),
+            (
+                listed("manifest.json", "name", ""),
+                "a plugin list needs id_separator",
+            ),
+        ] {
+            assert!(
+                error(&text).contains(refusal),
+                "{refusal}: {}",
                 error(&text)
             );
         }

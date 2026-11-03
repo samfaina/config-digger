@@ -2286,6 +2286,40 @@
       ]
     },
     {
+      "id": "33",
+      "title": "Plugins sincronizados que el manifest.json de la cuenta no lista",
+      "steps": [
+        {
+          "id": "33.1",
+          "title": "Un plugin sincronizado listado y otro sin listar",
+          "goal": "Claude Code carga solo las carpetas de plugins sincronizados que nombra una fila del manifest.json de la cuenta, y config-digger enseña las skills de una carpeta que ninguna fila nombra Unread, de solo lectura, con una razón que lo dice.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "Busca cd-throwaway-synced:cd-throwaway-synced-skill en la lista Items.",
+            "Elige la skill cd-throwaway-unlisted:cd-throwaway-unlisted-skill y lee su tarjeta."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «cd-throwaway-synced:cd-throwaway-synced-skill» sale «Effective».",
+            "El Item «cd-throwaway-unlisted:cd-throwaway-unlisted-skill» sale «Unread».",
+            "Su tarjeta tiene la etiqueta «cloud mirror».",
+            "Su tarjeta dice «Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates them.».",
+            "El botón Disable de su tarjeta está desactivado.",
+            "El botón Remove de su tarjeta está desactivado."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#494"]
+        }
+      ]
+    },
+    {
       "id": "32",
       "title": "La cuenta de claude.ai y sus credenciales",
       "steps": [

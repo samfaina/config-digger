@@ -280,16 +280,21 @@ name = "name"
 source = "source"
 
 # Plugins synced from claude.ai, one folder each in
-# `plugins/synced/<org>_<account>/<name>~g<generation>` [disk], `<name>` in
-# 2.1.309 [disk], beside the account's `manifest.json`,
-# `.marketplaces.json`, `.last-complete-round` and a
-# `<name>~g<generation>.meta.json` per plugin, none of them a plugin, and
-# the empty file `synced/.bucket-<org>_<account>` [disk]. Claude Code
-# owns this copy and loads it with no `enabledPlugins` key [disk]. It loads
-# only a plugin the account's `manifest.json` lists, and a sync round
-# deletes one claude.ai does not list [test]; config-digger reads every
-# folder (#494). A synced plugin is named by its manifest's `name`, not by
-# its folder [disk], and its switches know it as `<name>@synced` [docs].
+# `plugins/synced/<org>_<account>` [disk], beside the account's
+# `manifest.json`, `.marketplaces.json`, `.last-complete-round` and a
+# `<folder>.meta.json` per plugin, none of them a plugin, and the empty file
+# `synced/.bucket-<org>_<account>` [disk]. Claude Code owns this copy and
+# loads it with no `enabledPlugins` key [disk]. It loads one folder per row
+# of the account's `manifest.json` `plugins`, and no other [binary, test]
+# (`listed`): a row's folder is its `name` when its `generation` is missing
+# or 1 or less, and `<name>~g<generation>` when it is 2 or more, and of two
+# rows that give one folder the first counts, in every version [binary]; no
+# version writes `<name>~g1` [binary]. A folder no row names is not loaded
+# [test], and the next sync round trashes it [binary], which also deletes a
+# plugin claude.ai does not list [test]: its servers and skills are Unread,
+# with a reason saying so. A synced plugin is named by its manifest's
+# `name`, not by its folder [disk], and its switches know it as
+# `<name>@synced` [docs].
 # Its Entries are read-only, being a copy of the
 # account's configuration. Like `synced-skills`, its servers and skills
 # are read only in the Signed-in account's folder, and while Claude Code
@@ -307,12 +312,13 @@ source = "source"
 id = "synced"
 unverified = [
   "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
+  "With the account's `manifest.json` missing, or not parsing, Claude Code is taken to load none of the account's synced plugins.",
   "An installed plugin of a synced plugin's name that is off, by `enabledPlugins` or forced off by the managed settings, or that no settings file names, is taken to leave the synced one loaded.",
   "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone, and in each other checkout of its repository `project_reach` reads it in.",
   "An installed plugin of a synced plugin's name that fails to load, its manifest failing, is taken to keep the synced one out still.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
 ]
-registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2 }
+registry = { block = "plugin-folders", anchor = { block = "home", root = "plugins", path = "synced" }, depth = 2, listed = { file = "manifest.json", root = ["plugins"], name = "name", generation = "generation", deletes_unlisted = true } }
 name = { file = ".claude-plugin/plugin.json", key_path = ["name"] }
 id_separator = "~g"
 id_template = "{plugin}@synced"

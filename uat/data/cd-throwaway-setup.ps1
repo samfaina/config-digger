@@ -258,19 +258,33 @@ name: cd-throwaway-unnamed-skill
 description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@
+# The synced plugins of claude-code-synced-home's account. The account's
+# manifest.json lists cd-throwaway-synced at generation 2, so Claude Code
+# loads the folder cd-throwaway-synced~g2. No row names the folder
+# cd-throwaway-unlisted~g2, so Claude Code does not load it. Step 33.1 walks
+# both.
 $synced = "$Root\claude-code-synced-home\.claude\plugins\synced\cd-org_cd-acct"
 Write-TestFile "$synced\manifest.json" @"
-{ "lastUpdated": 1790926800000, "plugins": [{ "name": "cd-throwaway-synced", "generation": 1, "installationPreference": "available" }] }
+{ "lastUpdated": 1790926800000, "plugins": [{ "name": "cd-throwaway-synced", "generation": 2, "installationPreference": "available" }] }
 "@
-Write-TestFile "$synced\cd-throwaway-synced~g1.meta.json" @"
+Write-TestFile "$synced\cd-throwaway-synced~g2.meta.json" @"
 { "server_plugin_id": "cd-throwaway", "marketplace_name": "cd-throwaway", "installation_preference": "available" }
 "@
-Write-TestFile "$synced\cd-throwaway-synced~g1\.claude-plugin\plugin.json" @"
+Write-TestFile "$synced\cd-throwaway-synced~g2\.claude-plugin\plugin.json" @"
 { "name": "cd-throwaway-synced", "version": "1.0.0", "description": "Throwaway plugin for testing config-digger." }
 "@
-Write-TestFile "$synced\cd-throwaway-synced~g1\skills\cd-throwaway-synced-skill\SKILL.md" @"
+Write-TestFile "$synced\cd-throwaway-synced~g2\skills\cd-throwaway-synced-skill\SKILL.md" @"
 ---
 name: cd-throwaway-synced-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+Write-TestFile "$synced\cd-throwaway-unlisted~g2\.claude-plugin\plugin.json" @"
+{ "name": "cd-throwaway-unlisted", "version": "1.0.0", "description": "Throwaway plugin for testing config-digger." }
+"@
+Write-TestFile "$synced\cd-throwaway-unlisted~g2\skills\cd-throwaway-unlisted-skill\SKILL.md" @"
+---
+name: cd-throwaway-unlisted-skill
 description: Throwaway skill for testing config-digger. Does nothing.
 ---
 "@

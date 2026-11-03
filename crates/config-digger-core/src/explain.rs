@@ -2110,6 +2110,26 @@ pub(crate) fn other_account(agent_name: &str, account: &str, folder: &str) -> Re
     }
 }
 
+/// An Unread Entry's reason: `agent_name` loads only the plugins the file
+/// `list` lists, which leaves out the Entry's, and with `deleted` deletes
+/// its folder.
+pub(crate) fn plugin_not_listed(agent_name: &str, list: &Path, deleted: bool) -> Reason {
+    let deletes = if deleted {
+        ", and deletes its folder the next time it updates them"
+    } else {
+        ""
+    };
+    Reason {
+        code: ReasonCode::PluginNotListed,
+        effective: None,
+        switch: None,
+        sentence: format!(
+            "{agent_name} loads only the plugins that {} lists, and it does not list this one: {agent_name} does not load it{deletes}.",
+            list.display()
+        ),
+    }
+}
+
 /// An Unread Entry's reason: `agent_name` reads it only for the `account`
 /// account it is signed in to, and it is signed in to none, as `why` says.
 pub(crate) fn not_signed_in(agent_name: &str, account: &str, why: &NotSignedIn) -> Reason {
