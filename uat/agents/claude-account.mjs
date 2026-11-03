@@ -9,15 +9,17 @@
 //
 // The model is the local stand-in, as in `claude-code.mjs`, so no prompt
 // reaches it; Claude Code still signs in, fetches its gates and syncs the
-// account's skills. The probe plants skills and plugins next to the synced
-// ones, changes the gates' cached values, the user settings and two keys
-// of `.claude.json`, and puts them back at the end. Sign the home out
+// account's skills. Most sessions run under `-p`; those of `ANTHROPIC_API_KEY`
+// run interactively too, in a Windows pseudo console. The probe plants
+// skills and plugins next to the synced ones, changes the gates' cached
+// values, the user settings, four keys of `.claude.json` and its entry for
+// the Project, and puts them back at the end. Sign the home out
 // with `claude auth logout` on the same `CLAUDE_CONFIG_DIR` when done,
 // never on a copy. `CD_PROBE_ACCOUNT_HOME` names another signed-in home, a
 // folder named `claude-account-home*` in the probe root.
 import fs from "node:fs";
 import path from "node:path";
-import { fresh, json, modelServer, probe, root, run, same, sameIn, skill, syncedPlugin, write } from "./lib.mjs";
+import { fresh, json, modelServer, probe, pseudoConsole, root, run, same, sameIn, skill, syncedPlugin, write } from "./lib.mjs";
 
 const bin = process.argv.includes("--bin") ? process.argv[process.argv.indexOf("--bin") + 1] : "claude.exe";
 // The signed-in home sits in the probe root, and `fresh("claude-account")`
@@ -44,11 +46,14 @@ const state = path.join(home, ".claude.json");
 const synced = path.join(home, "skills", "synced");
 const { organizationUuid, accountUuid } = json(state).oauthAccount;
 const bucket = path.join(synced, `${organizationUuid}_${accountUuid}`);
-// What the account checks change, put back at the end: the user settings
-// and two keys of `.claude.json`.
+// What the account checks change, put back at the end: the user settings,
+// four keys of `.claude.json`, one of them the Chrome dialog's answer, and
+// its entry for the Project, keyed by its path with forward slashes.
 const userSettings = path.join(home, "settings.json");
 const keptSettings = fs.existsSync(userSettings) ? fs.readFileSync(userSettings) : null;
-const keptKeys = (({ primaryApiKey, customApiKeyResponses }) => ({ primaryApiKey, customApiKeyResponses }))(json(state));
+const projKey = proj.replaceAll("\\", "/");
+const keptKeys = (({ primaryApiKey, customApiKeyResponses, hasCompletedOnboarding, claudeInChromeDefaultEnabled }) => ({ primaryApiKey, customApiKeyResponses, hasCompletedOnboarding, claudeInChromeDefaultEnabled }))(json(state));
+const keptProject = json(state).projects?.[projKey];
 function putBackSettings() {
   if (keptSettings) write(userSettings, keptSettings);
   else fs.rmSync(userSettings, { force: true });
@@ -59,6 +64,8 @@ function putBackState() {
     if (value === undefined) delete s[key];
     else s[key] = value;
   }
+  if (keptProject !== undefined) s.projects[projKey] = keptProject;
+  else if (s.projects) delete s.projects[projKey];
   write(state, s);
 }
 const reply = { id: "msg_x", type: "message", role: "assistant", model: "claude-x", content: [{ type: "text", text: "ok" }], stop_reason: "end_turn", usage: { input_tokens: 1, output_tokens: 1 } };
@@ -73,9 +80,63 @@ async function session({ prompt = "hi", env = {}, on = home, timeout } = {}) {
   const { stdout } = await run(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: on, ANTHROPIC_BASE_URL: model.url, ...env }, timeout });
   model.close();
   const init = JSON.parse(stdout.split("\n").find((l) => l.includes('"subtype":"init"')));
-  const listing = model.bodies.map((b) => b.match(/The following skills are available(?:[^"\\]|\\.)*/)).find(Boolean);
-  const listed = listing ? JSON.parse(`"${listing[0]}"`).split("\n").filter((l) => l.startsWith("- ")) : [];
-  return { skills: init.skills, plugins: init.plugins.map((x) => x.name), servers: init.mcp_servers.map((x) => x.name), listed, sent: model.bodies.join("\n") };
+  return { skills: init.skills, plugins: init.plugins.map((x) => x.name), servers: init.mcp_servers.map((x) => x.name), listed: listedIn(model.bodies), sent: model.bodies.join("\n") };
+}
+
+// The dialogs an interactive session can raise before its first request,
+// each with the text that shows it, and the option and keys that answer
+// it: trust the folder, use an API key or not, and use the Claude in Chrome
+// extension, which comes up once on a machine where Chrome has it.
+const dialogs = {
+  trust: { shows: "Quick safety check", option: "Yes, I trust this folder", keys: "\x1b[B" },
+  key: { shows: "Detected a custom API key", option: "No (recommended)", keys: "" },
+  chrome: { shows: "Claude in Chrome extension detected", option: "No, keep browser tools off", keys: "" },
+};
+// The `- ` lines of the skill listing in the first request that holds
+// one: what the model is told of the skills it can run.
+function listedIn(bodies) {
+  const listing = bodies.map((b) => b.match(/The following skills are available(?:[^"\\]|\\.)*/)).find(Boolean);
+  return listing ? JSON.parse(`"${listing[0]}"`).split("\n").filter((l) => l.startsWith("- ")) : [];
+}
+
+// One interactive session, `claude "hi"` in a pseudo console, on the
+// signed-in home: what its first request to the model lists, the
+// credentials its requests to the model carry, `api_key` for `x-api-key`
+// and `oauth` for a bearer token, and the dialogs it raised before its
+// first request, each with the number of requests the model had got when
+// it showed. It answers each dialog of `dialogs`, and ends once the model's
+// reply shows, as Ctrl+C twice ends it.
+async function interactive({ env = {} } = {}) {
+  const model = await modelServer(reply);
+  const c = pseudoConsole(bin, ["hi"], { cwd: proj, env: { CLAUDE_CONFIG_DIR: home, ANTHROPIC_BASE_URL: model.url, ...env }, timeout: 150_000 });
+  const raised = [];
+  try {
+    const requested = () => model.bodies.some((b) => b.includes('"messages"'));
+    for (const end = Date.now() + 90_000; !requested() && Date.now() < end; await new Promise((r) => setTimeout(r, 200))) {
+      const text = c.text();
+      const shown = Object.entries(dialogs).find(([name, d]) => text.includes(d.shows) && !raised.some((r) => r.dialog === name));
+      if (!shown) continue;
+      const [name, d] = shown;
+      raised.push({ dialog: name, requests: model.bodies.length });
+      const from = text.lastIndexOf(d.shows);
+      // A key sent as the dialog first draws can come before it listens.
+      await new Promise((r) => setTimeout(r, 1000));
+      c.send(d.keys);
+      if (!(await c.until((t) => t.slice(from).includes(`❯ ${d.option}`), 10_000))) throw new Error(`the ${name} dialog never put ${d.option} first:\n${c.text().slice(from)}`);
+      c.send("\r");
+    }
+    if (!requested()) throw new Error(`no request reached the model:\n${c.text().slice(-2000)}`);
+    await c.until((t) => /● ok/.test(t), 30_000);
+    c.send("\x03");
+    await new Promise((r) => setTimeout(r, 500));
+    c.send("\x03");
+    await Promise.race([c.exited, new Promise((r) => setTimeout(r, 15_000))]);
+  } finally {
+    await c.stop();
+    model.close();
+  }
+  const credentials = model.headers.filter((_, i) => model.bodies[i].includes('"messages"')).map((h) => (h["x-api-key"] ? "api_key" : /^Bearer /.test(h.authorization ?? "") ? "oauth" : "none"));
+  return { listed: listedIn(model.bodies), credentials: [...new Set(credentials)], raised };
 }
 
 // The auth Claude Code picks in the Project, as `claude auth status` says.
@@ -455,6 +516,67 @@ try {
       putBackState();
     }
     return same(states, { none: "api_key/firstParty", approved: "api_key/firstParty", rejected: "api_key/firstParty" });
+  });
+
+  // Interactive sessions, offline, in a pseudo console. `.claude.json`
+  // holds the onboarding done and the Project trusted, so neither dialog
+  // comes up. What a session reads is what its first request lists: the
+  // synced skills, and the synced plugin's skill. `asked` is the number of
+  // requests the model had got when the key dialog showed, or null when it
+  // did not; `dialogs` names every dialog the session answered.
+  const key = "not-a-real-secret";
+  function interactiveState(customApiKeyResponses) {
+    const s = json(state);
+    s.hasCompletedOnboarding = true;
+    s.projects = { ...s.projects, [projKey]: { ...s.projects?.[projKey], hasTrustDialogAccepted: true } };
+    if (customApiKeyResponses) s.customApiKeyResponses = customApiKeyResponses;
+    else delete s.customApiKeyResponses;
+    write(state, s);
+  }
+  async function interactively(env, customApiKeyResponses) {
+    interactiveState(customApiKeyResponses);
+    try {
+      const { listed, credentials, raised } = await interactive({ env: { ...offline, ...env } });
+      return {
+        reads: { skills: listed.some((l) => l.startsWith("- anthropic-skills:")), plugin: listed.some((l) => l.startsWith("- cd-throwaway-synced:")) },
+        credentials,
+        asked: raised.find((r) => r.dialog === "key")?.requests ?? null,
+        responses: json(state).customApiKeyResponses ?? null,
+        dialogs: raised.map((r) => r.dialog),
+      };
+    } finally {
+      putBackState();
+    }
+  }
+  // `same` on the keys of `expected`, with all a session saw in `observed`.
+  const sameSeen = (seen, expected) => ({ ...same(Object.fromEntries(Object.keys(expected).map((k) => [k, seen[k]])), expected), observed: JSON.stringify(seen) });
+
+  // The controls: the interactive reads must flip as `-p`'s do, or the
+  // driver or the read is wrong, and the key's checks below measure nothing.
+  let controlsHold = false;
+  await p.check("account.off", "in an interactive session, as under `-p`, Claude Code with no key reads the synced skills and plugin, and with `CLAUDE_CODE_OAUTH_TOKEN` in the environment reads neither", async () => {
+    const seen = {};
+    for (const [label, env] of [["no key", {}], ["CLAUDE_CODE_OAUTH_TOKEN", { CLAUDE_CODE_OAUTH_TOKEN: key }]]) {
+      const { reads: interactiveReads, credentials, dialogs } = await interactively(env);
+      seen[label] = { p: reads(await session({ env: { ...offline, ...env } })), interactive: interactiveReads, credentials, dialogs };
+    }
+    const result = sameIn(["p", "interactive"], seen, { "no key": { p: both, interactive: both }, CLAUDE_CODE_OAUTH_TOKEN: { p: none, interactive: none } });
+    controlsHold = result.pass;
+    return { ...result, observed: JSON.stringify(seen) };
+  });
+
+  // `ANTHROPIC_API_KEY` in each of its three states: `customApiKeyResponses`
+  // approves the key, as Claude Code writes an approval, rejects it, or
+  // holds nothing about it, and the session asks.
+  const keyCheck = (title, fn) => p.check("account.off", title, async () => (controlsHold ? fn() : { pass: false, observed: "the interactive controls above do not match `-p`" }));
+  await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses.approved` holds leaves Claude Code on the account: it sends the key to the model, yet reads the synced skills and plugin, and does not ask about the key", async () => {
+    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }, { approved: [key], rejected: [] }), { reads: both, credentials: ["api_key"], asked: null });
+  });
+  await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses.rejected` holds leaves Claude Code on the account: it sends its claude.ai token to the model, reads the synced skills and plugin, and does not ask about the key", async () => {
+    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }, { approved: [], rejected: [key] }), { reads: both, credentials: ["oauth"], asked: null });
+  });
+  await keyCheck("in an interactive session, `ANTHROPIC_API_KEY` that `customApiKeyResponses` does not answer brings up the key dialog before any request reaches the model; answered No, the key is written to `customApiKeyResponses.rejected` and Claude Code stays on the account: it sends its claude.ai token to the model and reads the synced skills and plugin", async () => {
+    return sameSeen(await interactively({ ANTHROPIC_API_KEY: key }), { reads: both, credentials: ["oauth"], asked: 0, responses: { approved: [], rejected: [key] } });
   });
 
   unplantPlugins();

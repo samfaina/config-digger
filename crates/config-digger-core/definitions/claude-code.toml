@@ -108,10 +108,13 @@ credentials = { block = "home", root = "credentials_file" }
 # `CLAUDE_CODE_USE_BEDROCK` it reads the synced skills, and keeps out the
 # synced plugins only because it holds the plugin sync gate off [test]. The
 # other providers leave it on alike [binary], and hold the gate off as its
-# bypass says. `ANTHROPIC_API_KEY` leaves it on under
-# `-p` [test], and `primaryApiKey` in `~/.claude.json` leaves it on [test].
+# bypass says. `ANTHROPIC_API_KEY` leaves it on under `-p` and in an
+# interactive session, whether `customApiKeyResponses` in `~/.claude.json`
+# approves the key, rejects it or holds nothing, the session then asking
+# before its first request [test]: an approved key goes to the model, and
+# the synced skills and plugins still load. `primaryApiKey` in
+# `~/.claude.json` leaves it on [test].
 [account.off]
-unverified = "`ANTHROPIC_API_KEY` is taken to leave an interactive session on the account too, whether the user approved the key or not, as the binary says (#492)."
 settings = [
   { anchor = { block = "settings", settings = "managed" }, key_path = ["apiKeyHelper"], every_source = true },
   { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["apiKeyHelper"] },
