@@ -303,31 +303,20 @@ const OFF_VARIABLES: [(&str, &str); 2] = [
 ];
 
 #[test]
-fn an_auth_token_or_an_oauth_token_in_a_settings_files_env_takes_claude_code_off_the_account() {
+fn an_auth_token_or_an_oauth_token_in_the_user_settings_env_takes_claude_code_off_the_account_everywhere()
+ {
     for (name, value) in OFF_VARIABLES {
         let user = synced_home().with_file(
             in_home(r".claude\settings.json"),
             json!({ "env": { name: value } }).to_string(),
         );
-        assert_eq!(
-            synced_states(&user, home_env(), &Context::default()),
-            all("unread", "off_account"),
-            "{name} in the user settings"
-        );
-        let project = synced_home().with_file(
-            PathBuf::from(PROJECT).join(r".claude\settings.json"),
-            json!({ "env": { name: value } }).to_string(),
-        );
-        assert_eq!(
-            synced_states(&project, home_env(), &in_project()),
-            all("unread", "off_account"),
-            "{name} in the Project's settings"
-        );
-        assert_eq!(
-            synced_states(&project, home_env(), &Context::default()),
-            all("effective", ""),
-            "{name} in the Project's settings, outside it"
-        );
+        for context in [Context::default(), in_project()] {
+            assert_eq!(
+                synced_states(&user, home_env(), &context),
+                all("unread", "off_account"),
+                "{name} in the user settings, {context:?}"
+            );
+        }
     }
     let fs = synced_home().with_file(
         in_home(r".claude\settings.json"),
@@ -337,6 +326,57 @@ fn an_auth_token_or_an_oauth_token_in_a_settings_files_env_takes_claude_code_off
         entry(&inventory(&fs), "anthropic-skills:pdf")["reason"]["sentence"],
         r"`ANTHROPIC_AUTH_TOKEN` in `env` of C:\Users\fixture\.claude\settings.json takes Claude Code off its claude.ai account, and it reads this only while it runs on that account."
     );
+}
+
+#[test]
+fn an_auth_token_in_a_projects_settings_env_takes_claude_code_off_the_account_there_alone() {
+    let project = synced_home().with_file(
+        PathBuf::from(PROJECT).join(r".claude\settings.json"),
+        json!({ "env": { "ANTHROPIC_AUTH_TOKEN": "not-a-real-secret" } }).to_string(),
+    );
+
+    assert_eq!(
+        synced_states(&project, home_env(), &in_project()),
+        all("unread", "off_account")
+    );
+    assert_eq!(
+        synced_states(&project, home_env(), &Context::default()),
+        all("effective", "")
+    );
+}
+
+#[test]
+fn an_oauth_token_in_either_settings_file_of_a_project_leaves_claude_code_on_the_account() {
+    for file in [r".claude\settings.json", r".claude\settings.local.json"] {
+        let project = synced_home().with_file(
+            PathBuf::from(PROJECT).join(file),
+            json!({ "env": { "CLAUDE_CODE_OAUTH_TOKEN": "not-a-real-secret" } }).to_string(),
+        );
+
+        for context in [in_project(), Context::default()] {
+            assert_eq!(
+                synced_states(&project, home_env(), &context),
+                all("effective", ""),
+                "{file}, {context:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_oauth_token_in_the_managed_settings_env_takes_claude_code_off_the_account_everywhere() {
+    let managed = synced_home().with_file(
+        in_home(r".claude\remote-settings.json"),
+        json!({ "env": { "CLAUDE_CODE_OAUTH_TOKEN": "not-a-real-secret" } }).to_string(),
+    );
+
+    for context in [Context::default(), in_project()] {
+        assert_eq!(
+            synced_states(&managed, home_env(), &context),
+            all("unread", "off_account"),
+            "{context:?}"
+        );
+    }
 }
 
 #[test]

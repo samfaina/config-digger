@@ -446,12 +446,13 @@ try {
     return same({ auth: await auth({ on: copy }), reads: reads(await session({ env: offline, on: copy })) }, { auth: "none/firstParty", reads: none });
   });
 
-  // One settings file at a time, the user's or the Project's, holding what
+  // One settings file at a time, the user's or one of the Project's, holding what
   // takes Claude Code off the account or leaves it on. `claude auth status`
   // leaves out a Project's token variables. Bedrock points at a closed port,
   // and the session stops before it gives up: the init event comes before
   // any request.
   const projectSettings = path.join(proj, ".claude", "settings.json");
+  const localSettings = path.join(proj, ".claude", "settings.local.json");
   const bedrock = (value) => ({ env: { CLAUDE_CODE_USE_BEDROCK: value, ANTHROPIC_BEDROCK_BASE_URL: closedPort, CLAUDE_CODE_SKIP_BEDROCK_AUTH: "1", AWS_REGION: "us-east-1" } });
   // Each case: what the file holds, what `claude auth status` says, which
   // of the account's synced skills and plugins Claude Code reads, and what
@@ -466,7 +467,8 @@ try {
     ["`env.ANTHROPIC_AUTH_TOKEN` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "not-a-real-secret" } }, onAccount, none, takesOff],
     ["`env.ANTHROPIC_AUTH_TOKEN` set to `\"\"` in the Project's settings", projectSettings, { env: { ANTHROPIC_AUTH_TOKEN: "" } }, onAccount, both, leavesOn],
     ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the user settings", userSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, "oauth_token/firstParty", none, takesOff],
-    ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the Project's settings", projectSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, onAccount, { skills: false, plugin: true }, "takes Claude Code's synced skills off the account, not its synced plugins"],
+    ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the Project's settings", projectSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, onAccount, both, leavesOn],
+    ["`env.CLAUDE_CODE_OAUTH_TOKEN` in the Project's `.claude/settings.local.json`", localSettings, { env: { CLAUDE_CODE_OAUTH_TOKEN: "not-a-real-secret" } }, onAccount, both, leavesOn],
     ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the Project's settings", projectSettings, bedrock("1"), "third_party/bedrock", skillsOnly, holdsGateOff],
     ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"1\"` in the user settings", userSettings, bedrock("1"), "third_party/bedrock", skillsOnly, holdsGateOff],
     ["`env.CLAUDE_CODE_USE_BEDROCK` set to `\"0\"` in the user settings", userSettings, bedrock("0"), onAccount, both, leavesOn],

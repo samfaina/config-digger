@@ -2381,7 +2381,8 @@ fn read_accounts(
 /// Project folder `project`, or else everywhere. A setting a file sets,
 /// then a variable a map sets, take it off; one of those variables set in
 /// config-digger's environment, where no map replaces it, or a variable
-/// that only may take it off, set anywhere, only may.
+/// that only may take it off, set anywhere, only may. A variable whose
+/// `env_maps` names some maps is read from those alone.
 fn on_account(
     off: &blocks::OffAccount,
     home: &FoundHome,
@@ -2401,29 +2402,39 @@ fn on_account(
         }
     }
     // Each map's object with its file, the one that overrides the others first.
-    let maps: Vec<(
-        PathBuf,
-        &[String],
-        serde_json::Map<String, serde_json::Value>,
-    )> = off
+    let maps: Vec<(&EnvMap, PathBuf, serde_json::Map<String, serde_json::Value>)> = off
         .env_maps
         .iter()
         .flat_map(|map| {
             let objects = KeyAt::map(map).values(home, project, settings, reader);
-            objects.into_iter().filter_map(|(path, value)| {
-                Some((path, map.key_path.as_slice(), value.as_object()?.clone()))
-            })
+            objects
+                .into_iter()
+                .filter_map(move |(path, value)| Some((map, path, value.as_object()?.clone())))
         })
         .collect();
-    let in_map = |name: &str| maps.iter().find(|(_, _, map)| map.contains_key(name));
+    // The first variable declared by `name`, whose `env_maps` says the maps
+    // the name is read from, in an `unless` too; a name no variable
+    // declares is read from every map.
+    let declared = |name: &str| {
+        off.variables
+            .iter()
+            .chain(&off.may_be_off)
+            .find(|variable| variable.name == name)
+    };
+    let in_map = |name: &str| {
+        maps.iter().find(|(map, _, object)| {
+            declared(name).is_none_or(|variable| variable.read_from(map))
+                && object.contains_key(name)
+        })
+    };
     let mapped = |name: &str| {
         let (_, _, map) = in_map(name)?;
         map.get(name)?.as_str().map(str::to_owned)
     };
     let off_by = |name: String| match in_map(&name) {
-        Some((path, key_path, _)) => OffBy::Mapped {
+        Some((map, path, _)) => OffBy::Mapped {
             name,
-            key_path: key_path.to_vec(),
+            key_path: map.key_path.clone(),
             path: path.clone(),
         },
         None => OffBy::Environment(name),

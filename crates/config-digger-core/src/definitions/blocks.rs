@@ -8936,6 +8936,24 @@ pub(crate) struct BypassVariable {
     /// from counting.
     #[serde(default)]
     pub unless: Vec<String>,
+    /// In what takes an Agent off its account, the `id`s of the env maps
+    /// of the block the Agent reads this variable from, such as Claude
+    /// Code's `CLAUDE_CODE_OAUTH_TOKEN`, which it does not take from a
+    /// Project's settings. A map not named here neither sets the variable
+    /// nor replaces it in the environment. Left out, every map counts.
+    #[serde(default)]
+    pub env_maps: Option<Vec<String>>,
+}
+
+impl BypassVariable {
+    /// Whether the Agent reads it from the env map `map`.
+    pub fn read_from(&self, map: &EnvMap) -> bool {
+        self.env_maps.as_ref().is_none_or(|ids| {
+            map.id
+                .as_ref()
+                .is_some_and(|id| ids.iter().any(|named| named == id))
+        })
+    }
 }
 
 /// Which values of a variable count as setting it.
@@ -8955,6 +8973,9 @@ pub(crate) enum VariableValues {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct EnvMap {
+    /// The name a variable's `env_maps` gives it, unique in its block.
+    #[serde(default)]
+    pub id: Option<String>,
     pub anchor: Anchor,
     /// The key path of the object, one key per segment.
     pub key_path: Vec<String>,
@@ -8976,13 +8997,25 @@ impl Validate for EnvBypass {
             for name in std::iter::once(&variable.name).chain(&variable.unless) {
                 validate_variable(name)?;
             }
+            if variable.env_maps.is_some() {
+                return Err(format!(
+                    "variable `{}`: `env_maps` is only for a variable that takes an Agent off its account",
+                    variable.name
+                ));
+            }
         }
-        for map in &self.env_maps {
-            validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
-                .map_err(|e| format!("env map: {e}"))?;
-        }
-        Ok(())
+        validate_env_maps(&self.env_maps)
     }
+}
+
+/// The env maps of one block: each key in its file, and each `id`
+/// non-empty and declared once.
+fn validate_env_maps(maps: &[EnvMap]) -> Result<(), String> {
+    for map in maps {
+        validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
+            .map_err(|e| format!("env map: {e}"))?;
+    }
+    super::unique("env map", maps.iter().filter_map(|map| map.id.as_deref()))
 }
 
 /// A key in one file, or in the files of settings, as an env map or a
@@ -9066,8 +9099,9 @@ pub(crate) struct OffAccount {
     /// value other than `null` or an empty string, highest first.
     #[serde(default)]
     pub settings: Vec<SettingKey>,
-    /// Variables that take it off when a map of `env_maps` sets one. Set in
-    /// the environment config-digger runs in, they only may: the Agent can
+    /// Variables that take it off when a map of `env_maps` sets one, or
+    /// one of the maps a variable's own `env_maps` names. Set in the
+    /// environment config-digger runs in, they only may: the Agent can
     /// start in another, and its Entries keep their State, with a caveat.
     #[serde(default)]
     pub variables: Vec<BypassVariable>,
@@ -9098,18 +9132,30 @@ impl Validate for OffAccount {
         if !self.variables.is_empty() && self.env_maps.is_empty() {
             return Err("off variables need env maps to be read from".into());
         }
-        for variable in self.variables.iter().chain(&self.may_be_off) {
-            for name in std::iter::once(&variable.name).chain(&variable.unless) {
-                validate_variable(name)?;
-            }
-        }
         for key in &self.settings {
             validate_key_in_file("a setting", &key.anchor, &key.key_path, key.every_source)
                 .map_err(|e| format!("setting: {e}"))?;
         }
-        for map in &self.env_maps {
-            validate_key_in_file("an env map", &map.anchor, &map.key_path, map.every_source)
-                .map_err(|e| format!("env map: {e}"))?;
+        // The variables name the maps, so the maps come first.
+        validate_env_maps(&self.env_maps)?;
+        for variable in self.variables.iter().chain(&self.may_be_off) {
+            for name in std::iter::once(&variable.name).chain(&variable.unless) {
+                validate_variable(name)?;
+            }
+            let context = |e: String| format!("variable `{}`: {e}", variable.name);
+            match variable.env_maps.as_deref() {
+                Some([]) => return Err(context("`env_maps` names no env map".into())),
+                Some(ids) => {
+                    for id in ids {
+                        if !self.env_maps.iter().any(|map| map.id.as_ref() == Some(id)) {
+                            return Err(context(format!(
+                                "`env_maps` names `{id}`, no env map of the block"
+                            )));
+                        }
+                    }
+                }
+                None => {}
+            }
         }
         Ok(())
     }

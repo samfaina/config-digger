@@ -4008,6 +4008,45 @@ may_be_off = [{ name = "API_KEY", values = "non-empty" }]
     }
 
     #[test]
+    fn an_off_variable_reads_only_env_maps_of_its_block() {
+        let with_maps = |maps: &str| {
+            with_account(
+                &ACCOUNT
+                    .replace(
+                        r#"{ name = "AUTH_TOKEN", values = "non-empty" }"#,
+                        &format!(
+                            r#"{{ name = "AUTH_TOKEN", values = "non-empty", env_maps = {maps} }}"#
+                        ),
+                    )
+                    .replace(
+                        r#"env_maps = [{ anchor"#,
+                        r#"env_maps = [{ id = "user", anchor"#,
+                    ),
+            )
+        };
+        let text = with_maps(r#"["user"]"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (maps, message) in [
+            (r#"["project"]"#, "names `project`, no env map of the block"),
+            ("[]", "names no env map"),
+        ] {
+            let text = with_maps(maps);
+            assert!(error(&text).contains(message), "{maps}: {}", error(&text));
+        }
+        let text = with_maps(r#"["user"]"#).replace(
+            r#"key_path = ["env"] }]"#,
+            r#"key_path = ["env"] }, { id = "user", anchor = { block = "home", root = "state" }, key_path = ["vars"] }]"#,
+        );
+        assert!(
+            error(&text).contains("env map `user` is declared twice"),
+            "{}",
+            error(&text)
+        );
+        let text = with_maps(r#"["user"]"#).replace(r#"id = "user", anchor"#, r#"id = "", anchor"#);
+        assert!(error(&text).contains("env map id"), "{}", error(&text));
+    }
+
+    #[test]
     fn an_account_folder_names_each_id_once_and_only_ids() {
         for (folder, message) in [
             ("{org}_{team}", "undeclared id `team`"),
@@ -4776,6 +4815,16 @@ trusted = \"trusted\"
         );
         assert!(
             error(&text).contains("not a variable name"),
+            "{}",
+            error(&text)
+        );
+        let text = with_gate(
+            JSON_LOOKUP,
+            r#"bypass = { block = "env", variables = [{ name = "NO_FLAGS", values = "truthy", env_maps = ["user"] }], env_maps = [{ id = "user", anchor = { block = "home", root = "state" }, key_path = ["env"] }] }"#,
+        );
+        assert!(
+            error(&text)
+                .contains("`env_maps` is only for a variable that takes an Agent off its account"),
             "{}",
             error(&text)
         );
