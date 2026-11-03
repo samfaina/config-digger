@@ -153,7 +153,7 @@ const KEYS_IN_ANOTHER_CASE: [&str; 3] = [
 ];
 
 #[test]
-fn trust_and_approvals_are_looked_up_without_regard_to_case() {
+fn trust_and_approvals_under_a_key_in_another_case_count() {
     let trusted = json!({ "hasTrustDialogAccepted": true });
     for key in KEYS_IN_ANOTHER_CASE {
         for source in OWN {
