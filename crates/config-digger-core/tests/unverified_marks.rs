@@ -425,11 +425,6 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         (
             "vscode.toml",
             "plugins[agent-plugins]",
-            "leaves no `name` before or after it",
-        ),
-        (
-            "vscode.toml",
-            "plugins[agent-plugins]",
             "whose `source` is an object of a known kind",
         ),
     ] {
@@ -451,6 +446,14 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
     // reads them, so no mark names it.
     assert!(
         !marks.iter().any(|mark| mark.sentence.contains("#510")),
+        "{marks:#?}"
+    );
+    // #531 shows a manifest broken before its `name` naming the plugin by
+    // its marketplace, so no mark names it.
+    assert!(
+        !marks.iter().any(|mark| mark
+            .sentence
+            .contains("leaves no `name` before or after it")),
         "{marks:#?}"
     );
 }

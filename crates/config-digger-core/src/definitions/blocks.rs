@@ -1959,6 +1959,20 @@ pub(crate) struct PluginRecord {
     pub not_listed: Option<NotListed>,
     /// The marketplace whose list may name it, when the registry reads one.
     pub listed_in: Option<ListedIn>,
+    /// The name its record gives it when the place of its name that
+    /// decides gives none, when the registry reads one.
+    pub fallback: Option<Fallback>,
+}
+
+/// What a plugin list's item gives its plugin for a name when the place of
+/// its name that decides gives none.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Fallback {
+    /// The name.
+    Name(String),
+    /// No name: the field holds this text, trimmed, which is no reference
+    /// the Agent reads, or nothing.
+    Unread(Option<String>),
 }
 
 /// A plugin the file listing the plugins the Agent loads leaves out, so
@@ -2010,6 +2024,15 @@ impl PluginRegistry {
         matches!(self, PluginRegistry::JsonPluginList(block) if block.folder_fallback)
     }
 
+    /// What an item gives a plugin for a name when the place of its name
+    /// that decides gives none, when the registry reads it.
+    pub fn fallback_name(&self) -> Option<&FallbackName> {
+        match self {
+            PluginRegistry::JsonPluginList(block) => block.fallback_name.as_ref(),
+            _ => None,
+        }
+    }
+
     /// The Projects a record bound to one Project applies in.
     pub fn project_reach(&self) -> ProjectReach {
         match self {
@@ -2033,6 +2056,7 @@ impl PluginRegistry {
         self.marketplaces()
             .is_some_and(FolderMarketplaces::fails_plugin)
             || self.listed_marketplaces().is_some()
+            || self.fallback_name().is_some()
     }
 
     /// The marketplaces whose lists name its plugins, if any.
@@ -2881,6 +2905,7 @@ impl JsonPluginRecords {
                     version: text_of(record, self.version.as_ref()),
                     not_listed: None,
                     listed_in: None,
+                    fallback: None,
                 });
             }
         }
@@ -2917,6 +2942,11 @@ pub(crate) struct JsonPluginList {
     /// the plugin is named by its id, as its `[[plugins]]` says.
     #[serde(default)]
     pub folder_fallback: bool,
+    /// What an item gives a plugin for a name when the place of its name
+    /// that decides gives none, as VS Code names an agent plugin by its
+    /// marketplace. Without it, such a plugin is named as `folder_fallback`
+    /// says.
+    pub fallback_name: Option<FallbackName>,
     /// The marketplaces the items come from, as far as each one's list
     /// names its plugins. Without it, no item is read in a marketplace's
     /// list.
@@ -2937,10 +2967,113 @@ impl Validate for JsonPluginList {
                 return Err("a plugin registry field must not be empty".into());
             }
         }
+        if let Some(fallback) = &self.fallback_name {
+            if fallback.field.is_empty() {
+                return Err("a plugin registry field must not be empty".into());
+            }
+            if self.folder_fallback {
+                return Err(
+                    "a plugin list names a plugin by its folder with fallback_name already: drop folder_fallback".into(),
+                );
+            }
+        }
         if let Some(marketplaces) = &self.marketplaces {
             marketplaces.validate()?;
         }
         Ok(())
+    }
+}
+
+/// The name a plugin list's item gives a plugin when the place of its
+/// name that decides gives none: the text of its `field`, trimmed, when it
+/// is a reference of the spelling `reference`. A plugin whose item holds
+/// no such text, or that no place of its name names or decides for, has no
+/// name the Agent gives it: the Agent does not load it, and it is named by
+/// its folder.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FallbackName {
+    /// The field of an item that holds it, such as VS Code's `marketplace`.
+    pub field: String,
+    /// The references that give a name.
+    pub reference: ReferenceSpelling,
+}
+
+/// The text of an item's field that is a reference giving its plugin a
+/// name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum ReferenceSpelling {
+    /// A git marketplace as VS Code reads one, once trimmed: a URI of the
+    /// scheme `http`, `https` or `ssh` with a host, `<user>@<host>:<path>.git`
+    /// or `<owner>/<repo>`, each with a `#<ref>` or not. A `file:` URI is a
+    /// marketplace on the machine, which gives no name.
+    GitMarketplace,
+}
+
+impl ReferenceSpelling {
+    /// Whether `text`, trimmed, is a reference that gives a name.
+    fn names(self, text: &str) -> bool {
+        match self {
+            ReferenceSpelling::GitMarketplace => git_marketplace(text),
+        }
+    }
+}
+
+/// A URI scheme, which VS Code's URI parser takes.
+static URI_SCHEME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\A[A-Za-z0-9_][A-Za-z0-9_+.-]*\z").expect("a valid scheme"));
+/// A git marketplace of the form `<user>@<host>:<path>.git`.
+static SCP_LIKE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\A[^@\s]+@[^:\s]+:.+?\.git(?:#.+)?\z").expect("a valid git address")
+});
+/// A GitHub marketplace of the form `<owner>/<repo>`.
+static SHORTHAND: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\A[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:#.+)?\z").expect("a valid shorthand")
+});
+
+/// Whether `text` is a git marketplace, as [`ReferenceSpelling::GitMarketplace`]
+/// says: read as VS Code 1.141.0 reads one, first as a URI, then as
+/// `<user>@<host>:<path>.git`, then as `<owner>/<repo>`.
+fn git_marketplace(text: &str) -> bool {
+    let text = text.trim();
+    // The scheme ends at the first `:`, when no `/`, `?` or `#` comes first.
+    let scheme = text
+        .find([':', '/', '?', '#'])
+        .filter(|&at| at > 0 && text[at..].starts_with(':'))
+        .map(|at| (&text[..at], &text[at + 1..]))
+        .filter(|(scheme, _)| URI_SCHEME.is_match(scheme));
+    if let Some((scheme, rest)) = scheme {
+        let scheme = scheme.to_ascii_lowercase();
+        let fragment = text
+            .split_once('#')
+            .is_some_and(|(_, after)| !after.is_empty());
+        if scheme == "file" && rest.starts_with("//") && !fragment {
+            return false;
+        }
+        if matches!(scheme.as_str(), "http" | "https" | "ssh")
+            && let Some(after) = rest.strip_prefix("//")
+            && !after.is_empty()
+            && !after.starts_with(['/', '?', '#'])
+        {
+            return true;
+        }
+    }
+    SCP_LIKE.is_match(text) || SHORTHAND.is_match(text)
+}
+
+impl FallbackName {
+    /// What `item` gives its plugin.
+    fn of(&self, item: &Value) -> Fallback {
+        let text = item
+            .get(&self.field)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|text| !text.is_empty());
+        match text {
+            Some(text) if self.reference.names(text) => Fallback::Name(text.to_owned()),
+            text => Fallback::Unread(text.map(str::to_owned)),
+        }
     }
 }
 
@@ -3322,6 +3455,10 @@ impl JsonPluginList {
                         .marketplaces
                         .as_ref()
                         .and_then(|marketplaces| marketplaces.listed_in(item, &base)),
+                    fallback: self
+                        .fallback_name
+                        .as_ref()
+                        .map(|fallback| fallback.of(item)),
                 })
             })
             .collect())

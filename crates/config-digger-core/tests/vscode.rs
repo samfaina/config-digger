@@ -1276,7 +1276,9 @@ fn plugin_of(inventory: &Inventory, server: &str) -> String {
 }
 
 #[test]
-fn a_listed_plugin_is_named_by_its_manifest_wherever_it_lies_or_else_by_its_folder() {
+fn a_plugin_of_a_repo_with_no_list_is_named_by_its_manifest_never_one_in_github_plugin() {
+    // `github` and `bare` have no manifest VS Code names a plugin of
+    // `installed.json` by: they fail to load, named by their folders.
     let manifest = |name: &str| format!(r#"{{ "name": "{name}" }}"#);
     let servers =
         |name: &str| format!(r#"{{ "mcpServers": {{ "{name}": {{ "command": "x" }} }} }}"#);
@@ -1326,18 +1328,12 @@ fn a_listed_plugin_is_named_by_its_manifest_wherever_it_lies_or_else_by_its_fold
         .collect();
     assert_eq!(
         names,
-        [
-            "named-root",
-            "named-github",
-            "named-claude",
-            "named-open",
-            "bare"
-        ]
+        ["named-root", "github", "named-claude", "named-open", "bare"]
     );
 }
 
 #[test]
-fn a_listed_plugin_is_named_by_a_manifest_with_comments_and_trailing_commas_wherever_it_lies() {
+fn a_plugin_of_a_repo_with_no_list_is_named_by_a_manifest_with_comments_and_trailing_commas() {
     let manifest = |name: &str| {
         format!(
             "{{\n  // The plugin's name.\n  /* VS Code reads it as JSONC. */\n  \"name\": \"{name}\",\n}}\n"
@@ -1390,7 +1386,7 @@ fn a_listed_plugin_is_named_by_a_manifest_with_comments_and_trailing_commas_wher
         .collect();
     assert_eq!(
         names,
-        ["named-root", "named-github", "named-claude", "named-open"]
+        ["named-root", "github", "named-claude", "named-open"]
     );
 }
 
@@ -2048,6 +2044,330 @@ fn a_marketplace_whose_url_names_a_ref_is_read_in_its_clone_of_that_ref() {
     );
 }
 
+/// The marketplace of the probe's repo `<tag>`, which has no list.
+fn repo_marketplace(tag: &str) -> String {
+    format!("https://cd-throwaway.invalid/cd-throwaway/{tag}.git")
+}
+
+/// A repo of the probe's with no list: its tag, its item's `marketplace`
+/// and its manifests, each a path and its text.
+type Repo<'a> = (&'a str, &'a str, &'a [(&'a str, &'a str)]);
+
+/// `fs` with `installed.json` listing only `plugins`, each a repo of its
+/// own with no list, VS Code's clone of `<tag>` its folder, as the probe's
+/// `broken-manifest` launch lays them: each a tag, the item's
+/// `marketplace` and the plugin's manifests, each a path and its text.
+/// Each plugin also holds a `.mcp.json` with the server
+/// `cd-throwaway-<tag>-dot` and the skill `cd-throwaway-<tag>-sk`.
+fn with_repos(fs: FakeFileSystem, plugins: &[Repo]) -> FakeFileSystem {
+    let installed: Vec<Value> = plugins
+        .iter()
+        .map(|(tag, marketplace, _)| {
+            serde_json::json!({
+                "pluginUri": format!("file:///c%3A/Users/fixture/.vscode/agent-plugins/cd-throwaway.invalid/cd-throwaway/{tag}"),
+                "marketplace": marketplace,
+                "name": format!("cd-throwaway-{tag}-item"),
+            })
+        })
+        .collect();
+    let listed = serde_json::json!({ "version": 1, "installed": installed });
+    let fs = fs.with_file(installed_json(), listed.to_string());
+    plugins.iter().fold(fs, |fs, (tag, _, manifests)| {
+        let folder = market_clone().with_file_name(tag);
+        let fs = fs
+            .with_file(
+                folder.join(".mcp.json"),
+                format!(
+                    r#"{{ "mcpServers": {{ "cd-throwaway-{tag}-dot": {{ "command": "x" }} }} }}"#
+                ),
+            )
+            .with_file(
+                folder.join(format!(r"skills\cd-throwaway-{tag}-sk\SKILL.md")),
+                "---\ndescription: probe\n---\n",
+            );
+        manifests.iter().fold(fs, |fs, (file, text)| {
+            fs.with_file(folder.join(file), *text)
+        })
+    })
+}
+
+#[test]
+fn a_plugin_of_a_repo_with_no_list_whose_first_manifest_has_no_name_is_named_by_its_marketplace() {
+    // The probe's `nn`: `.plugin\plugin.json` parses with no `name`, and
+    // decides, though `plugin.json` names the plugin.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(
+            "nn",
+            &repo_marketplace("nn"),
+            &[
+                (".plugin/plugin.json", r#"{ "version": "1.0.0" }"#),
+                ("plugin.json", r#"{ "name": "cd-throwaway-nn-root" }"#),
+            ],
+        )],
+    );
+
+    let effective = (repo_marketplace("nn"), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory(&fs), "nn"),
+        [effective.clone(), effective]
+    );
+}
+
+#[test]
+fn a_manifest_broken_before_its_name_that_still_parses_to_an_object_names_the_plugin_by_its_marketplace()
+ {
+    // The probe's `bn`: a string left open in `.claude-plugin\plugin.json`
+    // takes its `name` into it, leaving an object with no `name`.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(
+            "bn",
+            &repo_marketplace("bn"),
+            &[
+                (
+                    ".claude-plugin/plugin.json",
+                    r#"{ "description": "cd-throwaway open, "name": "cd-throwaway-bn-claude" }"#,
+                ),
+                ("plugin.json", r#"{ "name": "cd-throwaway-bn-root" }"#),
+            ],
+        )],
+    );
+
+    let effective = (repo_marketplace("bn"), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory(&fs), "bn"),
+        [effective.clone(), effective]
+    );
+}
+
+#[test]
+fn a_root_manifest_with_an_agent_plugins_schema_decides_first_its_name_trimmed() {
+    // The probe's `sc`: a padded `name` beside a `.plugin\plugin.json` of
+    // another name. `sb`'s `name` is blank, so the marketplace names it.
+    // `so`'s `$schema` is another's, so that its `plugin.json` is read as
+    // the last of the other manifests, its name untrimmed.
+    let schema = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+    let sc = format!(r#"{{ "$schema": "{schema}", "name": "  cd-throwaway-sc-schema  " }}"#);
+    let sb = format!(r#"{{ "$schema": "{schema}", "name": "   " }}"#);
+    let so = r#"{ "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", "name": " cd-throwaway-so-root " }"#;
+    let fs = with_repos(
+        with_home(vscode()),
+        &[
+            (
+                "sc",
+                &repo_marketplace("sc"),
+                &[
+                    ("plugin.json", &sc),
+                    (
+                        ".plugin/plugin.json",
+                        r#"{ "name": "cd-throwaway-sc-open" }"#,
+                    ),
+                ],
+            ),
+            (
+                "sb",
+                &repo_marketplace("sb"),
+                &[
+                    ("plugin.json", &sb),
+                    (
+                        ".plugin/plugin.json",
+                        r#"{ "name": "cd-throwaway-sb-open" }"#,
+                    ),
+                ],
+            ),
+            ("so", &repo_marketplace("so"), &[("plugin.json", so)]),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    // Each plugin's skill: VS Code reads the servers of a plugin with an
+    // Open Plugins `$schema` from elsewhere than its `.mcp.json`, which
+    // #531 does not test.
+    for (tag, name) in [
+        ("sc", "cd-throwaway-sc-schema".to_owned()),
+        ("sb", repo_marketplace("sb")),
+        ("so", " cd-throwaway-so-root ".to_owned()),
+    ] {
+        let entry = &skill(&inventory, &format!("cd-throwaway-{tag}-sk")).entries[0];
+        assert_eq!(
+            (
+                entry.plugin.as_ref().unwrap().name.as_str(),
+                code(entry.state).as_str()
+            ),
+            (name.as_str(), "effective"),
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn a_plugin_of_a_repo_with_no_list_and_no_manifest_fails_to_load_named_by_its_folder() {
+    // The probe's `nm` has no manifest; `gh` only one in `.github\plugin`,
+    // which names no plugin of `installed.json`.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[
+            ("nm", &repo_marketplace("nm"), &[]),
+            (
+                "gh",
+                &repo_marketplace("gh"),
+                &[(
+                    ".github/plugin/plugin.json",
+                    r#"{ "name": "cd-throwaway-gh-github" }"#,
+                )],
+            ),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    for tag in ["nm", "gh"] {
+        let invalid = (tag.to_owned(), "invalid".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory, tag),
+            [invalid.clone(), invalid],
+            "{tag}"
+        );
+        let sentence = format!(
+            "Invalid: VS Code does not load the plugin `{tag}`, since VS Code finds no manifest that holds an object in its folder, {}.",
+            market_clone().with_file_name(tag).display()
+        );
+        for item in [
+            item(&inventory, &format!("cd-throwaway-{tag}-dot")),
+            skill(&inventory, &format!("cd-throwaway-{tag}-sk")),
+        ] {
+            let reason = item.entries[0].reason.as_ref().unwrap();
+            assert_eq!(code(reason.code), "plugin_failed_to_load");
+            assert_eq!(reason.sentence, sentence);
+        }
+    }
+}
+
+#[test]
+fn the_marketplace_name_is_the_item_s_marketplace_trimmed_in_each_form_vs_code_reads() {
+    // Each plugin's `.plugin\plugin.json` decides with no `name`.
+    let unnamed: &[(&str, &str)] = &[(".plugin/plugin.json", "{}")];
+    let fs = with_repos(
+        with_home(vscode()),
+        &[
+            (
+                "hr",
+                " https://cd-throwaway.invalid/cd-throwaway/hr.git#v1/beta\n",
+                unnamed,
+            ),
+            (
+                "ss",
+                "ssh://git@cd-throwaway.invalid/cd-throwaway/ss.git",
+                unnamed,
+            ),
+            (
+                "sp",
+                "git@cd-throwaway.invalid:cd-throwaway/sp.git",
+                unnamed,
+            ),
+            ("or", "cd-throwaway/or#main", unnamed),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    for (tag, name) in [
+        (
+            "hr",
+            "https://cd-throwaway.invalid/cd-throwaway/hr.git#v1/beta",
+        ),
+        ("ss", "ssh://git@cd-throwaway.invalid/cd-throwaway/ss.git"),
+        ("sp", "git@cd-throwaway.invalid:cd-throwaway/sp.git"),
+        ("or", "cd-throwaway/or#main"),
+    ] {
+        let effective = (name.to_owned(), "effective".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory, tag),
+            [effective.clone(), effective],
+            "{tag}"
+        );
+    }
+}
+
+#[test]
+fn a_plugin_whose_marketplace_vs_code_cannot_read_fails_to_load_named_by_its_folder() {
+    // A `file:` marketplace with no list, a URL with no host, text that is
+    // no reference, and none: VS Code has no metadata for the plugin,
+    // though its manifest names it.
+    let named: &[(&str, &str)] = &[("plugin.json", r#"{ "name": "cd-throwaway-named" }"#)];
+    let local = "file:///c%3A/Users/fixture/cd-throwaway-market";
+    let fs = with_repos(
+        with_home(vscode()),
+        &[
+            ("fu", local, named),
+            ("nh", "https:///cd-throwaway/nh.git", named),
+            ("tx", "cd throwaway market", named),
+            ("em", "  ", named),
+        ],
+    );
+    let inventory = inventory(&fs);
+
+    for (tag, cause) in [
+        (
+            "fu",
+            format!("VS Code cannot read its marketplace reference `{local}`"),
+        ),
+        (
+            "nh",
+            "VS Code cannot read its marketplace reference `https:///cd-throwaway/nh.git`"
+                .to_owned(),
+        ),
+        (
+            "tx",
+            "VS Code cannot read its marketplace reference `cd throwaway market`".to_owned(),
+        ),
+        ("em", "its item names no marketplace".to_owned()),
+    ] {
+        let invalid = (tag.to_owned(), "invalid".to_owned());
+        assert_eq!(
+            listed_plugin(&inventory, tag),
+            [invalid.clone(), invalid],
+            "{tag}"
+        );
+        let reason = item(&inventory, &format!("cd-throwaway-{tag}-dot")).entries[0]
+            .reason
+            .as_ref()
+            .unwrap();
+        assert_eq!(code(reason.code), "plugin_failed_to_load");
+        assert_eq!(
+            reason.sentence,
+            format!("Invalid: VS Code does not load the plugin `{tag}`, since {cause}.")
+        );
+    }
+}
+
+#[test]
+fn a_manifest_that_is_no_object_passes_the_name_on_to_the_next() {
+    // The probe's `an`: `.plugin\plugin.json` is a JSON array.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(
+            "an",
+            &repo_marketplace("an"),
+            &[
+                (
+                    ".plugin/plugin.json",
+                    r#"[{ "name": "cd-throwaway-an-open" }]"#,
+                ),
+                (
+                    ".claude-plugin/plugin.json",
+                    r#"{ "name": "cd-throwaway-an-claude" }"#,
+                ),
+            ],
+        )],
+    );
+
+    let effective = ("cd-throwaway-an-claude".to_owned(), "effective".to_owned());
+    assert_eq!(
+        listed_plugin(&inventory(&fs), "an"),
+        [effective.clone(), effective]
+    );
+}
+
 /// The default profile's server Entries of agent plugins in `inventory`,
 /// each `<name> <state> <file name>`, sorted.
 fn plugin_server_states(inventory: &Inventory) -> Vec<String> {
@@ -2068,7 +2388,8 @@ fn plugin_server_states(inventory: &Inventory) -> Vec<String> {
 
 #[test]
 fn a_manifest_names_a_file_of_servers_from_claude_plugin_or_plugin_not_github_plugin() {
-    // The probe's `manifests` launch: each manifest names `servers.json`.
+    // The probe's `manifests` launch: each manifest names `servers.json`,
+    // and the marketplace's list names each plugin, so that `github` loads.
     // VS Code 1.129.1 to 1.141.0 never take `.github/plugin/plugin.json` for
     // a plugin's manifest.
     let manifest = |tag: &str| {
@@ -2112,6 +2433,16 @@ fn a_manifest_names_a_file_of_servers_from_claude_plugin_or_plugin_not_github_pl
                 ],
             ),
         ],
+    )
+    .with_file(
+        Path::new(HOME).join(
+            r".vscode\agent-plugins\github.com\acme\review-market\.github\plugin\marketplace.json",
+        ),
+        market_list(&[
+            ("github", "./plugins/github"),
+            ("claude", "./plugins/claude"),
+            ("open", "./plugins/open"),
+        ]),
     );
 
     assert_eq!(

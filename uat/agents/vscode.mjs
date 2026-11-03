@@ -535,7 +535,15 @@ if (runs("manifests")) {
 // of the list gives, and `nameless`'s item has no `name`, an entry of
 // another name than its manifest's naming its folder. `mm` is a repo of
 // its own like `rb` and `cb`, whose item names it otherwise than its
-// manifest on every version. `tests/vscode.rs` reads the same plugins.
+// manifest on every version. So are the plugins of #531, named as VS Code
+// names one of a marketplace with no list: `nn`, whose `.plugin\plugin.json`
+// has no `name` beside a `plugin.json` that has one; `bn`, whose
+// `.claude-plugin\plugin.json` leaves a string open before its `name`; `an`,
+// whose `.plugin\plugin.json` is a list beside a named
+// `.claude-plugin\plugin.json`; `sc`, whose root `plugin.json` has an
+// Open Plugins `$schema` and a `name` with spaces around it, beside a
+// `.plugin\plugin.json` of another name; and `nm`, with no manifest.
+// `tests/vscode.rs` reads the same plugins.
 if (runs("broken-manifest")) {
   const dir = fresh("broken-manifest", base);
   const { plugins } = folders(dir);
@@ -558,6 +566,17 @@ if (runs("broken-manifest")) {
     "claude.json": dotMcp("cb-claude"),
   });
   lay("mm", { "plugin.json": manifest("mm-manifest") });
+  lay("nn", { ".plugin/plugin.json": { version: "1.0.0" }, "plugin.json": manifest("nn-root") });
+  lay("bn", {
+    ".claude-plugin/plugin.json": `{ "description": "cd-throwaway open, "name": "cd-throwaway-bn-claude" }`,
+    "plugin.json": manifest("bn-root"),
+  });
+  lay("an", { ".plugin/plugin.json": `[{ "name": "cd-throwaway-an-open" }]`, ".claude-plugin/plugin.json": manifest("an-claude") });
+  lay("sc", {
+    "plugin.json": { $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", name: "  cd-throwaway-sc-schema  ", version: "1.0.0" },
+    ".plugin/plugin.json": manifest("sc-open"),
+  });
+  lay("nm", {});
   const listedFolders = marketplace(plugins, [
     ["listed", { "plugin.json": manifest("listed-manifest"), ".mcp.json": dotMcp("listed-dot") }],
     ["unlisted", { "plugin.json": manifest("unlisted-manifest"), ".mcp.json": dotMcp("unlisted-dot") }],
@@ -588,12 +607,33 @@ if (runs("broken-manifest")) {
     installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: `https://cd-throwaway.invalid/cd-throwaway/${tag}.git`, name });
   }
   installed.installed.push({ pluginUri: fileUri(repo("mm")), marketplace: "https://cd-throwaway.invalid/cd-throwaway/mm.git", name: "cd-throwaway-mm-item" });
+  // The name each version gives the plugins of #531: its marketplace's
+  // label, the trimmed `marketplace`, when the manifest that decides has no
+  // `name`. 1.129.1 has no `$schema` manifest [binary]. Before 1.141.0 the
+  // item names each plugin by that name, which the version loads only
+  // then [binary].
+  const label = (tag) => `https://cd-throwaway.invalid/cd-throwaway/${tag}.git`;
+  const unlistedNames = {
+    nn: label("nn"),
+    bn: label("bn"),
+    an: "cd-throwaway-an-claude",
+    sc: fromMinor(135) ? "cd-throwaway-sc-schema" : "cd-throwaway-sc-open",
+  };
+  for (const tag of ["nn", "bn", "an", "sc", "nm"]) {
+    const name = fromMinor(141) ? `cd-throwaway-${tag}-item` : (unlistedNames[tag] ?? `cd-throwaway-${tag}-item`);
+    installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: ` ${label(tag)} `, name });
+  }
   write(path.join(plugins, "installed.json"), installed);
   const seen = await launch(dir, fresh("proj", dir));
   // The name VS Code gives each plugin, from the command of its skill:
   // `chat.getSkills` lists one skill of a name only.
   const names = (seen.done.commands ?? []).map((s) => s.name).filter((n) => n.endsWith(":cd-throwaway-sk")).map((n) => n.slice(0, -":cd-throwaway-sk".length));
   const plugin = (tag) => ({ names: names.filter((n) => n.startsWith(`cd-throwaway-${tag}`)), servers: seen.tags.filter((t) => t.startsWith(`${tag}-`)) });
+  // A plugin's name as VS Code puts it before `:<skill>` [binary].
+  const slug = (name) => name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9_.:-]/g, "-").replace(/-+/g, "-").replace(/^[-:.]+|[-:.]+$/g, "");
+  // The names VS Code gives a plugin of #531 out of those it may give, and
+  // its servers.
+  const unlisted = (tag, candidates) => ({ names: names.filter((n) => candidates.map(slug).includes(n)), servers: seen.tags.filter((t) => t.startsWith(`${tag}-`)) });
 
   await p.check("plugins[agent-plugins]", "of a plugin whose `plugin.json` does not parse and whose `.claude-plugin\\plugin.json` names it otherwise, VS Code takes `.claude-plugin\\plugin.json` for its manifest: its name, and its `mcpServers` file beside the `.mcp.json`, not the root's file", async () =>
     same(plugin("rb"), { names: ["cd-throwaway-rb-claude"], servers: ["rb-claude", "rb-dot"] }),
@@ -614,6 +654,23 @@ if (runs("broken-manifest")) {
   // clone's root, here the plugin's own, against the item's [binary].
   await p.check("plugins[agent-plugins]", "of a plugin of a marketplace with no list whose item names it otherwise than its manifest, 1.129.1 and 1.135.0 load nothing, and 1.141.0 and later name it by its manifest", async () =>
     same(plugin("mm"), fromMinor(141) ? { names: ["cd-throwaway-mm-manifest"], servers: ["mm-dot"] } : { names: [], servers: [] }),
+  );
+  // #531: on 1.129.1 and 1.135.0 each item names its plugin as the version
+  // does, so each check passes there when the version names the plugin so.
+  await p.check("plugins[agent-plugins]", "of a plugin of a marketplace with no list whose `.plugin\\plugin.json` parses with no `name`, VS Code takes that manifest and names the plugin by its item's `marketplace`, trimmed, not by its `plugin.json`'s `name`", async () =>
+    same(unlisted("nn", [label("nn"), "cd-throwaway-nn-root"]), { names: [slug(label("nn"))], servers: ["nn-dot"] }),
+  );
+  await p.check("plugins[agent-plugins]", "a `.claude-plugin\\plugin.json` broken before its `name`, which still parses to an object, names the plugin by its marketplace, not by the `plugin.json` after it", async () =>
+    same(unlisted("bn", [label("bn"), "cd-throwaway-bn-claude", "cd-throwaway-bn-root"]), { names: [slug(label("bn"))], servers: ["bn-dot"] }),
+  );
+  await p.check("plugins[agent-plugins]", "a `.plugin\\plugin.json` that holds a list passes the name on to the `.claude-plugin\\plugin.json`", async () =>
+    same(unlisted("an", [label("an"), "cd-throwaway-an-open", "cd-throwaway-an-claude"]), { names: ["cd-throwaway-an-claude"], servers: ["an-dot"] }),
+  );
+  await p.check("plugins[agent-plugins]", "a root `plugin.json` with an Open Plugins `$schema` names the plugin first, by its `name` trimmed, over a `.plugin\\plugin.json`, from 1.135.0 on; 1.129.1 takes the `.plugin\\plugin.json`", async () =>
+    same(unlisted("sc", [label("sc"), "cd-throwaway-sc-schema", "cd-throwaway-sc-open"]).names, [slug(unlistedNames.sc)]),
+  );
+  await p.check("plugins[agent-plugins]", "VS Code does not load a plugin of a marketplace with no list that has no manifest: neither its servers nor its skills", async () =>
+    same(unlisted("nm", [label("nm"), "nm", "cd-throwaway-nm-item"]), { names: [], servers: [] }),
   );
 }
 
