@@ -263,12 +263,18 @@ version = "version"
 # the marketplace's folder, a `github` object or `../x`, leaves the plugin
 # read from its copy in the cache [test]. When the manifest is missing or
 # does not parse, Claude Code loads none of the marketplace's plugins, and
-# when it does not list a plugin, not that one [test]; config-digger still
-# reads them from the cache (#506). Claude Code records the marketplace in
+# when it does not list a plugin, not that one [test]: every Entry of such
+# a plugin, read from its copy in the cache, the only one config-digger
+# can list then, is Invalid (`on_manifest_failure`), and a manifest that
+# does not parse is a Read failure. Claude Code records the marketplace in
 # `known_marketplaces.json`, with the folder in `installLocation` and in
 # its `source`, and the user settings record that `source` under
 # `extraKnownMarketplaces` [disk].
 [plugins.registry.marketplaces]
+unverified = [
+  "A manifest whose `plugins` holds no list is taken to list no plugin, so that Claude Code fails every installed plugin of the marketplace.",
+  "A manifest Claude Code cannot open or decode is taken to fail every installed plugin of the marketplace, as one that does not parse does.",
+]
 anchor = { block = "home", root = "plugins", path = "known_marketplaces.json" }
 settings = [{ anchor = { block = "home", root = "settings_file" }, key_path = ["extraKnownMarketplaces"] }]
 kind = ["source", "source"]
@@ -278,6 +284,7 @@ manifest = ".claude-plugin/marketplace.json"
 plugins = ["plugins"]
 name = "name"
 source = "source"
+on_manifest_failure = "fails_plugin"
 
 # Plugins synced from claude.ai, one folder each in
 # `plugins/synced/<org>_<account>` [disk], beside the account's

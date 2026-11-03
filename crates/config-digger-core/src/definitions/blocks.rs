@@ -6,6 +6,7 @@
 //! that must handle it.
 
 use super::ReadFailureReaction;
+use crate::api::ReadFailureKind;
 use crate::around_error;
 use crate::edit::{Edit, Syntax};
 use crate::installations::pe;
@@ -2014,6 +2015,14 @@ impl PluginRegistry {
             _ => ProjectReach::Project,
         }
     }
+
+    /// The marketplaces that say where its plugins' files are, if any.
+    pub fn marketplaces(&self) -> Option<&FolderMarketplaces> {
+        match self {
+            PluginRegistry::JsonPluginRecords(block) => block.marketplaces.as_ref(),
+            _ => None,
+        }
+    }
 }
 
 impl ListPlugins for PluginRegistry {
@@ -2554,9 +2563,10 @@ pub(crate) enum ProjectReach {
 /// plugin whose id names a marketplace in a folder, after the plugins'
 /// `id_separator`, is read from the folder its entry in the marketplace's
 /// manifest names, a path relative to the marketplace's folder. A plugin
-/// of a marketplace of another kind, or one whose manifest is missing,
-/// does not parse, does not list it or names no folder below the
-/// marketplace's for it, is read from its record's folder.
+/// of a marketplace of another kind, or one whose entry names no folder
+/// below the marketplace's, is read from its record's folder; so is one
+/// whose manifest is missing, does not parse or does not list it, unless
+/// `on_manifest_failure` says the Agent fails it.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct FolderMarketplaces {
@@ -2587,6 +2597,61 @@ pub(crate) struct FolderMarketplaces {
     /// The field of an entry that holds where the plugin's files are: as a
     /// relative path, a folder below the marketplace's or that folder.
     pub source: String,
+    /// What the Agent does with a plugin of a marketplace in a folder whose
+    /// manifest is missing, does not parse or does not list it, a manifest
+    /// whose `plugins` key path holds no list listing none.
+    #[serde(default)]
+    pub on_manifest_failure: OnManifestFailure,
+}
+
+/// What an Agent does with a plugin of a marketplace in a folder whose
+/// manifest is missing, does not parse or does not list it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum OnManifestFailure {
+    /// It reads the plugin from its record's folder.
+    #[default]
+    ReadsRecordFolder,
+    /// It fails to load the plugin: every Entry of the plugin, read from
+    /// its record's folder, is Invalid, and a manifest that cannot be read
+    /// or does not parse is a Read failure.
+    FailsPlugin,
+}
+
+/// Where the manifest of a marketplace in a folder sends one of its
+/// plugins.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum PluginPlace {
+    /// To this folder, below the marketplace's.
+    Folder(PathBuf),
+    /// To its record's folder: its entry's source is no path below the
+    /// marketplace's folder.
+    RecordFolder,
+    /// Nowhere: the manifest does not list it.
+    NotInManifest,
+}
+
+/// A plugin the manifest of its marketplace keeps the Agent from loading.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ManifestFailure {
+    /// The marketplace's name.
+    pub marketplace: String,
+    /// The marketplace's manifest.
+    pub manifest: PathBuf,
+    /// What keeps the manifest from listing the plugin.
+    pub cause: ManifestCause,
+}
+
+/// What keeps a marketplace's manifest from listing one of its plugins.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ManifestCause {
+    /// It is missing.
+    Missing,
+    /// It is a Read failure of the kind this says, with the 1-based line
+    /// and column of a parse error when the parser knows them.
+    ReadFailure(ReadFailureKind, Option<(usize, usize)>),
+    /// It parses but does not list the plugin.
+    DoesNotList,
 }
 
 /// A settings file that records marketplaces, such as Claude Code's
@@ -2635,6 +2700,12 @@ impl Validate for FolderMarketplaces {
 }
 
 impl FolderMarketplaces {
+    /// Whether the Agent fails to load a plugin the manifest of its
+    /// marketplace does not list, missing or not parsing.
+    pub fn fails_plugin(&self) -> bool {
+        self.on_manifest_failure == OnManifestFailure::FailsPlugin
+    }
+
     /// The files that record marketplaces, in the order they are read,
     /// each with the key path of the object whose keys are marketplace
     /// names, empty for the whole document.
@@ -2676,27 +2747,38 @@ impl FolderMarketplaces {
         })
     }
 
-    /// The folder of the plugin named `name` in the marketplace at
-    /// `folder`, by the text of the marketplace's manifest: its first
-    /// entry of that name, when its source is a relative path that stays
-    /// in the marketplace's folder.
-    pub fn plugin_folder(&self, folder: &Path, manifest: &str, name: &str) -> Option<PathBuf> {
-        let document = JsonFormat::STRICT.parse(manifest).ok()?;
+    /// Where the marketplace at `folder`, whose manifest is `manifest`,
+    /// sends the plugin named `name`: by its first entry of that name, to
+    /// the folder its source names when that is a relative path that stays
+    /// in the marketplace's folder. A manifest whose `plugins` key path
+    /// holds no list lists no plugin.
+    pub fn plugin_place(&self, folder: &Path, manifest: &Value, name: &str) -> PluginPlace {
         let entries = self
             .plugins
             .iter()
-            .try_fold(&document, |value, key| value.get(key))?
-            .as_array()?;
-        let entry = entries
-            .iter()
-            .find(|entry| entry.get(&self.name).and_then(Value::as_str) == Some(name))?;
-        let source = entry.get(&self.source)?.as_str()?;
-        if source.is_empty() {
-            return None;
-        }
+            .try_fold(manifest, |value, key| value.get(key))
+            .and_then(Value::as_array);
+        let Some(entry) = entries
+            .into_iter()
+            .flatten()
+            .find(|entry| entry.get(&self.name).and_then(Value::as_str) == Some(name))
+        else {
+            return PluginPlace::NotInManifest;
+        };
+        let Some(source) = entry
+            .get(&self.source)
+            .and_then(Value::as_str)
+            .filter(|source| !source.is_empty())
+        else {
+            return PluginPlace::RecordFolder;
+        };
         // An absolute source replaces the folder, and `..` can climb out of it.
         let plugin = paths::lexical(&folder.join(source));
-        plugin.starts_with(folder).then_some(plugin)
+        if plugin.starts_with(folder) {
+            PluginPlace::Folder(plugin)
+        } else {
+            PluginPlace::RecordFolder
+        }
     }
 }
 

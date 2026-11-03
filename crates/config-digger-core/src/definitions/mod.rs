@@ -10,10 +10,11 @@ use crate::ports::{Environment, FileSystem};
 use crate::version::{Standing, Version};
 use blocks::{
     Anchor, Anchored, Bypass, Bypasses, Competition, Condition, DisableMechanism, Disables,
-    FindsBy, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition, InstallationFolder,
-    Interpolation, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins, Locate,
-    Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register, Registry, Rule,
-    SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate, VersionSource,
+    FindsBy, FolderMarketplaces, Format, Gate, GateCondition, GateLookup, Holds, HomeCondition,
+    InstallationFolder, Interpolation, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder,
+    ListPlugins, Locate, Locator, LookUp, Merge, PluginRegistry, ProjectWalk, Provenance, Register,
+    Registry, Rule, SessionFiles, SettingOneOf, SettingsSource, Shape, StoreClass, Validate,
+    VersionSource,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -2398,7 +2399,7 @@ impl AgentDefinition {
                 )
                 .map_err(context)?;
             // The plugin lists in which a file the Agent cannot read fails
-            // the plugin whole.
+            // the plugin whole, or the manifest of its marketplace does.
             let failing: BTreeSet<&str> = self
                 .locations
                 .iter()
@@ -2406,6 +2407,17 @@ impl AgentDefinition {
                 .filter_map(|location| location.anchor.plugin())
                 .flat_map(|anchor| anchor.plugins.all())
                 .map(String::as_str)
+                .chain(
+                    self.plugins
+                        .iter()
+                        .filter(|plugins| {
+                            plugins
+                                .registry
+                                .marketplaces()
+                                .is_some_and(FolderMarketplaces::fails_plugin)
+                        })
+                        .map(|plugins| plugins.id.as_str()),
+                )
                 .collect();
             let in_failing = self.locations.iter().any(|location| {
                 location.kind == *kind
@@ -2421,8 +2433,8 @@ impl AgentDefinition {
                 .check_when(
                     Check::PluginLoad,
                     in_failing,
-                    "which a location that fails its plugin needs",
-                    "but no location of the kind is in plugins a location fails",
+                    "which a location that fails its plugin, or a marketplace that does, needs",
+                    "but no location of the kind is in plugins a location or a marketplace fails",
                 )
                 .map_err(context)?;
             rules
@@ -5637,6 +5649,54 @@ replaces = {{ plugins = "{replaced}", file = "package.json", id = [["publisher"]
         let text = with_plugin_reaction(r#"on_read_failure = "ignores_file""#, PLUGIN_LOAD);
         assert!(
             error(&text).contains("checks holds `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+    }
+
+    /// [`with_plugins`], whose registry records marketplaces in folders,
+    /// `on_manifest` ending their fields, and whose kind checks `checks`.
+    fn with_marketplaces(on_manifest: &str, checks: &str) -> String {
+        with_plugins("")
+            .replace(
+                r#"folder = "path" }"#,
+                &format!(
+                    r#"folder = "path", marketplaces = {{ anchor = {{ block = "home", root = "plugins", path = "known.json" }}, kind = ["kind"], folder_kind = "directory", folder = [["location"]], manifest = "marketplace.json", plugins = ["plugins"], name = "name", source = "source"{on_manifest} }} }}"#
+                ),
+            )
+            .replace(
+                "uninstall = \"agent plugin uninstall",
+                "id_separator = \"@\"
+uninstall = \"agent plugin uninstall",
+            )
+            .replace(r#"checks = ["disable", "precedence"]"#, checks)
+    }
+
+    #[test]
+    fn marketplaces_that_fail_a_plugin_need_the_plugin_load_check() {
+        let fails = r#", on_manifest_failure = "fails_plugin""#;
+        let without = r#"checks = ["disable", "precedence"]"#;
+        let text = with_marketplaces(fails, PLUGIN_LOAD);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = with_marketplaces(fails, without);
+        assert!(
+            error(&text).contains("checks leaves out `plugin-load`"),
+            "{}",
+            error(&text)
+        );
+        for reads in ["", r#", on_manifest_failure = "reads_record_folder""#] {
+            let text = with_marketplaces(reads, without);
+            assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+            let text = with_marketplaces(reads, PLUGIN_LOAD);
+            assert!(
+                error(&text).contains("checks holds `plugin-load`"),
+                "{}",
+                error(&text)
+            );
+        }
+        let text = with_marketplaces(r#", on_manifest_failure = "fails""#, PLUGIN_LOAD);
+        assert!(
+            error(&text).contains("unknown variant `fails`"),
             "{}",
             error(&text)
         );

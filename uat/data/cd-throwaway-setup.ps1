@@ -309,6 +309,61 @@ $manyProjects
 }
 "@
 
+# A Claude Code home with two plugins installed from the `directory`
+# marketplace `cd-throwaway-market`, the folder `market`, both turned on in
+# its user settings, each with a skill in its copy in the cache and in its
+# folder in the marketplace. The marketplace's manifest lists
+# `cd-throwaway-listed`, which Claude Code reads from the marketplace's
+# folder, and not `cd-throwaway-notlisted`, which it fails to load. Step
+# 34.1 walks it.
+$marketHome = "$Root\claude-code-market-home"
+$market = "$Root\market"
+$marketJson = $market -replace '\\', '\\'
+$marketCache = "$marketHome\.claude\plugins\cache\cd-throwaway-market"
+Write-TestFile "$marketHome\.claude.json" "{}"
+Write-TestFile "$marketHome\.claude\plugins\known_marketplaces.json" @"
+{
+  "cd-throwaway-market": {
+    "source": { "source": "directory", "path": "$marketJson" },
+    "installLocation": "$marketJson"
+  }
+}
+"@
+Write-TestFile "$market\.claude-plugin\marketplace.json" @"
+{
+  "name": "cd-throwaway-market",
+  "owner": { "name": "cd-throwaway" },
+  "plugins": [{ "name": "cd-throwaway-listed", "source": "./plugins/cd-throwaway-listed" }]
+}
+"@
+$marketRecords = foreach ($plugin in "cd-throwaway-listed", "cd-throwaway-notlisted") {
+    $cached = "$marketCache\$plugin\1.0.0"
+    foreach ($copy in $cached, "$market\plugins\$plugin") {
+        Write-TestFile "$copy\.claude-plugin\plugin.json" @"
+{ "name": "$plugin", "version": "1.0.0", "description": "Throwaway plugin for testing config-digger." }
+"@
+        Write-TestFile "$copy\skills\$plugin-skill\SKILL.md" @"
+---
+name: $plugin-skill
+description: Throwaway skill for testing config-digger. Does nothing.
+---
+"@
+    }
+    $cachedJson = $cached -replace '\\', '\\'
+    "    `"$plugin@cd-throwaway-market`": [{ `"scope`": `"user`", `"installPath`": `"$cachedJson`", `"version`": `"1.0.0`" }]"
+}
+Write-TestFile "$marketHome\.claude\plugins\installed_plugins.json" @"
+{
+  "version": 2,
+  "plugins": {
+$($marketRecords -join ",`n")
+  }
+}
+"@
+Write-TestFile "$marketHome\.claude\settings.json" @"
+{ "enabledPlugins": { "cd-throwaway-listed@cd-throwaway-market": true, "cd-throwaway-notlisted@cd-throwaway-market": true } }
+"@
+
 # Cursor as the fake backend sees it, with appdata as %APPDATA% and
 # claude-code-home as the user's folder: Cursor has run, and its local
 # plugin cd-throwaway-kit has a first manifest that does not parse and a

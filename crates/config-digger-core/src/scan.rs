@@ -7,11 +7,12 @@ use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
-    Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
-    NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList,
-    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
-    RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList,
-    Spelling, StoreClass, Unlisted, is_entry_key,
+    Locate, Locator, LookUp, Malformed, ManifestCause, ManifestFailure, ManifestSkills, McpbCache,
+    NAME_KEY, NameFrom, NameRuleOn, NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError,
+    PluginCache, PluginFolders, PluginList, PluginPlace, PluginRecord, PluginRegistry,
+    ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry, RelativePaths, SettingKey,
+    SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList, Spelling, StoreClass,
+    Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -251,6 +252,9 @@ pub(crate) struct ScannedPlugin {
     pub winners: Vec<ScannedPlugin>,
     /// What leaves it out of the plugins the Agent loads, when something does.
     pub not_listed: Option<NotListed>,
+    /// What in the manifest of its marketplace keeps the Agent from loading
+    /// it, when something does: it is read from its record's folder then.
+    pub manifest_failure: Option<ManifestFailure>,
 }
 
 /// A plugin's id, lowercased, and version, as a list's `replaces` compares
@@ -4119,17 +4123,18 @@ impl Scanner<'_> {
             }
             // A plugin of a marketplace in a folder is read there, its
             // record's folder only telling whether it is superseded.
-            let marketplaces = match &plugins.registry {
-                PluginRegistry::JsonPluginRecords(block) => block.marketplaces.as_ref(),
-                _ => None,
-            };
+            let marketplaces = plugins.registry.marketplaces();
             let in_marketplace = marketplaces.zip(plugins.id_separator.as_deref()).and_then(
                 |(marketplaces, separator)| {
                     let (name, marketplace) = record.id.split_once(separator)?;
                     self.marketplace_folder(home, marketplaces, name, marketplace)
                 },
             );
-            let folder = in_marketplace.unwrap_or(folder);
+            let (folder, manifest_failure) = match in_marketplace {
+                Some(Ok(in_marketplace)) => (in_marketplace, None),
+                Some(Err(failure)) => (folder, Some(failure)),
+                None => (folder, None),
+            };
             let installed = record.installed.as_ref().map_or_else(
                 || folder.clone(),
                 |installed| paths::lexical(Path::new(installed)),
@@ -4192,6 +4197,7 @@ impl Scanner<'_> {
                 shared_with: Vec::new(),
                 winners: Vec::new(),
                 not_listed: record.not_listed,
+                manifest_failure,
             });
         }
         if plugins.same_names_invalid {
@@ -4398,32 +4404,72 @@ impl Scanner<'_> {
 
     /// The folder of the plugin named `name` in the marketplace named
     /// `marketplace`, when the marketplace is in a folder and its manifest
-    /// names one for the plugin; `None` when the plugin is read from its
-    /// record's folder. A file that cannot be read here names no folder,
-    /// and is no Read failure.
+    /// names one for the plugin, or what in the manifest keeps the Agent
+    /// from loading the plugin, when the marketplaces say the Agent fails
+    /// it then; `None` when the plugin is read from its record's folder.
+    /// A failing manifest that cannot be read or does not parse is then a
+    /// Read failure; otherwise no file read here is one.
     fn marketplace_folder(
         &mut self,
         home: &FoundHome,
         marketplaces: &FolderMarketplaces,
         name: &str,
         marketplace: &str,
-    ) -> Option<PathBuf> {
+    ) -> Option<Result<PathBuf, ManifestFailure>> {
         let record = marketplaces.registries().find_map(|(anchor, root)| {
             let path = anchor.path(&home.roots, None)?;
             let text = self.reader.peek(&path).ok()??;
             FolderMarketplaces::record_in(text, root, marketplace)
         })?;
         let folder = marketplaces.folder_of(&record)?;
-        let manifest = blocks::join_relative(&folder, &marketplaces.manifest);
-        let Some(text) = self.reader.peek(&manifest).ok().flatten() else {
-            tracing::debug!(%marketplace, path = %manifest.display(), "no marketplace manifest to read");
+        // A marketplace whose folder is gone leaves its plugins read from
+        // their records' folders.
+        if !self.reader.fs.exists(&folder) {
+            tracing::debug!(%marketplace, path = %folder.display(), "no marketplace folder");
             return None;
-        };
-        let found = marketplaces.plugin_folder(&folder, text, name);
-        if found.is_none() {
-            tracing::debug!(plugin = %name, %marketplace, "the marketplace names no folder for the plugin");
         }
-        found
+        let manifest = blocks::join_relative(&folder, &marketplaces.manifest);
+        let fails = marketplaces.fails_plugin();
+        let failure = |cause| {
+            fails.then(|| {
+                Err(ManifestFailure {
+                    marketplace: marketplace.to_owned(),
+                    manifest: manifest.clone(),
+                    cause,
+                })
+            })
+        };
+        let parsed = match self.reader.peek(&manifest) {
+            Ok(None) => {
+                tracing::debug!(%marketplace, path = %manifest.display(), "no marketplace manifest to read");
+                return failure(ManifestCause::Missing);
+            }
+            Ok(Some(text)) => JsonFormat::STRICT
+                .parse(text)
+                .map_err(|error| (ReadFailureKind::Parse, error.position)),
+            Err(kind) => Err((kind, None)),
+        };
+        let document = match parsed {
+            Ok(document) => document,
+            Err((kind, position)) => {
+                tracing::debug!(%marketplace, path = %manifest.display(), ?kind, "marketplace manifest not read");
+                if fails {
+                    self.reader.fail(home, &manifest, None, kind, position);
+                }
+                return failure(ManifestCause::ReadFailure(kind, position));
+            }
+        };
+        match marketplaces.plugin_place(&folder, &document, name) {
+            PluginPlace::Folder(plugin) => Some(Ok(plugin)),
+            PluginPlace::RecordFolder => {
+                tracing::debug!(plugin = %name, %marketplace, "the marketplace names no folder for the plugin");
+                None
+            }
+            PluginPlace::NotInManifest => {
+                tracing::debug!(plugin = %name, %marketplace, "the marketplace does not list the plugin");
+                failure(ManifestCause::DoesNotList)
+            }
+        }
     }
 
     /// A record for each plugin the Project folder `folder`, whose key is
@@ -6590,6 +6636,7 @@ mod tests {
                 shared_with: Vec::new(),
                 winners: Vec::new(),
                 not_listed: None,
+                manifest_failure: None,
             }),
             switch_id: None,
             own_name: None,

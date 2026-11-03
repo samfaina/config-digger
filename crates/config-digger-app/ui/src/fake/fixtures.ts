@@ -828,6 +828,42 @@ export const fixtures: Fixtures = {
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
               }
             ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
           }
         ],
         "items": [
@@ -2411,6 +2447,125 @@ export const fixtures: Fixtures = {
                 "enable": null,
                 "remove": {
                   "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
                 },
                 "caveats": [],
                 "also_read_by": [],
@@ -3998,6 +4153,42 @@ export const fixtures: Fixtures = {
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
               }
             ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
           }
         ],
         "items": [
@@ -5862,6 +6053,260 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-project",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-project"
+                ],
+                "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "not_approved",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: Claude Code has not approved `cd-throwaway-project` from E:\\cd-throwaway\\project\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; the Project's own approvals count only once you trust the Project in Claude Code. config-digger never approves servers, nor trusts a Project."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-project",
+                    "--token",
+                    "••••"
+                  ]
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable adds `cd-throwaway-project` to `disabledMcpjsonServers` in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-project-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-project-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-project-skill` to \"off\" in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-shape-home",
             "kind": "mcp",
             "name": "cd-throwaway-project",
@@ -6761,6 +7206,13 @@ export const fixtures: Fixtures = {
                   {
                     "agent": "claude-code",
                     "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-market-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
                     "home": "E:\\cd-throwaway\\claude-code-shape-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Effective."
@@ -6898,6 +7350,13 @@ export const fixtures: Fixtures = {
                     "home": "E:\\cd-throwaway\\claude-code-many-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-market-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Effective."
                   },
                   {
                     "agent": "claude-code",
@@ -7117,6 +7576,13 @@ export const fixtures: Fixtures = {
                     "home": "E:\\cd-throwaway\\claude-code-many-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-market-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Effective."
                   },
                   {
                     "agent": "claude-code",
@@ -8174,6 +8640,42 @@ export const fixtures: Fixtures = {
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
               }
             ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
           }
         ],
         "items": [
@@ -9904,6 +10406,193 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-extra",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-extra"
+                ],
+                "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "not_approved",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: Claude Code has not approved `cd-throwaway-extra` from E:\\cd-throwaway\\project-extra\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; config-digger never approves servers."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-extra"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json",
+                  "sentence": "Disable adds `cd-throwaway-extra` to `disabledMcpjsonServers` in E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-shape-home",
             "kind": "mcp",
             "name": "cd-throwaway-extra",
@@ -10539,6 +11228,13 @@ export const fixtures: Fixtures = {
                     "home": "E:\\cd-throwaway\\claude-code-many-home",
                     "state": "blocked",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-many-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-market-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Blocked."
                   },
                   {
                     "agent": "claude-code",
@@ -12496,6 +13192,42 @@ export const fixtures: Fixtures = {
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
               }
             ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
           }
         ]
       },
@@ -14209,6 +14941,42 @@ export const fixtures: Fixtures = {
                   "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
                 }
               ]
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "folder": "E:\\cd-throwaway\\claude-code-market-home",
+              "source": {
+                "kind": "added"
+              },
+              "hidden": false,
+              "not_read": null,
+              "mirror": null,
+              "no_configuration": null,
+              "scopes": [
+                "managed",
+                "local",
+                "project",
+                "user",
+                "plugin"
+              ],
+              "installations": [],
+              "out_of_range": false,
+              "last_ran": null,
+              "entries": 2,
+              "notes": [
+                {
+                  "code": "cloud_connectors_not_on_disk",
+                  "installation": null,
+                  "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+                },
+                {
+                  "code": "no_installation_found",
+                  "installation": null,
+                  "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+                }
+              ]
             }
           ]
         },
@@ -14429,7 +15197,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-8fa",
+      "id": "20261001-120000-643",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14455,7 +15223,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-0aa",
+      "id": "20261001-120000-406",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14478,10 +15246,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406"
     },
     {
-      "id": "20261001-120000-080",
+      "id": "20261001-120000-a66",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14509,7 +15277,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-8fa",
+        "id": "20261001-120000-643",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -14969,7 +15737,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -14989,7 +15757,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -15008,7 +15776,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -15017,7 +15785,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-0aa",
+        "id": "20261001-120000-406",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -15040,7 +15808,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406"
       },
       "project": null,
       "changes": [
@@ -15477,7 +16245,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -15515,16 +16283,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -15539,7 +16307,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-080",
+        "id": "20261001-120000-a66",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -15998,7 +16766,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -16018,7 +16786,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -16031,10 +16799,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-080",
+          "operation": "20261001-120000-a66",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml"
         }
       ]
     },
@@ -16042,10 +16810,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-8fa",
+          "operation": "20261001-120000-643",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json"
         }
       ]
     }
@@ -18004,12 +18772,1028 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "entry",
+        "verb": "disable",
+        "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+        "project": null
+      },
+      "preview": {
+        "plan_id": "plan-34",
+        "preview": {
+          "action": "disable",
+          "title": "Disable 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": null,
+          "changes": [
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": null,
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\claude-code-home",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-01",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-02",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-03",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-04",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-05",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-06",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-07",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-08",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-09",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-10",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-11",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-12",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-13",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-14",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-15",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-16",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-17",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-18",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-19",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-20",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-21",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-22",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-23",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-24",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-25",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-26",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-27",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-28",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-29",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-30",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\project-deleted",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\project-gone",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\project-hide",
+              "before": "effective",
+              "after": "disabled"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "before": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-listed:cd-throwaway-listed-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\claude-code-market-home",
+              "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json",
+              "git_versioned": false,
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "set",
+                  "key_path": [
+                    "enabledPlugins",
+                    "cd-throwaway-listed@cd-throwaway-market"
+                  ]
+                }
+              ],
+              "diff": null,
+              "diff_unavailable": "no_reader",
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json`, so nothing says where its Secrets are; 1 line differs.",
+              "changed_lines": 1
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [
+          {
+            "class": "wide-reach",
+            "sentence": "This Disable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill in all projects and with no Project.",
+            "advice": [
+              {
+                "todo": "Check that everything it reaches should change.",
+                "why": "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.",
+                "paths": [
+                  "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill in all projects and with no Project"
+                ]
+              }
+            ]
+          }
+        ],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "entry",
+        "verb": "disable",
+        "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+        "project": null
+      },
+      "preview": {
+        "plan_id": "plan-35",
+        "preview": {
+          "action": "disable",
+          "title": "Disable 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": null,
+          "changes": [
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": null,
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\claude-code-home",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-01",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-02",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-03",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-04",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-05",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-06",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-07",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-08",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-09",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-10",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-11",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-12",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-13",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-14",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-15",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-16",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-17",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-18",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-19",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-20",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-21",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-22",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-23",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-24",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-25",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-26",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-27",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-28",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-29",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-30",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\many\\project-gone",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\project-deleted",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\project-gone",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\project-hide",
+              "before": "invalid",
+              "after": "disabled"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "before": null,
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-notlisted:cd-throwaway-notlisted-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\claude-code-market-home",
+              "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json",
+              "git_versioned": false,
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "set",
+                  "key_path": [
+                    "enabledPlugins",
+                    "cd-throwaway-notlisted@cd-throwaway-market"
+                  ]
+                }
+              ],
+              "diff": null,
+              "diff_unavailable": "no_reader",
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\claude-code-market-home\\.claude\\settings.json`, so nothing says where its Secrets are; 1 line differs.",
+              "changed_lines": 1
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [
+          {
+            "class": "wide-reach",
+            "sentence": "This Disable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill in all projects and with no Project.",
+            "advice": [
+              {
+                "todo": "Check that everything it reaches should change.",
+                "why": "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.",
+                "paths": [
+                  "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill in all projects and with no Project"
+                ]
+              }
+            ]
+          }
+        ],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "entry",
         "verb": "remove",
         "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
         "project": null
       },
       "preview": {
-        "plan_id": "plan-34",
+        "plan_id": "plan-36",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -18079,7 +19863,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-35",
+        "plan_id": "plan-37",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -18144,7 +19928,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-36",
+        "plan_id": "plan-38",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -18242,7 +20026,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-37",
+        "plan_id": "plan-39",
         "preview": {
           "action": "enable",
           "title": "Enable 1 Entry",
@@ -18768,7 +20552,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-38",
+        "plan_id": "plan-40",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -18833,7 +20617,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-39",
+        "plan_id": "plan-41",
         "preview": {
           "action": "enable",
           "title": "Enable 1 Entry",
@@ -19342,7 +21126,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-40",
+        "plan_id": "plan-42",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -19407,7 +21191,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-41",
+        "plan_id": "plan-43",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -19484,7 +21268,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-42",
+        "plan_id": "plan-44",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -19507,6 +21291,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-project",
+              "path": "E:\\cd-throwaway\\project\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "blocked",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-project",
               "path": "E:\\cd-throwaway\\project\\.mcp.json",
               "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
@@ -19619,7 +21414,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-43",
+        "plan_id": "plan-45",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -19642,6 +21437,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-project-skill",
               "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
               "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
@@ -19697,6 +21503,16 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-project-skill",
+              "before": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-project-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-project-skill",
               "before": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
               "after": null,
@@ -19788,7 +21604,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-44",
+        "plan_id": "plan-46",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -19811,6 +21627,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-project-skill",
               "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
               "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
@@ -19935,7 +21762,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-45",
+        "plan_id": "plan-47",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -20012,7 +21839,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project"
       },
       "preview": {
-        "plan_id": "plan-46",
+        "plan_id": "plan-48",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -20079,7 +21906,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-47",
+        "plan_id": "plan-49",
         "preview": {
           "action": "disable",
           "title": "Disable 1 Entry",
@@ -20102,6 +21929,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-extra",
+              "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "blocked",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-extra",
               "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
               "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
@@ -20157,6 +21995,16 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-extra",
+              "before": null,
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-extra in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-extra",
               "before": null,
               "after": null,
@@ -20243,7 +22091,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-extra"
       },
       "preview": {
-        "plan_id": "plan-48",
+        "plan_id": "plan-50",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -20266,6 +22114,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-many-home",
+              "item": "cd-throwaway-extra",
+              "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "blocked",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
               "item": "cd-throwaway-extra",
               "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
               "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
@@ -20371,7 +22230,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\many\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-49",
+        "plan_id": "plan-51",
         "preview": {
           "action": "remove",
           "title": "Remove 12 Entries",
@@ -20656,7 +22515,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-50",
+        "plan_id": "plan-52",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -20723,7 +22582,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-51",
+        "plan_id": "plan-53",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -20773,7 +22632,7 @@ export const fixtures: Fixtures = {
         "kind": "stranded"
       },
       "preview": {
-        "plan_id": "plan-52",
+        "plan_id": "plan-54",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -20821,14 +22680,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-8fa"
+        "operation": "20261001-120000-643"
       },
       "preview": {
-        "plan_id": "plan-53",
+        "plan_id": "plan-55",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-8fa \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-8fa",
+          "title": "Undo 20261001-120000-643 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-643",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -20884,15 +22743,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-8fa"
+        "operation": "20261001-120000-643"
       },
       "preview": {
-        "plan_id": "plan-54",
+        "plan_id": "plan-56",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-8fa \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-643 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-8fa",
+          "backup_of": "20261001-120000-643",
           "project": null,
           "changes": [],
           "effective": [],
@@ -20900,11 +22759,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-8fa can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-643",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-643 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -20913,15 +22772,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-0aa"
+        "operation": "20261001-120000-406"
       },
       "preview": {
-        "plan_id": "plan-55",
+        "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-0aa \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-406 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-0aa",
+          "backup_of": "20261001-120000-406",
           "project": null,
           "changes": [],
           "effective": [],
@@ -20929,10 +22788,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-0aa can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-406",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-406 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -20941,14 +22800,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-080"
+        "operation": "20261001-120000-a66"
       },
       "preview": {
-        "plan_id": "plan-56",
+        "plan_id": "plan-58",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-080 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-080",
+          "title": "Undo 20261001-120000-a66 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-a66",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -21434,15 +23293,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-080"
+        "operation": "20261001-120000-a66"
       },
       "preview": {
-        "plan_id": "plan-57",
+        "plan_id": "plan-59",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-080 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-a66 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-080",
+          "backup_of": "20261001-120000-a66",
           "project": null,
           "changes": [],
           "effective": [],
@@ -21450,10 +23309,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-080 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a66 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -21463,11 +23322,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-080",
+      "operation": "20261001-120000-a66",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-080: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a66",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-a66: verified.",
       "hints": []
     }
   },
@@ -21515,7 +23374,7 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "ce2c1a8",
+    "commit": "b406aa2",
     "date": "2026-11-03",
     "platform": "Windows x64",
     "pages": [

@@ -2320,6 +2320,50 @@
       ]
     },
     {
+      "id": "34",
+      "title": "Plugins de un marketplace directory que su manifiesto no lista",
+      "steps": [
+        {
+          "id": "34.1",
+          "title": "Un plugin que el manifiesto del marketplace lista y otro que no",
+          "goal": "Claude Code lee un plugin de un marketplace directory de la carpeta del marketplace que nombra su entrada, y no carga uno que el manifiesto del marketplace no lista: config-digger enseña la skill de este Invalid, leída de su copia en la caché, con una razón que nombra el manifiesto.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-market-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-market-home.",
+            "Busca cd-throwaway-listed:cd-throwaway-listed-skill en la lista Items.",
+            "Elige la skill cd-throwaway-notlisted:cd-throwaway-notlisted-skill.",
+            "Lee su tarjeta.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-market-home, bajo Claude Code, pulsa Remove from list."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «cd-throwaway-listed:cd-throwaway-listed-skill» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill».",
+            "El Item «cd-throwaway-notlisted:cd-throwaway-notlisted-skill» sale «Invalid».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill».",
+            "Su tarjeta dice «Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it.».",
+            "Encima de los Items no sale ningún aviso «couldn't be read»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": ["#506"]
+        }
+      ]
+    },
+    {
       "id": "32",
       "title": "La cuenta de claude.ai y sus credenciales",
       "steps": [

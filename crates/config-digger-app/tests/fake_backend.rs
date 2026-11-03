@@ -178,12 +178,14 @@ fn every_screen_has_what_it_shows() {
         "{homes:?}"
     );
     // Claude Code's homes whose last parts fill a tile in the smallest
-    // window, and the one signed out of its claude.ai account.
+    // window, the one signed out of its claude.ai account, and the one with
+    // plugins of a `directory` marketplace.
     for last in [
         "claude-code-shape-home",
         "claude-code-synced-home",
         "claude-code-many-home",
         "claude-code-logout-home",
+        "claude-code-market-home",
     ] {
         assert!(
             homes.iter().any(|home| home.ends_with(last)),
@@ -210,5 +212,44 @@ fn every_screen_has_what_it_shows() {
             .iter()
             .any(|preview| preview["request"]["kind"] == "stranded"),
         "{previews:?}"
+    );
+}
+
+#[test]
+fn a_directory_marketplace_s_listed_plugin_is_read_and_its_unlisted_one_fails() {
+    let (_, fixtures) = recorded();
+
+    let inventory = &fixtures["inventories"][0]["inventory"];
+    let item = |name: &str| {
+        inventory["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                item["name"] == name
+                    && item["home"]
+                        .as_str()
+                        .unwrap()
+                        .ends_with("claude-code-market-home")
+            })
+            .unwrap_or_else(|| panic!("no {name}"))
+    };
+    let listed = item("cd-throwaway-listed:cd-throwaway-listed-skill");
+    assert_eq!(listed["state"], "effective", "{listed:#}");
+    assert!(
+        normalized(listed["entries"][0]["path"].as_str().unwrap())
+            .ends_with("/market/plugins/cd-throwaway-listed/skills/cd-throwaway-listed-skill"),
+        "{listed:#}"
+    );
+    let unlisted = item("cd-throwaway-notlisted:cd-throwaway-notlisted-skill");
+    assert_eq!(unlisted["state"], "invalid", "{unlisted:#}");
+    let reason = &unlisted["entries"][0]["reason"];
+    assert_eq!(reason["code"], "plugin_failed_to_load", "{unlisted:#}");
+    assert!(
+        reason["sentence"]
+            .as_str()
+            .unwrap()
+            .ends_with(r"\market\.claude-plugin\marketplace.json, does not list it."),
+        "{unlisted:#}"
     );
 }

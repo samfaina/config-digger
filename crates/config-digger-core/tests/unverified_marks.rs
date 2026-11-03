@@ -381,6 +381,16 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "locations[managed-settings-mcp]",
             "fails several",
         ),
+        (
+            "claude-code.toml",
+            "plugins[installed].registry.marketplaces",
+            "`plugins` holds no list",
+        ),
+        (
+            "claude-code.toml",
+            "plugins[installed].registry.marketplaces",
+            "cannot open or decode",
+        ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         (
             "claude-code.toml",
