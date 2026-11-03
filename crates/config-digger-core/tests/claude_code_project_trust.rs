@@ -1,7 +1,7 @@
 //! Claude Code's `.mcp.json` approvals through the core `api`, with fake
 //! ports: those of the Project's own settings, local settings and state count
-//! only while its state, under its key with forward slashes, holds
-//! `hasTrustDialogAccepted: true`, and the user's count in any Project.
+//! only while its state, under its key with forward slashes in any case,
+//! holds `hasTrustDialogAccepted: true`, and the user's count in any Project.
 
 use config_digger_core::api::{Context, Core, Inventory, ScanOptions};
 use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
@@ -64,12 +64,17 @@ const OWN: [Own; 3] = [Own::Settings, Own::LocalSettings, Own::State];
 
 /// `home`, with `supabase` approved by the Project's own `source`, and the
 /// Project's state holding `state` besides.
-fn approved_by_the_project(source: Own, mut state: Value) -> FakeFileSystem {
+fn approved_by_the_project(source: Own, state: Value) -> FakeFileSystem {
+    approved_under("E:/projects/petme-app", source, state)
+}
+
+/// `approved_by_the_project`, with the Project's state under `key`.
+fn approved_under(key: &str, source: Own, mut state: Value) -> FakeFileSystem {
     let approval = json!({ "enabledMcpjsonServers": ["supabase"] });
     if let Own::State = source {
         state["enabledMcpjsonServers"] = approval["enabledMcpjsonServers"].clone();
     }
-    let fs = home(json!({ "E:/projects/petme-app": state }));
+    let fs = home(json!({ key: state }));
     let settings = match source {
         Own::Settings => r".claude\settings.json",
         Own::LocalSettings => r".claude\settings.local.json",
@@ -138,15 +143,36 @@ fn the_users_approvals_count_in_an_untrusted_project() {
     assert_eq!(entry["state"], "effective", "{entry}");
 }
 
+/// The Project's key with forward slashes, with its drive letter, its last
+/// folder's name or the whole key in another case. Claude Code writes the
+/// key in the case it started in, so the state counts under any of them.
+const KEYS_IN_ANOTHER_CASE: [&str; 3] = [
+    "e:/projects/petme-app",
+    "E:/projects/PETME-APP",
+    "E:/PROJECTS/PETME-APP",
+];
+
 #[test]
-fn trust_is_looked_up_without_regard_to_case() {
-    let fs = home(json!({
-        "e:/PROJECTS/petme-app": { "hasTrustDialogAccepted": true, "enableAllProjectMcpServers": true },
-    }));
+fn trust_and_approvals_are_looked_up_without_regard_to_case() {
+    let trusted = json!({ "hasTrustDialogAccepted": true });
+    for key in KEYS_IN_ANOTHER_CASE {
+        for source in OWN {
+            let entry = supabase(&approved_under(key, source, trusted.clone()));
 
-    let entry = supabase(&fs);
+            assert_eq!(entry["state"], "effective", "{key} {source:?}: {entry}");
+        }
 
-    assert_eq!(entry["state"], "effective", "{entry}");
+        let fs = home(json!({
+            key: { "hasTrustDialogAccepted": true, "enableAllProjectMcpServers": true },
+        }));
+
+        let entry = supabase(&fs);
+
+        assert_eq!(
+            entry["state"], "effective",
+            "{key} enableAllProjectMcpServers: {entry}"
+        );
+    }
 }
 
 #[test]
