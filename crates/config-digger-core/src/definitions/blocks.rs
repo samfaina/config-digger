@@ -7185,8 +7185,9 @@ pub(crate) struct Switch {
     /// first, then each of these in the order given, and the first that
     /// holds a value decides, `on` and partial values too: a later key is
     /// read only while every earlier one holds nothing. Disable writes
-    /// `{name}`, and Enable lifts the key that decides and every later key
-    /// that holds the disabled value, so that none Disables it again.
+    /// `{name}`. Enable lifts the key that decides, then the next key in
+    /// turn while it holds the disabled value, so that no later key
+    /// Disables the Entry again.
     #[serde(default)]
     pub also_names: Vec<String>,
     /// Whether the Agent reads the switch, in a Project's file, only when it

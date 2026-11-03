@@ -1028,10 +1028,7 @@ fn synced_pdf_overridden(settings: &Path, overrides: Value) -> FakeFileSystem {
 
 #[test]
 fn skill_overrides_turns_a_synced_skill_off_by_its_folder_alone_in_each_settings_file() {
-    let local = settings_local();
-    let shared = Path::new(PROJECT).join(r".claude\settings.json");
-    let user = in_home(r".claude\settings.json");
-    for settings in [local, shared, user] {
+    for settings in every_settings_file() {
         let fs = synced_pdf_overridden(&settings, json!({ "pdf": "off" }));
 
         let inventory = inventory(&core(&fs), &in_project());

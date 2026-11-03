@@ -1126,10 +1126,9 @@ sources = [
 # first that holds one, `on` included [binary]. config-digger reads both
 # keys through `also_names` in that order, so the prefixed key, when it
 # holds a value, decides, and the bare key counts only while the prefixed
-# one holds nothing. Disable writes the prefixed key, and Enable deletes it
-# and a bare key that holds `off` too (#510). The binary reads a nested
-# skill's `<subfolder>:<name>` before its bare `<name>` the same way. Each
-# of the three switches marks what the probe did not test.
+# one holds nothing (#510). The binary reads a nested skill's
+# `<subfolder>:<name>` before its bare `<name>` the same way. Each of the
+# three switches marks what the probe did not test.
 [[items.skill.disable]]
 unverified = [
   "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill.",
