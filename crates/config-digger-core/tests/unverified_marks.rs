@@ -427,6 +427,11 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "plugins[agent-plugins]",
             "leaves no `name` before or after it",
         ),
+        (
+            "vscode.toml",
+            "plugins[agent-plugins]",
+            "whose `source` is an object of a known kind",
+        ),
     ] {
         let mark = marks
             .iter()

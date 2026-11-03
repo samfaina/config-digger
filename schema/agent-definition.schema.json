@@ -2136,6 +2136,17 @@
               "type": "boolean",
               "default": false
             },
+            "marketplaces": {
+              "description": "The marketplaces the items come from, as far as each one's list\nnames its plugins. Without it, no item is read in a marketplace's\nlist.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ListedMarketplaces"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "json-plugin-list"
@@ -2493,6 +2504,136 @@
           "type": "string",
           "const": "fails_plugin"
         }
+      ]
+    },
+    "ListedMarketplaces": {
+      "description": "The marketplaces the items of a plugin list come from, as far as each\none's list names its plugins, such as the marketplaces VS Code installs\nagent plugins from. An item whose `item_marketplace` names a\nmarketplace sits in its clone, which `clone` places below the plugin list's\nfolder, and the first of `files` at the clone's root whose `plugins`\nkey path holds a list is the marketplace's list. Of its entries, those\nwhose `name` holds a non-empty string and whose `source` names a plugin\ncount. The entry an item matches names its plugin: the entry whose\n`name` is the item's `item_name`, exactly, whatever its source, or, for\nan item without one, the entry whose source is a path to the plugin's\nfolder. A plugin whose marketplace has a list that it matches no entry\nof fails to load. A marketplace with no list, no file holding one or a\nlist with no entry that counts, leaves its plugins named as their\n`[[plugins]]` says.",
+      "type": "object",
+      "properties": {
+        "item_marketplace": {
+          "description": "The field of an item that names its marketplace.",
+          "type": "string"
+        },
+        "clone": {
+          "description": "How that field places the marketplace's clone below the folder of\nthe plugin list.",
+          "$ref": "#/$defs/CloneSpelling"
+        },
+        "ref_folder": {
+          "description": "The folder below the plugin list's that holds the clones of the\nmarketplaces whose URL names a ref. Without it, such a marketplace\nhas no list.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item_name": {
+          "description": "The field of an item that holds the plugin's name in its\nmarketplace's list.",
+          "type": "string"
+        },
+        "files": {
+          "description": "The files at the clone's root that may hold the list, in the order\nthey are tried.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dialect": {
+          "description": "The dialect the files are read in. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reads_around_error": {
+          "description": "Whether a file that does not parse is read around its error, for\nwhat parses before and after it. Without it, such a file holds no\nlist. Neither is a Read failure.",
+          "type": "boolean",
+          "default": false
+        },
+        "plugins": {
+          "description": "The key path of the list's entries.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The field of an entry that holds the plugin's name.",
+          "type": "string"
+        },
+        "source": {
+          "description": "The field of an entry that holds where the plugin is: a path below\nthe clone's root, `\\` read as `/`, trimmed, with leading `./` and\n`/` and trailing `/` dropped and `..` stopping at the root; the root\nitself when the field is missing or null; or an object of\n`source_objects`, a plugin elsewhere.",
+          "type": "string"
+        },
+        "plugin_root": {
+          "description": "The key path of the list's folder below the clone's root that the\npath of a source lies in, unless it starts with that folder already.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "source_objects": {
+          "description": "The objects a source may hold, each naming a plugin elsewhere.\nWithout it, an entry whose source is an object does not count.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceObjects"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "item_marketplace",
+        "clone",
+        "item_name",
+        "files",
+        "plugins",
+        "name",
+        "source"
+      ]
+    },
+    "CloneSpelling": {
+      "description": "How an item's field places its marketplace's clone.",
+      "oneOf": [
+        {
+          "description": "A git URL of the scheme `http`, `https` or `ssh` with a host, as VS\nCode clones a marketplace: in the folder of its host, lowercased,\nthen one per segment of its path, a final `.git` dropped, each of\n`\\/:*?\"<>|` in a name turned into `_`. A URL whose fragment names a\nref is cloned below the `ref_folder` instead, in a last folder\n`ref_` followed by the ref, URI-encoded. A `file:` URI with no\nfragment names the clone itself; any other text names none.",
+          "type": "string",
+          "const": "git-url"
+        }
+      ]
+    },
+    "SourceObjects": {
+      "description": "The objects an entry's source may hold in a marketplace's list, each\nnaming a plugin outside the marketplace's clone: one whose `kind`\nfield holds one of `kinds`.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "The field of the object that holds its kind.",
+          "type": "string"
+        },
+        "kinds": {
+          "description": "The kinds that name a plugin.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "kinds"
       ]
     },
     "InstallRecords": {
