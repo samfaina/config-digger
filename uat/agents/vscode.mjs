@@ -669,6 +669,12 @@ if (runs("broken-manifest")) {
   await p.check("plugins[agent-plugins]", "a root `plugin.json` with an Open Plugins `$schema` names the plugin first, by its `name` trimmed, over a `.plugin\\plugin.json`, from 1.135.0 on; 1.129.1 takes the `.plugin\\plugin.json`", async () =>
     same(unlisted("sc", [label("sc"), "cd-throwaway-sc-schema", "cd-throwaway-sc-open"]).names, [slug(unlistedNames.sc)]),
   );
+  // Found beside #531's checks: config-digger reads such a plugin's
+  // `.mcp.json`, which VS Code does not, reading an Open Plugins plugin's
+  // servers from `mcp.json` [binary].
+  await p.check("locations[plugin-mcp]", "the `.mcp.json` server of a plugin whose root `plugin.json` has an Open Plugins `$schema` does not start from 1.135.0 on; on 1.129.1, which takes the `.plugin\plugin.json`, it does", async () =>
+    same(unlisted("sc", []).servers, fromMinor(135) ? [] : ["sc-dot"]),
+  );
   await p.check("plugins[agent-plugins]", "VS Code does not load a plugin of a marketplace with no list that has no manifest: neither its servers nor its skills", async () =>
     same(unlisted("nm", [label("nm"), "nm", "cd-throwaway-nm-item"]), { names: [], servers: [] }),
   );

@@ -128,12 +128,14 @@ workspace_files = true
 #    `.claude-plugin\plugin.json` and `plugin.json` that parses to an
 #    object decides: the plugin is named by its `name` when that is a
 #    non-empty string, untrimmed, and else by the label, never by a later
-#    manifest [test]. A manifest VS Code cannot read, or that holds no
-#    object, such as a list, passes on to the next [test].
-# 4. A plugin no manifest decides for, or whose `marketplace` is a `file:`
-#    URI or no reference, has no metadata: VS Code does not load it [test],
-#    logging only a debug line [binary]. Every Entry of it is Invalid, the
-#    plugin named by its folder.
+#    manifest [test]. A manifest that holds no object, such as a list,
+#    passes on to the next [test], as does one VS Code cannot read
+#    [binary].
+# 4. A plugin no manifest decides for has no metadata: VS Code does not
+#    load it [test], logging only a debug line [binary]. Nor does it load
+#    one whose `marketplace` is a `file:` URI or no reference [binary].
+#    Every Entry of such a plugin is Invalid, the plugin named by its
+#    folder.
 # 5. `.github\plugin\plugin.json` names no plugin of `installed.json`
 #    [test]: a plugin with no other manifest is not loaded.
 # VS Code 1.143.1 also finds no reference in a marketplace whose path has
@@ -175,8 +177,8 @@ workspace_files = true
 # the manifest of a plugin of a marketplace with no list at the clone's
 # root, 1.129.1 with no `$schema` manifest, and skip the plugin when the
 # name they give it is not its item's [test]; this definition follows
-# 1.141.0 and later. config-digger reads no list for a marketplace named by the
-# `owner/repo` shorthand, whose list VS Code fetches from GitHub, or by
+# 1.141.0 and later. config-digger reads no list for a marketplace named
+# by the `owner/repo` shorthand, whose list VS Code fetches from GitHub, or by
 # `git@<host>:<path>.git`.
 #
 # VS Code uninstalls a plugin in the Extensions view.

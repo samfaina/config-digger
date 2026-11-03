@@ -1972,7 +1972,7 @@ pub(crate) enum Fallback {
     Name(String),
     /// No name: the field holds this text, trimmed, which is no reference
     /// the Agent reads, or nothing.
-    Unread(Option<String>),
+    NoReference(Option<String>),
 }
 
 /// A plugin the file listing the plugins the Agent loads leaves out, so
@@ -3048,6 +3048,8 @@ fn git_marketplace(text: &str) -> bool {
         let fragment = text
             .split_once('#')
             .is_some_and(|(_, after)| !after.is_empty());
+        // A `file:` URI is a marketplace on the machine; one with a
+        // fragment is no URI to VS Code, which reads it on as text.
         if scheme == "file" && rest.starts_with("//") && !fragment {
             return false;
         }
@@ -3072,7 +3074,7 @@ impl FallbackName {
             .filter(|text| !text.is_empty());
         match text {
             Some(text) if self.reference.names(text) => Fallback::Name(text.to_owned()),
-            text => Fallback::Unread(text.map(str::to_owned)),
+            text => Fallback::NoReference(text.map(str::to_owned)),
         }
     }
 }

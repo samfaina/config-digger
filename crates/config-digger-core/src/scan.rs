@@ -260,6 +260,17 @@ pub(crate) struct ScannedPlugin {
     pub unnamed: Option<Unnamed>,
 }
 
+/// What the places of a plugin's name give it.
+enum ManifestName {
+    /// This name.
+    Named(String),
+    /// No name, from a place that decides: the plugin is named by its
+    /// record's fallback.
+    Decided,
+    /// Nothing: no place names it or decides.
+    None,
+}
+
 /// Why an Agent gives a plugin no name, and so does not load it, as VS
 /// Code loads no agent plugin it has no metadata for.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -4191,18 +4202,18 @@ impl Scanner<'_> {
                 &record.fallback,
             ) {
                 (Some(name), _) => Some(name),
-                (None, Some(Fallback::Unread(text))) => {
+                (None, Some(Fallback::NoReference(text))) => {
                     tracing::debug!(plugin = %record.id, "the plugin's record gives no reference the Agent reads");
                     unnamed = Some(Unnamed::Reference(text.clone()));
                     None
                 }
                 (None, fallback) => match self.manifest_name(plugins, &folder) {
-                    Some(Some(name)) => Some(name),
-                    Some(None) => match fallback {
+                    ManifestName::Named(name) => Some(name),
+                    ManifestName::Decided => match fallback {
                         Some(Fallback::Name(name)) => Some(name.clone()),
                         _ => None,
                     },
-                    None => {
+                    ManifestName::None => {
                         if plugins.registry.fallback_name().is_some() {
                             tracing::debug!(plugin = %record.id, "no manifest names the plugin");
                             unnamed = Some(Unnamed::NoManifest);
@@ -4258,15 +4269,10 @@ impl Scanner<'_> {
         found
     }
 
-    /// The name the places of `plugins`' names give the plugin in `folder`,
-    /// tried in turn: `Some(None)` when a place that decides gives it none,
-    /// and `None` when no place names it or decides.
-    fn manifest_name(
-        &mut self,
-        plugins: &PluginsDefinition,
-        folder: &Path,
-    ) -> Option<Option<String>> {
-        plugins
+    /// What the places of `plugins`' names, tried in turn, give the plugin
+    /// in `folder`.
+    fn manifest_name(&mut self, plugins: &PluginsDefinition, folder: &Path) -> ManifestName {
+        let found = plugins
             .name
             .iter()
             .flat_map(PluginNames::places)
@@ -4292,11 +4298,12 @@ impl Scanner<'_> {
                     .filter(|text| !text.is_empty())
                     .map(str::to_owned);
                 match named {
-                    Some(named) => Some(Some(named)),
-                    None if name.decides && document.is_object() => Some(None),
+                    Some(named) => Some(ManifestName::Named(named)),
+                    None if name.decides && document.is_object() => Some(ManifestName::Decided),
                     None => None,
                 }
-            })
+            });
+        found.unwrap_or(ManifestName::None)
     }
 
     /// Adds to `found`, for each plugin bound to a Project at the root of a
