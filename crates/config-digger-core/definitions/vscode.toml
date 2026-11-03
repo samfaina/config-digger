@@ -111,19 +111,46 @@ workspace_files = true
 # folder's path below this one, `relativePath` [test]. A folder directly
 # here that `installed.json` does not list is not read [test]. A plugin's
 # id is its folder below this one, so two marketplaces' plugins of one
-# name stay apart. A plugin of a marketplace with no list is named by its
-# manifest's `name`, or else by its folder (`folder_fallback`), whatever
-# its item says [test]. Its manifest is the one its servers come
-# from (see `plugin-manifest-mcp`): the first that exists of
-# `.plugin\plugin.json`, `.claude-plugin\plugin.json` and `plugin.json`
-# [test], then `.github\plugin\plugin.json`, which only VS Code 1.143.1
-# takes for a manifest [binary]. VS Code reads the manifest with its JSONC
-# parser, which takes comments and trailing commas, and reads one that does
-# not parse around its error, as `plugin-mcp` reads a `.mcp.json`: a
-# plugin whose `.claude-plugin\plugin.json` does not parse is named by the
-# `name` before the error, though its `plugin.json` parses, and one whose
-# `plugin.json` does not parse by its `.claude-plugin\plugin.json` [test].
-# So each place is read as `jsonc`, around its errors.
+# name stay apart.
+#
+# A plugin of a marketplace with no list is named as VS Code 1.141.0 and
+# later name it, whatever its item's `name` says [test]:
+# 1. VS Code reads the item's `marketplace`, trimmed, as a reference: a URI
+#    of the scheme `http`, `https` or `ssh` with a host, `<user>@<host>:
+#    <path>.git` or `<owner>/<repo>`, each with a `#<ref>` or not
+#    (`fallback_name`) [binary]. The reference's label is that trimmed
+#    text, for an `https` URL [test] as for the other forms [binary].
+# 2. A root `plugin.json` that parses to an object whose `$schema` is a
+#    string starting with `https://agent-plugins.org/schemas/` and ending
+#    with `/plugin.schema.json` decides: the plugin is named by its `name`,
+#    trimmed, when something is left of it, and else by the label [test].
+# 3. Otherwise the first of `.plugin\plugin.json`,
+#    `.claude-plugin\plugin.json` and `plugin.json` that parses to an
+#    object decides: the plugin is named by its `name` when that is a
+#    non-empty string, untrimmed, and else by the label, never by a later
+#    manifest [test]. A manifest that holds no object, such as a list,
+#    passes on to the next [test], as does one VS Code cannot read
+#    [binary].
+# 4. A plugin no manifest decides for has no metadata: VS Code does not
+#    load it [test], logging only a debug line [binary]. Nor does it load
+#    one whose `marketplace` is a `file:` URI or no reference [binary].
+#    Every Entry of such a plugin is Invalid, the plugin named by its
+#    folder.
+# 5. `.github\plugin\plugin.json` names no plugin of `installed.json`
+#    [test]: a plugin with no other manifest is not loaded.
+# VS Code 1.143.1 also finds no reference in a marketplace whose path has
+# a `.` or `..` segment, or a segment Windows cannot name a file by
+# [binary], which config-digger reads as 1.141.0 does. The manifest the
+# name comes from is the one its servers come from (see
+# `plugin-manifest-mcp`), but for the `$schema` one. VS Code reads each
+# manifest with its JSONC parser, which takes comments and trailing commas,
+# and reads one that does not parse around its error, as `plugin-mcp` reads
+# a `.mcp.json`: a plugin whose `.claude-plugin\plugin.json` does not parse
+# is named by the `name` before the error, though its `plugin.json`
+# parses, and one whose `plugin.json` does not parse by its
+# `.claude-plugin\plugin.json` [test]; one broken before its `name`, which
+# still parses to an object, names the plugin by its label [test]. So each
+# place is read as `jsonc`, around its errors.
 #
 # A plugin its marketplace's list names is named by its entry there, never
 # by its manifest (`marketplaces`) [test]. VS Code reads the list in its
@@ -145,12 +172,13 @@ workspace_files = true
 # `name`, the entry whose source is its folder [test]. A plugin whose
 # marketplace has a list it matches no entry of is not loaded [test], with
 # no log line [binary]: every Entry of it is Invalid, the plugin named from
-# its manifests. A list with no entry that counts is no list [binary]. VS
-# Code 1.129.1 and 1.135.0 read the manifest of a plugin of a marketplace with
-# no list at the clone's root, and skip the plugin when that manifest's
-# name is not its item's [test]; this definition follows 1.141.0 and
-# later. config-digger reads no list for a marketplace named by the
-# `owner/repo` shorthand, whose list VS Code fetches from GitHub, or by
+# its manifests as one of a marketplace with no list is. A list with no
+# entry that counts is no list [binary]. VS Code 1.129.1 and 1.135.0 read
+# the manifest of a plugin of a marketplace with no list at the clone's
+# root, 1.129.1 with no `$schema` manifest, and skip the plugin when the
+# name they give it is not its item's [test]; this definition follows
+# 1.141.0 and later. config-digger reads no list for a marketplace named
+# by the `owner/repo` shorthand, whose list VS Code fetches from GitHub, or by
 # `git@<host>:<path>.git`.
 #
 # VS Code uninstalls a plugin in the Extensions view.
@@ -159,15 +187,14 @@ workspace_files = true
 [[plugins]]
 id = "agent-plugins"
 unverified = [
-  "A manifest whose error leaves no `name` before or after it is taken to pass the name on to the next manifest, as one with no `name` does; in VS Code's code, the plugin is then named by its marketplace when what parses is an object, and by the next manifest when it is not. A probe check of a manifest broken before its `name` would test it.",
   "An entry of a marketplace's list whose `source` is an object of a known kind is taken to count whatever its other fields, and never to match an item with no `name`; in VS Code's code, such an entry missing a field its kind needs, or with one of the wrong form, is skipped, and an item with no `name` matches it by the folder VS Code installs it in. A probe check of a list holding such entries would test it.",
 ]
-registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", folder_fallback = true, marketplaces = { item_marketplace = "marketplace", clone = "git-url", ref_folder = ".marketplace-repositories", item_name = "name", files = ["marketplace.json", ".plugin/marketplace.json", ".github/plugin/marketplace.json", ".claude-plugin/marketplace.json"], dialect = "jsonc", reads_around_error = true, plugins = ["plugins"], name = "name", source = "source", plugin_root = ["metadata", "pluginRoot"], source_objects = { kind = "source", kinds = ["github", "url", "git-subdir", "npm", "pip"] } } }
+registry = { block = "json-plugin-list", anchor = { block = "machine", path = "~/.vscode/agent-plugins/installed.json" }, list = ["installed"], folder = "pluginUri", spelling = "file-uri", fallback_name = { field = "marketplace", reference = "git-marketplace" }, marketplaces = { item_marketplace = "marketplace", clone = "git-url", ref_folder = ".marketplace-repositories", item_name = "name", files = ["marketplace.json", ".plugin/marketplace.json", ".github/plugin/marketplace.json", ".claude-plugin/marketplace.json"], dialect = "jsonc", reads_around_error = true, plugins = ["plugins"], name = "name", source = "source", plugin_root = ["metadata", "pluginRoot"], source_objects = { kind = "source", kinds = ["github", "url", "git-subdir", "npm", "pip"] } } }
 name = [
-  { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
-  { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
-  { file = "plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
-  { file = ".github/plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error" },
+  { file = "plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error", decides = true, only_when = { key_path = ["$schema"], starts_with = "https://agent-plugins.org/schemas/", ends_with = "/plugin.schema.json" }, trims = true },
+  { file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error", decides = true },
+  { file = ".claude-plugin/plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error", decides = true },
+  { file = "plugin.json", dialect = "jsonc", key_path = ["name"], on_read_failure = "reads_around_error", decides = true },
 ]
 
 # The extensions that ship with each Installation, in its commit folder's

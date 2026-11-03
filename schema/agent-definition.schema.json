@@ -1950,7 +1950,7 @@
           ]
         },
         "name": {
-          "description": "Where a plugin's name is, or a list of places tried in turn, such as\nan extension's `display_name`, then its `name`. When the plugin's\nfolder holds none, its name is its folder's when its registry's\n`folder_fallback` says so, or else its id up to `id_separator`.",
+          "description": "Where a plugin's name is, or a list of places tried in turn, such as\nan extension's `display_name`, then its `name`. When the plugin's\nfolder holds none, its name is the one its registry's\n`fallback_name` reads, its folder's when its registry's\n`folder_fallback` says so, or else its id up to `id_separator`.",
           "anyOf": [
             {
               "$ref": "#/$defs/PluginNames"
@@ -2135,6 +2135,17 @@
               "description": "Whether a plugin that neither its item nor its manifest names is\nnamed by its folder, as VS Code names an agent plugin. Without it,\nthe plugin is named by its id, as its `[[plugins]]` says.",
               "type": "boolean",
               "default": false
+            },
+            "fallback_name": {
+              "description": "What an item gives a plugin for a name when the place of its name\nthat decides gives none, as VS Code names an agent plugin by its\nmarketplace. Without it, such a plugin is named as `folder_fallback`\nsays.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FallbackName"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             },
             "marketplaces": {
               "description": "The marketplaces the items come from, as far as each one's list\nnames its plugins. Without it, no item is read in a marketplace's\nlist.",
@@ -2506,6 +2517,38 @@
         }
       ]
     },
+    "FallbackName": {
+      "description": "The name a plugin list's item gives a plugin when the place of its\nname that decides gives none: the text of its `field`, trimmed, when it\nis a reference of the spelling `reference`. A plugin whose item holds\nno such text, or that no place of its name names or decides for, has no\nname the Agent gives it: the Agent does not load it, and it is named by\nits folder.",
+      "type": "object",
+      "properties": {
+        "field": {
+          "description": "The field of an item that holds it, such as VS Code's `marketplace`.",
+          "type": "string"
+        },
+        "reference": {
+          "description": "The references that give a name.",
+          "$ref": "#/$defs/ReferenceSpelling"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "reference"
+      ]
+    },
+    "ReferenceSpelling": {
+      "description": "The text of an item's field that is a reference giving its plugin a\nname.",
+      "oneOf": [
+        {
+          "description": "A git marketplace as VS Code reads one, once trimmed: a URI of the\nscheme `http`, `https` or `ssh` with a host, `<user>@<host>:<path>.git`\nor `<owner>/<repo>`, each with a `#<ref>` or not. A `file:` URI is a\nmarketplace on the machine, which gives no name.",
+          "type": "string",
+          "const": "git-marketplace"
+        }
+      ]
+    },
     "ListedMarketplaces": {
       "description": "The marketplaces the items of a plugin list come from, as far as each\none's list names its plugins, such as the marketplaces VS Code installs\nagent plugins from. An item whose `item_marketplace` names a\nmarketplace sits in its clone, which `clone` places below the plugin list's\nfolder, and the first of `files` at the clone's root whose `plugins`\nkey path holds a list is the marketplace's list. Of its entries, those\nwhose `name` holds a non-empty string and whose `source` names a plugin\ncount. The entry an item matches names its plugin: the entry whose\n`name` is the item's `item_name`, exactly, whatever its source, or, for\nan item without one, the entry whose source is a path to the plugin's\nfolder. A plugin whose marketplace has a list that it matches no entry\nof fails to load. A marketplace with no list, no file holding one or a\nlist with no entry that counts, leaves its plugins named as their\n`[[plugins]]` says.",
       "type": "object",
@@ -2799,6 +2842,27 @@
             }
           ]
         },
+        "decides": {
+          "description": "Whether the place decides the plugin's name once its file holds an\nobject, whatever its key path holds, as VS Code takes the first of\nan agent plugin's manifests that parses to an object: the plugin is\nnamed by the string there, or else by the name its registry's\n`fallback_name` reads, and no later place is tried. Without it, a\nfile that names no plugin passes on to the next place.",
+          "type": "boolean",
+          "default": false
+        },
+        "only_when": {
+          "description": "What the file must hold for the place to be tried, as VS Code takes\nan agent plugin's root `plugin.json` first only when its `$schema`\nis an Open Plugins one. Without it, the place is tried whatever the\nfile holds.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NameGate"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trims": {
+          "description": "Whether the name is trimmed, a name of only whitespace naming no\nplugin. Without it, the string is the name as it is.",
+          "type": "boolean",
+          "default": false
+        },
         "unverified": {
           "$ref": "#/$defs/Unverified"
         }
@@ -2807,6 +2871,36 @@
       "required": [
         "file",
         "key_path"
+      ]
+    },
+    "NameGate": {
+      "description": "A string a file must hold, in an object, for a place of a plugin's name\nin it to be tried.",
+      "type": "object",
+      "properties": {
+        "key_path": {
+          "description": "The key path of the string, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "starts_with": {
+          "description": "The text it starts with.",
+          "type": "string"
+        },
+        "ends_with": {
+          "description": "The text it ends with.",
+          "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key_path",
+        "starts_with",
+        "ends_with"
       ]
     },
     "Replaces": {

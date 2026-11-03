@@ -750,7 +750,8 @@ pub(crate) struct PluginsDefinition {
     pub superseded_marker: Option<String>,
     /// Where a plugin's name is, or a list of places tried in turn, such as
     /// an extension's `display_name`, then its `name`. When the plugin's
-    /// folder holds none, its name is its folder's when its registry's
+    /// folder holds none, its name is the one its registry's
+    /// `fallback_name` reads, its folder's when its registry's
     /// `folder_fallback` says so, or else its id up to `id_separator`.
     pub name: Option<PluginNames>,
     /// The text that ends a plugin's name in its id, such as the `@` before
@@ -848,6 +849,51 @@ pub(crate) struct PluginName {
     /// same file. Without it, a file that does not parse names no plugin,
     /// and the next place is tried.
     pub on_read_failure: Option<ReadFailureReaction>,
+    /// Whether the place decides the plugin's name once its file holds an
+    /// object, whatever its key path holds, as VS Code takes the first of
+    /// an agent plugin's manifests that parses to an object: the plugin is
+    /// named by the string there, or else by the name its registry's
+    /// `fallback_name` reads, and no later place is tried. Without it, a
+    /// file that names no plugin passes on to the next place.
+    #[serde(default)]
+    pub decides: bool,
+    /// What the file must hold for the place to be tried, as VS Code takes
+    /// an agent plugin's root `plugin.json` first only when its `$schema`
+    /// is an Open Plugins one. Without it, the place is tried whatever the
+    /// file holds.
+    pub only_when: Option<NameGate>,
+    /// Whether the name is trimmed, a name of only whitespace naming no
+    /// plugin. Without it, the string is the name as it is.
+    #[serde(default)]
+    pub trims: bool,
+}
+
+/// A string a file must hold, in an object, for a place of a plugin's name
+/// in it to be tried.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NameGate {
+    /// The key path of the string, one key per segment.
+    pub key_path: Vec<String>,
+    /// The text it starts with.
+    pub starts_with: String,
+    /// The text it ends with.
+    pub ends_with: String,
+}
+
+impl NameGate {
+    /// Whether `document` holds the string.
+    pub fn opens(&self, document: &serde_json::Value) -> bool {
+        document.is_object()
+            && self
+                .key_path
+                .iter()
+                .try_fold(document, |value, key| value.get(key))
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|text| {
+                    text.starts_with(&self.starts_with) && text.ends_with(&self.ends_with)
+                })
+    }
 }
 
 impl PluginName {
@@ -866,6 +912,9 @@ impl PluginName {
         blocks::validate_relative(&self.file)?;
         blocks::validate_key_path(&self.key_path)?;
         blocks::validate_rejected(&self.rejected_unless_path_object_or_list)?;
+        if let Some(gate) = &self.only_when {
+            blocks::validate_key_path(&gate.key_path)?;
+        }
         match self.on_read_failure {
             None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
             Some(_) => Err(format!(
@@ -6360,6 +6409,74 @@ name = {{ file = "plugin.json", dialect = {dialect}, key_path = ["name"] }}"#
                 message.contains("unknown variant") || message.contains("invalid type"),
                 "{dialect}: {message}"
             );
+        }
+    }
+
+    #[test]
+    fn a_plugin_list_s_fallback_name_and_a_name_s_gate_are_well_formed() {
+        let list = |registry: &str, name: &str| {
+            with_plugins("").replace(
+                r#"registry = { block = "json-plugin-records", anchor = { block = "home", root = "plugins", path = "installed.json" }, root = ["plugins"], folder = "path" }"#,
+                &format!(
+                    r#"registry = {{ block = "json-plugin-list", anchor = {{ block = "machine", path = "~/.agent/plugins/installed.json" }}, list = ["installed"], folder = "pluginUri", spelling = "file-uri"{registry} }}
+name = [{name}, {{ file = ".plugin/plugin.json", dialect = "jsonc", key_path = ["name"], decides = true }}]"#
+                ),
+            )
+            .replace(
+                r#"checks = ["disable", "precedence"]"#,
+                if registry.contains("fallback_name") {
+                    r#"checks = ["disable", "precedence", "plugin-load"]"#
+                } else {
+                    r#"checks = ["disable", "precedence"]"#
+                },
+            )
+        };
+        let fallback =
+            r#", fallback_name = { field = "marketplace", reference = "git-marketplace" }"#;
+        let gated = r#"{ file = "plugin.json", key_path = ["name"], decides = true, trims = true, only_when = { key_path = ["$schema"], starts_with = "https://", ends_with = ".json" } }"#;
+        let text = list(fallback, gated);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        // A plugin the list gives no name fails to load.
+        let text = list(fallback, gated).replace(r#", "plugin-load""#, "");
+        assert!(error(&text).contains("plugin-load"), "{}", error(&text));
+        // Without the new fields, a list parses as it did.
+        let text = list("", r#"{ file = "plugin.json", key_path = ["name"] }"#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (registry, expected) in [
+            (
+                r#", fallback_name = { field = "", reference = "git-marketplace" }"#,
+                "must not be empty",
+            ),
+            (
+                r#", fallback_name = { field = "marketplace", reference = "url" }"#,
+                "unknown variant",
+            ),
+            (
+                r#", fallback_name = { field = "marketplace" }"#,
+                "missing field `reference`",
+            ),
+            (
+                r#", folder_fallback = true, fallback_name = { field = "marketplace", reference = "git-marketplace" }"#,
+                "folder_fallback",
+            ),
+        ] {
+            let message = error(&list(registry, gated));
+            assert!(message.contains(expected), "{registry}: {message}");
+        }
+        for (gate, expected) in [
+            (
+                r#"{ key_path = [], starts_with = "a", ends_with = "b" }"#,
+                "key_path needs keys",
+            ),
+            (
+                r#"{ key_path = ["$schema"], starts_with = "a" }"#,
+                "missing field",
+            ),
+        ] {
+            let name =
+                format!(r#"{{ file = "plugin.json", key_path = ["name"], only_when = {gate} }}"#);
+            let message = error(&list(fallback, &name));
+            assert!(message.contains(expected), "{gate}: {message}");
         }
     }
 

@@ -14,7 +14,7 @@ use crate::definitions::{
 use crate::disable::{self, ContextProject, Hit};
 use crate::scan::{
     GateReading, HomeSource, NotSignedIn, OffBy, OnAccount, ScannedEntry, ScannedGate, ScannedHome,
-    ScannedParked, ScannedPlugin, ScannedReadFailure, SettingOwner, SignedIn, Snapshot,
+    ScannedParked, ScannedPlugin, ScannedReadFailure, SettingOwner, SignedIn, Snapshot, Unnamed,
 };
 use crate::{explain, folders, installations, locator, paths, rules};
 use std::borrow::Cow;
@@ -753,6 +753,9 @@ pub(crate) fn resolve(
                                     let cause = match failure {
                                         PluginFailure::Manifest(failure) => {
                                             explain::manifest_failure_cause(agent_name, failure)
+                                        }
+                                        PluginFailure::Unnamed(unnamed, folder) => {
+                                            explain::unnamed_cause(agent_name, unnamed, folder)
                                         }
                                         PluginFailure::File(failure, reaction) => {
                                             explain::file_failure_cause(
@@ -2168,6 +2171,9 @@ fn plugin_failure<'s>(
     if let Some(failure) = &plugin.manifest_failure {
         return Some(PluginFailure::Manifest(failure));
     }
+    if let Some(unnamed) = &plugin.unnamed {
+        return Some(PluginFailure::Unnamed(unnamed, &plugin.folder));
+    }
     snapshot
         .read_failures
         .iter()
@@ -2188,6 +2194,8 @@ fn plugin_failure<'s>(
 enum PluginFailure<'s> {
     /// The manifest of the plugin's marketplace.
     Manifest(&'s ManifestFailure),
+    /// What leaves it with no name, with its folder.
+    Unnamed(&'s Unnamed, &'s Path),
     /// The Read failure of a file of the plugin, with what the Agent does.
     File(&'s ScannedReadFailure, &'s Reaction),
 }

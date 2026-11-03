@@ -5,9 +5,9 @@
 use crate::api::{LinkKind, ReadFailureKind, StrandedReason};
 use crate::definitions::blocks::{
     self, Anchor, Anchored, Bundles, Bypasses, Cached, ConfigHash, Conform, DisableMechanism,
-    Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
-    InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
-    ListedIn, ListedMarketplaces, Locate, Locator, LookUp, Malformed, ManifestCause,
+    Disables, DownWalk, EnvMap, Fallback, FindsBy, FolderMarketplaces, Format, Gate, GateStore,
+    HoldsHere, InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder,
+    ListPlugins, ListedIn, ListedMarketplaces, Locate, Locator, LookUp, Malformed, ManifestCause,
     ManifestFailure, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn, NonceHash,
     NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList, PluginPlace,
     PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
@@ -255,6 +255,31 @@ pub(crate) struct ScannedPlugin {
     /// What in the manifest of its marketplace keeps the Agent from loading
     /// it, when something does: it is read from its record's folder then.
     pub manifest_failure: Option<ManifestFailure>,
+    /// Why the Agent gives it no name, and so does not load it, when it
+    /// does not: it is named by its folder then.
+    pub unnamed: Option<Unnamed>,
+}
+
+/// What the places of a plugin's name give it.
+enum ManifestName {
+    /// This name.
+    Named(String),
+    /// No name, from a place that decides: the plugin is named by its
+    /// record's fallback.
+    Decided,
+    /// Nothing: no place names it or decides.
+    None,
+}
+
+/// Why an Agent gives a plugin no name, and so does not load it, as VS
+/// Code loads no agent plugin it has no metadata for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Unnamed {
+    /// No place of its name names it or decides.
+    NoManifest,
+    /// Its record gives no reference the Agent reads: the text it holds,
+    /// trimmed, or `None` when it holds none.
+    Reference(Option<String>),
 }
 
 /// A plugin's id, lowercased, and version, as a list's `replaces` compares
@@ -4171,25 +4196,35 @@ impl Scanner<'_> {
                 },
                 None => None,
             };
-            let names = plugins.name.iter().flat_map(PluginNames::places);
-            let named = listed_name.or_else(|| record.name.clone()).or_else(|| {
-                names.into_iter().find_map(|name| {
-                    let document = self.plugin_json(
-                        &folder,
-                        &name.file,
-                        &name.format(),
-                        name.reads_around_error(),
-                    )?;
-                    let rejects = &name.rejected_unless_path_object_or_list;
-                    if blocks::rejected_at(&document, rejects).is_some() {
-                        return None;
+            let mut unnamed = None;
+            let named = match (
+                listed_name.or_else(|| record.name.clone()),
+                &record.fallback,
+            ) {
+                (Some(name), _) => Some(name),
+                (None, Some(Fallback::NoReference(text))) => {
+                    tracing::debug!(plugin = %record.id, "the plugin's record gives no reference the Agent reads");
+                    unnamed = Some(Unnamed::Reference(text.clone()));
+                    None
+                }
+                (None, fallback) => match self.manifest_name(plugins, &folder) {
+                    ManifestName::Named(name) => Some(name),
+                    ManifestName::Decided => match fallback {
+                        Some(Fallback::Name(name)) => Some(name.clone()),
+                        _ => None,
+                    },
+                    ManifestName::None => {
+                        if plugins.registry.fallback_name().is_some() {
+                            tracing::debug!(plugin = %record.id, "no manifest names the plugin");
+                            unnamed = Some(Unnamed::NoManifest);
+                        }
+                        None
                     }
-                    non_empty_str(&document, &name.key_path).map(str::to_owned)
-                })
-            });
+                },
+            };
             named_by_plugin.push(named.is_some());
             let name = named.unwrap_or_else(|| {
-                if plugins.registry.folder_fallback()
+                if (plugins.registry.folder_fallback() || unnamed.is_some())
                     && let Some(name) = folder.file_name()
                 {
                     return name.to_string_lossy().into_owned();
@@ -4222,6 +4257,7 @@ impl Scanner<'_> {
                 winners: Vec::new(),
                 not_listed: record.not_listed,
                 manifest_failure,
+                unnamed,
             });
         }
         if plugins.same_names_invalid {
@@ -4231,6 +4267,43 @@ impl Scanner<'_> {
             self.copy_to_other_checkouts(&mut found);
         }
         found
+    }
+
+    /// What the places of `plugins`' names, tried in turn, give the plugin
+    /// in `folder`.
+    fn manifest_name(&mut self, plugins: &PluginsDefinition, folder: &Path) -> ManifestName {
+        let found = plugins
+            .name
+            .iter()
+            .flat_map(PluginNames::places)
+            .find_map(|name| {
+                let document = self.plugin_json(
+                    folder,
+                    &name.file,
+                    &name.format(),
+                    name.reads_around_error(),
+                )?;
+                let rejects = &name.rejected_unless_path_object_or_list;
+                if blocks::rejected_at(&document, rejects).is_some()
+                    || name
+                        .only_when
+                        .as_ref()
+                        .is_some_and(|gate| !gate.opens(&document))
+                {
+                    return None;
+                }
+                let named = lookup(&document, &name.key_path)
+                    .and_then(serde_json::Value::as_str)
+                    .map(|text| if name.trims { text.trim() } else { text })
+                    .filter(|text| !text.is_empty())
+                    .map(str::to_owned);
+                match named {
+                    Some(named) => Some(ManifestName::Named(named)),
+                    None if name.decides && document.is_object() => Some(ManifestName::Decided),
+                    None => None,
+                }
+            });
+        found.unwrap_or(ManifestName::None)
     }
 
     /// Adds to `found`, for each plugin bound to a Project at the root of a
@@ -4602,6 +4675,7 @@ impl Scanner<'_> {
                         .map(|name| name.to_string_lossy().into_owned()),
                     not_listed: None,
                     listed_in: None,
+                    fallback: None,
                 })
             })
             .collect()
@@ -4693,6 +4767,7 @@ impl Scanner<'_> {
                     project: None,
                     not_listed,
                     listed_in: None,
+                    fallback: None,
                 });
             }
         }
@@ -4746,6 +4821,7 @@ impl Scanner<'_> {
                 version: None,
                 not_listed: None,
                 listed_in: None,
+                fallback: None,
             })
             .collect()
     }
@@ -4807,6 +4883,7 @@ impl Scanner<'_> {
                     version: Some(version),
                     not_listed: None,
                     listed_in: None,
+                    fallback: None,
                 });
             }
         }
@@ -6696,6 +6773,7 @@ mod tests {
                 winners: Vec::new(),
                 not_listed: None,
                 manifest_failure: None,
+                unnamed: None,
             }),
             switch_id: None,
             own_name: None,

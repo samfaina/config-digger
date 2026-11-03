@@ -14,7 +14,8 @@ use crate::definitions::blocks::{
 use crate::edit::Edit;
 use crate::folders::{ComesBack, FolderOp, FolderSize, Link};
 use crate::scan::{
-    Expected, NotSignedIn, OffBy, ScannedReadFailure, ScannedRejection, ScannedShape, ValueType,
+    Expected, NotSignedIn, OffBy, ScannedReadFailure, ScannedRejection, ScannedShape, Unnamed,
+    ValueType,
 };
 use crate::{locator, park};
 use serde_json::Value;
@@ -273,6 +274,21 @@ pub(crate) fn manifest_failure_cause(agent_name: &str, failure: &ManifestFailure
         failure.marketplace,
         failure.manifest.display()
     )
+}
+
+/// Why `agent_name` does not load a plugin in `folder` that it gives no
+/// name, as `unnamed` says.
+pub(crate) fn unnamed_cause(agent_name: &str, unnamed: &Unnamed, folder: &Path) -> String {
+    match unnamed {
+        Unnamed::NoManifest => format!(
+            "{agent_name} finds no manifest that holds an object in its folder, {}",
+            folder.display()
+        ),
+        Unnamed::Reference(Some(text)) => {
+            format!("{agent_name} cannot read its marketplace reference `{text}`")
+        }
+        Unnamed::Reference(None) => "its item names no marketplace".to_owned(),
+    }
 }
 
 /// Where in a file a parse error is, as a sentence puts it after the file.
