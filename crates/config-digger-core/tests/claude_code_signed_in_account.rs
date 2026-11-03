@@ -140,11 +140,21 @@ fn signed_in_to_no_account_every_synced_skill_is_unread() {
     }
 }
 
-/// The synced plugin `<name>~g1` in the account folder `account`, whose
-/// manifest names it `name`, with the skill `notes` and the server `docs`.
+/// The account folder `account` of the synced plugins.
+fn account_folder(account: &str) -> PathBuf {
+    in_home(&format!(r".claude\plugins\synced\{account}"))
+}
+
+/// The synced plugin `name` in the account folder `account`, which the
+/// account's `manifest.json` lists alone and whose manifest names it
+/// `name`, with the skill `notes` and the server `docs`.
 fn with_synced_plugin(fs: FakeFileSystem, account: &str, name: &str) -> FakeFileSystem {
-    let folder = in_home(&format!(r".claude\plugins\synced\{account}\{name}~g1"));
+    let folder = account_folder(account).join(name);
     fs.with_file(
+        account_folder(account).join("manifest.json"),
+        json!({ "plugins": [{ "name": name }] }).to_string(),
+    )
+    .with_file(
         folder.join(r".claude-plugin\plugin.json"),
         json!({ "name": name }).to_string(),
     )
@@ -207,6 +217,19 @@ fn only_the_signed_in_accounts_synced_plugins_servers_and_skills_are_read() {
     assert_eq!(
         entry(&inventory, "theirs:notes")["remove"]["code"],
         "read_only"
+    );
+}
+
+#[test]
+fn another_accounts_unlisted_synced_plugin_is_unread_as_another_accounts() {
+    let fs = with_synced_plugin(signed_in(FakeFileSystem::new()), "org-b_acct-b", "theirs");
+    fs.delete_file(account_folder("org-b_acct-b").join("manifest.json"));
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        states(&inventory, &["plugin:theirs:docs", "theirs:notes"]),
+        pairs(&[("unread", "other_account"), ("unread", "other_account")])
     );
 }
 

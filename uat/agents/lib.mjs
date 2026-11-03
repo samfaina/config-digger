@@ -47,13 +47,14 @@ export function skill(dir, frontmatter, body = "body") {
 // account's folder of `plugins/synced`: its folder, with its manifest and a
 // skill per name of `skills`, its `.meta.json`, and its entry in the
 // bucket's `manifest.json`, without which Claude Code does not load it.
-// The folder is `<name>`, as 2.1.309 names it, or `<name>~g<generation>`
-// with a `generation`, as 2.1.310 does. `manifest` stands for the plugin
-// manifest's content, an object or raw text. Returns the plugin's folder.
+// The folder is named as Claude Code names it in every version: `<name>`
+// when `generation` is missing or 1 or less, and `<name>~g<generation>`
+// when it is 2 or more. `manifest` stands for the plugin manifest's
+// content, an object or raw text. Returns the plugin's folder.
 // Claude Code reads it while the gate `tengu_claudeai_plugins_sync_enabled`
 // is on, and a sync round deletes it.
 export function syncedPlugin(bucket, name, { generation, manifest = { name, version: "1.0.0" }, skills = [] } = {}) {
-  const folder = generation === undefined ? name : `${name}~g${generation}`;
+  const folder = generation >= 2 ? `${name}~g${generation}` : name;
   const dir = path.join(bucket, folder);
   write(path.join(dir, ".claude-plugin", "plugin.json"), manifest);
   for (const s of skills) skill(path.join(dir, "skills", s), [`name: ${s}`, `description: a skill of ${name}`]);

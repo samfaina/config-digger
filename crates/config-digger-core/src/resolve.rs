@@ -4,8 +4,8 @@
 use crate::api::{self, Context};
 use crate::definitions::blocks::{
     self, Anchored, ApprovalHash, Built, Compete, Condition, Conform, Disables, FolderTrust, Gate,
-    Holds, JsonFormat, ListPlugins, Malformed, Merge, NonceTrust, Parse, PolicyField, Provenance,
-    SettingIs, SkillDefect, SkillFallback,
+    Holds, JsonFormat, ListPlugins, Malformed, Merge, NonceTrust, NotListed, Parse, PolicyField,
+    Provenance, SettingIs, SkillDefect, SkillFallback,
 };
 use crate::definitions::skill_managers::Strength;
 use crate::definitions::{
@@ -595,6 +595,9 @@ pub(crate) fn resolve(
                             }
                             Closed::OtherAccount { signed_in } => {
                                 explain::other_account(agent_name, account(), &signed_in)
+                            }
+                            Closed::NotListed(not_listed) => {
+                                explain::plugin_not_listed(agent_name, &not_listed)
                             }
                         };
                         return unread_entry(
@@ -2754,7 +2757,9 @@ fn setting_value(
         .find_map(|value| value.value.clone())
 }
 
-/// A `when` condition of a location that does not hold.
+/// Why an Entry's location is not read for it: a `when` condition of the
+/// location that does not hold, or the list of the plugins the Agent loads
+/// leaving out the plugin the Entry is part of.
 enum Closed<'d> {
     /// The Feature gate it depends on, and whether that gate is on.
     Gate(&'d str, bool),
@@ -2767,10 +2772,14 @@ enum Closed<'d> {
     /// The Entry is in another folder than that of the account the Agent
     /// home is signed in to.
     OtherAccount { signed_in: String },
+    /// The list of the plugins the Agent loads leaves out the plugin the
+    /// Entry is part of.
+    NotListed(NotListed),
 }
 
 /// The first `when` condition of the location of `entry` that does not
-/// hold in the context of the Project with the key `project`.
+/// hold in the context of the Project with the key `project`, or else the
+/// list of the plugins the Agent loads leaving out the Entry's plugin.
 fn closed<'d>(
     definition: &'d AgentDefinition,
     snapshot: &Snapshot,
@@ -2807,6 +2816,10 @@ fn closed<'d>(
                     account_closed(definition, snapshot, entry, project)
                 }
             }
+        })
+        .or_else(|| {
+            let plugin = entry.plugin.as_ref()?;
+            plugin.not_listed.clone().map(Closed::NotListed)
         })
 }
 

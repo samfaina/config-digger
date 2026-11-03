@@ -8,8 +8,8 @@ use crate::definitions::blocks::{
     Disables, DownWalk, EnvMap, FindsBy, FolderMarketplaces, Format, Gate, GateStore, HoldsHere,
     InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder, ListPlugins,
     Locate, Locator, LookUp, Malformed, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn,
-    NonceHash, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginRecord,
-    PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
+    NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList,
+    PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk, Register, Registry,
     RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback, SkillFolder, SkillList,
     Spelling, StoreClass, Unlisted, is_entry_key,
 };
@@ -249,6 +249,8 @@ pub(crate) struct ScannedPlugin {
     /// keeping it out wherever it applies and no switch turns it off. Empty
     /// when none has its name.
     pub winners: Vec<ScannedPlugin>,
+    /// What leaves it out of the plugins the Agent loads, when something does.
+    pub not_listed: Option<NotListed>,
 }
 
 /// A plugin's id, lowercased, and version, as a list's `replaces` compares
@@ -4084,7 +4086,9 @@ impl Scanner<'_> {
                     block.records(text, path)
                 })
             }
-            PluginRegistry::PluginFolders(block) => self.plugin_folders(home, block),
+            PluginRegistry::PluginFolders(block) => {
+                self.plugin_folders(home, block, plugins.id_separator.as_deref())
+            }
             PluginRegistry::InstallationFolders(block) => {
                 self.installation_folders(block, installation_folders)
             }
@@ -4187,6 +4191,7 @@ impl Scanner<'_> {
                 version: record.version,
                 shared_with: Vec::new(),
                 winners: Vec::new(),
+                not_listed: record.not_listed,
             });
         }
         if plugins.same_names_invalid {
@@ -4490,6 +4495,7 @@ impl Scanner<'_> {
                     version: version
                         .file_name()
                         .map(|name| name.to_string_lossy().into_owned()),
+                    not_listed: None,
                 })
             })
             .collect()
@@ -4498,8 +4504,15 @@ impl Scanner<'_> {
     /// A record for each folder at the block's depth that holds the marker,
     /// or with no marker each folder whose name does not start with `.`,
     /// sorted by name within each folder above it, with the version its
-    /// install record gives.
-    fn plugin_folders(&mut self, home: &FoundHome, block: &PluginFolders) -> Vec<PluginRecord> {
+    /// install record gives. With a list of the plugins the Agent loads, a
+    /// folder its folder's list does not name is left out by that list,
+    /// `separator` coming before a row's generation.
+    fn plugin_folders(
+        &mut self,
+        home: &FoundHome,
+        block: &PluginFolders,
+        separator: Option<&str>,
+    ) -> Vec<PluginRecord> {
         let Some(folder) = block.anchor.path(&home.roots, None) else {
             return Vec::new();
         };
@@ -4536,20 +4549,35 @@ impl Scanner<'_> {
                 .map(|(_, child)| child)
                 .collect();
         }
-        parents
-            .iter()
-            .flat_map(|parent| overlaid_folders(fs, &home.roots, parent, block.marker.as_ref()))
-            .filter_map(|(id, child)| {
+        let mut records = Vec::new();
+        for parent in &parents {
+            let listed = block.listed.as_ref().map(|listed| {
+                let path = blocks::join_relative(parent, &listed.file);
+                let folders =
+                    self.listed_folders(home, &path, listed, separator.unwrap_or_default());
+                (path, folders)
+            });
+            for (id, child) in overlaid_folders(fs, &home.roots, parent, block.marker.as_ref()) {
                 if removed.contains(&id.to_lowercase()) {
                     tracing::debug!(plugin = %id, "plugin folder marked for deletion");
-                    return None;
+                    continue;
                 }
+                let not_listed = listed
+                    .as_ref()
+                    .filter(|(_, folders)| !folders.contains(&id.to_lowercase()))
+                    .map(|(list, _)| NotListed {
+                        list: list.clone(),
+                        deleted: block
+                            .listed
+                            .as_ref()
+                            .is_some_and(|listed| listed.deletes_unlisted),
+                    });
                 let linked = block.linked.as_ref().and_then(|linked| {
                     let file = blocks::join_relative(&child, &linked.file);
                     let text = String::from_utf8(fs.read(&file).ok()?).ok()?;
                     linked.target(&text)
                 });
-                Some(PluginRecord {
+                records.push(PluginRecord {
                     version: versions.get(&id).cloned(),
                     folder: linked.as_ref().unwrap_or(&child).display().to_string(),
                     installed: linked.is_some().then(|| child.display().to_string()),
@@ -4557,9 +4585,34 @@ impl Scanner<'_> {
                     name: None,
                     scope: None,
                     project: None,
-                })
-            })
-            .collect()
+                    not_listed,
+                });
+            }
+        }
+        records
+    }
+
+    /// The folder names, lowercased, that the list `listed` at `path` names:
+    /// none when it is missing, and none when it does not parse, which is a
+    /// Read failure.
+    fn listed_folders(
+        &mut self,
+        home: &FoundHome,
+        path: &Path,
+        listed: &PluginList,
+        separator: &str,
+    ) -> BTreeSet<String> {
+        let Some(text) = self.reader.text(home, path, None) else {
+            return BTreeSet::new();
+        };
+        match listed.folders(text, separator) {
+            Ok(folders) => folders,
+            Err(error) => {
+                self.reader
+                    .fail(home, path, None, ReadFailureKind::Parse, error.position);
+                BTreeSet::new()
+            }
+        }
     }
 
     /// A record for each folder that holds the marker in the folder the
@@ -4584,6 +4637,7 @@ impl Scanner<'_> {
                 scope: None,
                 project: None,
                 version: None,
+                not_listed: None,
             })
             .collect()
     }
@@ -4643,6 +4697,7 @@ impl Scanner<'_> {
                     scope: None,
                     project: None,
                     version: Some(version),
+                    not_listed: None,
                 });
             }
         }
@@ -6534,6 +6589,7 @@ mod tests {
                 version: None,
                 shared_with: Vec::new(),
                 winners: Vec::new(),
+                not_listed: None,
             }),
             switch_id: None,
             own_name: None,

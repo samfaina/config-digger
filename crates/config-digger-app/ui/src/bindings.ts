@@ -1845,6 +1845,12 @@ export type ReasonCode =
  */
 "other_account" | 
 /**
+ *  The list of the plugins the Agent loads, such as a Claude Code
+ *  account's `manifest.json`, leaves out the plugin the Entry is part
+ *  of, so the Agent does not load it.
+ */
+"plugin_not_listed" | 
+/**
  *  The Agent reads the Entry's location only for the account it is
  *  signed in to, and the Agent home is signed in to none.
  */

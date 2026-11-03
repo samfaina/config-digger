@@ -384,6 +384,11 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         (
             "claude-code.toml",
+            "plugins[synced]",
+            "`manifest.json` missing, or not parsing",
+        ),
+        (
+            "claude-code.toml",
             "locations[plugin-skills]",
             "while `tengu_slate_wicket` is off",
         ),

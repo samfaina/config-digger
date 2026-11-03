@@ -25,11 +25,47 @@ fn skill_md(name: &str) -> String {
     format!("---\nname: {name}\ndescription: The {name} skill.\n---\n\nDo {name}.\n")
 }
 
+/// The account's `manifest.json`, with `rows` as its `plugins`.
+fn with_account_manifest(fs: FakeFileSystem, rows: Value) -> FakeFileSystem {
+    fs.with_file(
+        in_account("manifest.json"),
+        json!({ "lastUpdated": 1, "plugins": rows }).to_string(),
+    )
+}
+
+/// The synced plugin folder `folder` of [`ACCOUNT`], whose manifest names
+/// it `name`, with the skill `notes` and the server `docs`.
+fn with_plugin_folder(fs: FakeFileSystem, folder: &str, name: &str) -> FakeFileSystem {
+    fs.with_file(
+        in_account(&format!(r"{folder}\.claude-plugin\plugin.json")),
+        json!({ "name": name }).to_string(),
+    )
+    .with_file(
+        in_account(&format!(r"{folder}\skills\notes\SKILL.md")),
+        skill_md("notes"),
+    )
+    .with_file(
+        in_account(&format!(r"{folder}\.mcp.json")),
+        json!({ "mcpServers": { "docs": { "url": format!("https://{name}.example.com/mcp") } } })
+            .to_string(),
+    )
+}
+
 /// A Claude Code home signed in to the claude.ai account of [`ACCOUNT`],
 /// its plugin sync gate cached on, with the synced plugin folder `demo~g3`,
-/// whose manifest names it `demo`, with the skill `notes` and the server
-/// `docs`.
+/// which the account's `manifest.json` lists and whose manifest names it
+/// `demo`, with the skill `notes` and the server `docs`.
 fn synced_home() -> FakeFileSystem {
+    let fs = synced_home_unlisted();
+    with_account_manifest(
+        fs,
+        json!([{ "pluginId": "p1", "name": "demo", "generation": 3 }]),
+    )
+}
+
+/// A Claude Code home signed in to the claude.ai account of [`ACCOUNT`],
+/// its plugin sync gate cached on, with no synced plugin.
+fn signed_in_home() -> FakeFileSystem {
     let account = json!({ "organizationUuid": "org1", "accountUuid": "acct1" });
     let gates = json!({ "tengu_claudeai_plugins_sync_enabled": true });
     FakeFileSystem::new()
@@ -38,6 +74,11 @@ fn synced_home() -> FakeFileSystem {
             json!({ "oauthAccount": account, "cachedGrowthBookFeatures": gates }).to_string(),
         )
         .with_file(in_home(r".claude\.credentials.json"), "not-a-real-secret")
+}
+
+/// [`synced_home`] without the account's `manifest.json`.
+fn synced_home_unlisted() -> FakeFileSystem {
+    signed_in_home()
         .with_file(
             in_account(r"demo~g3\.claude-plugin\plugin.json"),
             json!({ "name": "demo", "version": "1.2.0" }).to_string(),
@@ -166,6 +207,157 @@ fn a_synced_plugins_servers_are_read_only_cloud_mirrors_too() {
     }
 }
 
+/// The path, State and reason code of each Entry of the Item `name`, by path.
+fn by_path(inventory: &Inventory, name: &str) -> Vec<(String, String, String)> {
+    let mut rows = rows_by(inventory, name, "/path");
+    rows.sort();
+    rows
+}
+
+/// What [`plugin_states`] gives for the synced plugin folders of
+/// [`ACCOUNT`] `folders`, each with its State and reason code.
+fn plugin_rows(folders: &[(&str, &str, &str)]) -> Vec<Vec<(String, String, String)>> {
+    let rows = |file: &dyn Fn(&str) -> String| {
+        let mut rows: Vec<_> = folders
+            .iter()
+            .map(|(folder, state, code)| {
+                row(
+                    &in_account(&file(folder)).display().to_string(),
+                    state,
+                    code,
+                )
+            })
+            .collect();
+        rows.sort();
+        rows
+    };
+    vec![
+        rows(&|folder| format!(r"{folder}\.mcp.json")),
+        rows(&|folder| format!(r"{folder}\skills\notes")),
+    ]
+}
+
+/// [`by_path`] for the Items `plugin:<name>:docs` and `<name>:notes`.
+fn plugin_states(inventory: &Inventory, name: &str) -> Vec<Vec<(String, String, String)>> {
+    vec![
+        by_path(inventory, &format!("plugin:{name}:docs")),
+        by_path(inventory, &format!("{name}:notes")),
+    ]
+}
+
+#[test]
+fn a_synced_plugin_folder_the_accounts_manifest_does_not_list_is_unread() {
+    let fs = with_plugin_folder(synced_home(), "stray", "stray");
+
+    let inventory = inventory(&fs);
+
+    assert_eq!(
+        plugin_states(&inventory, "demo"),
+        plugin_rows(&[("demo~g3", "effective", "")])
+    );
+    assert_eq!(
+        plugin_states(&inventory, "stray"),
+        plugin_rows(&[("stray", "unread", "plugin_not_listed")])
+    );
+    let stray = entry_json(&item(&inventory, "stray:notes").entries[0]);
+    assert_eq!(
+        stray["reason"]["sentence"],
+        format!(
+            "Claude Code loads only the plugins that {} lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins.",
+            in_account("manifest.json").display()
+        )
+    );
+    assert_eq!(stray["provenance"], "cloud_mirror");
+    assert_eq!(stray["remove"]["code"], "read_only", "{stray}");
+    assert_eq!(stray["disable"]["code"], "unread", "{stray}");
+    assert_eq!(inventory.read_failures, []);
+}
+
+#[test]
+fn a_rows_generation_of_two_or_more_names_its_folder_after_the_separator() {
+    for (row, listed, unlisted) in [
+        (
+            json!({ "name": "demo", "generation": 2 }),
+            "demo~g2",
+            "demo",
+        ),
+        (
+            json!({ "name": "demo", "generation": 12 }),
+            "demo~g12",
+            "demo~g2",
+        ),
+        (json!({ "name": "demo" }), "demo", "demo~g1"),
+        (
+            json!({ "name": "demo", "generation": 1 }),
+            "demo",
+            "demo~g1",
+        ),
+        (
+            json!({ "name": "demo", "generation": 0 }),
+            "demo",
+            "demo~g0",
+        ),
+        (
+            json!({ "name": "Demo", "generation": 2 }),
+            "demo~G2",
+            "demo~g3",
+        ),
+    ] {
+        let fs = with_account_manifest(signed_in_home(), json!([row]));
+        let fs = with_plugin_folder(with_plugin_folder(fs, listed, "demo"), unlisted, "demo");
+
+        let inventory = inventory(&fs);
+
+        assert_eq!(
+            plugin_states(&inventory, "demo"),
+            plugin_rows(&[
+                (listed, "effective", ""),
+                (unlisted, "unread", "plugin_not_listed"),
+            ]),
+            "{row}"
+        );
+    }
+}
+
+#[test]
+fn without_a_manifest_that_parses_every_synced_plugin_folder_of_the_account_is_unread() {
+    let home = || with_plugin_folder(synced_home_unlisted(), "stray", "stray");
+    let unparsable = home().with_file(in_account("manifest.json"), r#"{ "plugins": [ "#);
+
+    for (fs, failures) in [
+        (home(), vec![]),
+        (unparsable, vec![in_account("manifest.json")]),
+    ] {
+        let inventory = inventory(&fs);
+
+        assert_eq!(
+            [
+                plugin_states(&inventory, "demo"),
+                plugin_states(&inventory, "stray")
+            ]
+            .concat(),
+            [
+                plugin_rows(&[("demo~g3", "unread", "plugin_not_listed")]),
+                plugin_rows(&[("stray", "unread", "plugin_not_listed")]),
+            ]
+            .concat()
+        );
+        let failed: Vec<(PathBuf, String)> = inventory
+            .read_failures
+            .iter()
+            .map(|failure| {
+                let kind = serde_json::to_value(failure.kind).unwrap();
+                (failure.path.clone(), kind.as_str().unwrap().to_owned())
+            })
+            .collect();
+        let expected: Vec<(PathBuf, String)> = failures
+            .into_iter()
+            .map(|path| (path, "parse".to_owned()))
+            .collect();
+        assert_eq!(failed, expected);
+    }
+}
+
 /// The names of every Item of the inventory.
 fn names(inventory: &Inventory) -> Vec<&str> {
     inventory
@@ -185,7 +377,7 @@ fn the_files_claude_code_keeps_beside_synced_plugins_are_no_entries() {
         )
         .with_file(
             in_account("manifest.json"),
-            json!({ "lastUpdated": 1, "plugins": [{ "pluginId": "p1", "name": "demo" }] })
+            json!({ "lastUpdated": 1, "plugins": [{ "pluginId": "p1", "name": "demo", "generation": 3 }] })
                 .to_string(),
         )
         .with_file(in_account(".marketplaces.json"), marketplaces.to_string())
@@ -339,18 +531,22 @@ fn an_installed_plugin_of_the_same_name_shadows_the_synced_one_whole() {
 
 #[test]
 fn a_synced_plugin_kept_out_whole_shadows_no_server_of_its_endpoint() {
-    let fs = with_installed_demo(synced_home())
+    let rows = json!([
+        { "name": "demo", "generation": 3 },
+        { "name": "other", "generation": 1 },
+    ]);
+    let fs = with_installed_demo(with_account_manifest(synced_home(), rows))
         .with_file(
             in_account(r"demo~g3\.claude-plugin\plugin.json"),
             json!({ "name": "demo", "mcpServers": { "alpha": { "command": "shared-tool" } } })
                 .to_string(),
         )
         .with_file(
-            in_account(r"other~g1\.claude-plugin\plugin.json"),
+            in_account(r"other\.claude-plugin\plugin.json"),
             json!({ "name": "other" }).to_string(),
         )
         .with_file(
-            in_account(r"other~g1\.mcp.json"),
+            in_account(r"other\.mcp.json"),
             json!({ "mcpServers": { "zeta": { "command": "shared-tool" } } }).to_string(),
         );
 

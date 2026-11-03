@@ -1954,6 +1954,19 @@ pub(crate) struct PluginRecord {
     pub project: Option<String>,
     /// Its version, as recorded.
     pub version: Option<String>,
+    /// What leaves it out of the plugins the Agent loads, when something does.
+    pub not_listed: Option<NotListed>,
+}
+
+/// A plugin the file listing the plugins the Agent loads leaves out, so
+/// that the Agent does not load it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NotListed {
+    /// The file, such as a Claude Code account's `manifest.json`.
+    pub list: PathBuf,
+    /// Whether the Agent deletes the plugin's folder the next time it
+    /// updates its plugins.
+    pub deleted: bool,
 }
 
 /// Lists the plugins an Agent installed.
@@ -2241,6 +2254,65 @@ pub(crate) struct PluginFolders {
     /// marked for deletion, such as VS Code's `.obsolete`: they hold no
     /// plugin.
     pub removals: Option<String>,
+    /// A file in the folder the plugins' folders are in that lists the
+    /// plugins the Agent loads, such as the `manifest.json` of each of
+    /// Claude Code's accounts. Without it, the Agent loads every plugin.
+    pub listed: Option<PluginList>,
+}
+
+/// A strict JSON file in the folder the plugins' folders are in, such as a
+/// Claude Code account's `manifest.json`, whose rows name the folders of
+/// the plugins the Agent loads: a row's folder is its name, or with a
+/// generation of 2 or more, its name, the plugins' `id_separator` and its
+/// generation, such as `demo~g2`. A row whose name is no string names no
+/// folder, and one whose generation is no whole number is taken to have
+/// none. The Agent loads no plugin of a folder no row names, the file
+/// being missing or not parsing too, and the plugin's Entries are Unread.
+/// Folder names are compared as Windows compares them, without regard to
+/// case.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginList {
+    /// A `/`-separated path relative to the folder the plugins' folders
+    /// are in.
+    pub file: String,
+    /// The key path of the array of rows.
+    pub root: Vec<String>,
+    /// The field of a row that holds the plugin's name.
+    pub name: String,
+    /// The field of a row that holds the plugin's generation.
+    pub generation: String,
+    /// Whether the Agent deletes the folder of a plugin no row names the
+    /// next time it updates its plugins, as Claude Code's next sync round
+    /// does.
+    #[serde(default)]
+    pub deletes_unlisted: bool,
+}
+
+impl PluginList {
+    /// The folder names, lowercased, that the rows of the file's text
+    /// `text` name, a row's generation following `separator`.
+    pub fn folders(&self, text: &str, separator: &str) -> Result<BTreeSet<String>, ParseError> {
+        let document = JsonFormat::STRICT.parse(text)?;
+        let rows = self
+            .root
+            .iter()
+            .try_fold(&document, |value, key| value.get(key));
+        let Some(Value::Array(rows)) = rows else {
+            return Ok(BTreeSet::new());
+        };
+        Ok(rows
+            .iter()
+            .filter_map(|row| {
+                let name = row.get(&self.name)?.as_str()?;
+                let folder = match row.get(&self.generation).and_then(Value::as_u64) {
+                    Some(generation) if generation >= 2 => format!("{name}{separator}{generation}"),
+                    _ => name.to_owned(),
+                };
+                Some(folder.to_lowercase())
+            })
+            .collect())
+    }
 }
 
 /// A strict JSON file in a plugin's folder, such as the
@@ -2312,6 +2384,13 @@ impl Validate for PluginFolders {
         }
         if let Some(removals) = &self.removals {
             validate_relative(removals)?;
+        }
+        if let Some(listed) = &self.listed {
+            validate_relative(&listed.file)?;
+            validate_key_path(&listed.root)?;
+            if listed.name.is_empty() || listed.generation.is_empty() {
+                return Err("a plugin list needs its name and generation fields".into());
+            }
         }
         if let Some(linked) = &self.linked {
             validate_relative(&linked.file)?;
@@ -2698,6 +2777,7 @@ impl JsonPluginRecords {
                     scope: text_of(record, self.scope.as_ref()),
                     project: text_of(record, self.project.as_ref()),
                     version: text_of(record, self.version.as_ref()),
+                    not_listed: None,
                 });
             }
         }
@@ -2790,6 +2870,7 @@ impl JsonPluginList {
                     scope: None,
                     project: None,
                     version: text_of(item, self.version.as_ref()),
+                    not_listed: None,
                 })
             })
             .collect())

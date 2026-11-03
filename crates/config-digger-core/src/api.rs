@@ -2620,6 +2620,10 @@ pub enum ReasonCode {
     /// The Entry is in the folder of another account than the one the
     /// Agent home is signed in to, which alone the Agent reads.
     OtherAccount,
+    /// The list of the plugins the Agent loads, such as a Claude Code
+    /// account's `manifest.json`, leaves out the plugin the Entry is part
+    /// of, so the Agent does not load it.
+    PluginNotListed,
     /// The Agent reads the Entry's location only for the account it is
     /// signed in to, and the Agent home is signed in to none.
     NotSignedIn,

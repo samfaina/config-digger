@@ -743,7 +743,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 1,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -2479,9 +2479,9 @@ export const fixtures: Fixtures = {
             "state": "effective",
             "entries": [
               {
-                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "key_path": [],
-                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "scope": "user",
                 "provenance": "cloud_mirror",
                 "skill_manager": null,
@@ -2490,7 +2490,7 @@ export const fixtures: Fixtures = {
                   "name": "cd-throwaway-synced",
                   "scope": null,
                   "version": null,
-                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1"
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
                 },
                 "git_versioned": false,
                 "link": null,
@@ -2509,6 +2509,71 @@ export const fixtures: Fixtures = {
                   "status": "not_offered",
                   "code": "read_only",
                   "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
                 },
                 "enable": null,
                 "remove": {
@@ -3848,7 +3913,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 1,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -6127,9 +6192,9 @@ export const fixtures: Fixtures = {
             "state": "effective",
             "entries": [
               {
-                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "key_path": [],
-                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "scope": "user",
                 "provenance": "cloud_mirror",
                 "skill_manager": null,
@@ -6138,7 +6203,7 @@ export const fixtures: Fixtures = {
                   "name": "cd-throwaway-synced",
                   "scope": null,
                   "version": null,
-                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1"
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
                 },
                 "git_versioned": false,
                 "link": null,
@@ -6157,6 +6222,71 @@ export const fixtures: Fixtures = {
                   "status": "not_offered",
                   "code": "read_only",
                   "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
                 },
                 "enable": null,
                 "remove": {
@@ -7959,7 +8089,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 1,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -9967,9 +10097,9 @@ export const fixtures: Fixtures = {
             "state": "effective",
             "entries": [
               {
-                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "key_path": [],
-                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1\\skills\\cd-throwaway-synced-skill",
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
                 "scope": "user",
                 "provenance": "cloud_mirror",
                 "skill_manager": null,
@@ -9978,7 +10108,7 @@ export const fixtures: Fixtures = {
                   "name": "cd-throwaway-synced",
                   "scope": null,
                   "version": null,
-                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g1"
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
                 },
                 "git_versioned": false,
                 "link": null,
@@ -9997,6 +10127,71 @@ export const fixtures: Fixtures = {
                   "status": "not_offered",
                   "code": "read_only",
                   "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
                 },
                 "enable": null,
                 "remove": {
@@ -12216,7 +12411,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 1,
+            "entries": 2,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -13929,7 +14124,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 1,
+              "entries": 2,
               "notes": [
                 {
                   "code": "cloud_connectors_not_on_disk",
@@ -14234,7 +14429,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-a44",
+      "id": "20261001-120000-8fa",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14260,7 +14455,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-5bd",
+      "id": "20261001-120000-0aa",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14283,10 +14478,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa"
     },
     {
-      "id": "20261001-120000-1a5",
+      "id": "20261001-120000-080",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -14314,7 +14509,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-a44",
+        "id": "20261001-120000-8fa",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -14774,7 +14969,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -14794,7 +14989,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -14813,7 +15008,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -14822,7 +15017,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-5bd",
+        "id": "20261001-120000-0aa",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -14845,7 +15040,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa"
       },
       "project": null,
       "changes": [
@@ -15282,7 +15477,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -15320,16 +15515,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -15344,7 +15539,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-1a5",
+        "id": "20261001-120000-080",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -15803,7 +15998,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -15823,7 +16018,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -15836,10 +16031,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-1a5",
+          "operation": "20261001-120000-080",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml"
         }
       ]
     },
@@ -15847,10 +16042,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-a44",
+          "operation": "20261001-120000-8fa",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json"
         }
       ]
     }
@@ -20626,14 +20821,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-a44"
+        "operation": "20261001-120000-8fa"
       },
       "preview": {
         "plan_id": "plan-53",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-a44 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-a44",
+          "title": "Undo 20261001-120000-8fa \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-8fa",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -20689,15 +20884,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-a44"
+        "operation": "20261001-120000-8fa"
       },
       "preview": {
         "plan_id": "plan-54",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-a44 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-8fa \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-a44",
+          "backup_of": "20261001-120000-8fa",
           "project": null,
           "changes": [],
           "effective": [],
@@ -20705,11 +20900,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-a44",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-a44 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8fa",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-8fa can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -20718,15 +20913,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-5bd"
+        "operation": "20261001-120000-0aa"
       },
       "preview": {
         "plan_id": "plan-55",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-5bd \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-0aa \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-5bd",
+          "backup_of": "20261001-120000-0aa",
           "project": null,
           "changes": [],
           "effective": [],
@@ -20734,10 +20929,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5bd",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-5bd can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-0aa",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-0aa can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -20746,14 +20941,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-1a5"
+        "operation": "20261001-120000-080"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-1a5 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-1a5",
+          "title": "Undo 20261001-120000-080 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-080",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -21239,15 +21434,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-1a5"
+        "operation": "20261001-120000-080"
       },
       "preview": {
         "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-1a5 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-080 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-1a5",
+          "backup_of": "20261001-120000-080",
           "project": null,
           "changes": [],
           "effective": [],
@@ -21255,10 +21450,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-1a5 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-080 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -21268,11 +21463,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-1a5",
+      "operation": "20261001-120000-080",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-1a5",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-1a5: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-080",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-080: verified.",
       "hints": []
     }
   },
@@ -21320,8 +21515,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "3a1403b",
-    "date": "2026-11-02",
+    "commit": "ce2c1a8",
+    "date": "2026-11-03",
     "platform": "Windows x64",
     "pages": [
       {

@@ -702,11 +702,16 @@ fn a_variable_in_the_remote_settings_env_bypasses_the_cache() {
 const PLUGIN_SYNC_GATE: &str = "tengu_claudeai_plugins_sync_enabled";
 
 /// A Claude Code home whose `~/.claude.json` is `state`, signed in, with
-/// the plugin `demo` synced from claude.ai, carrying the skill `notes` and
-/// the server `docs`.
+/// the plugin `demo` synced from claude.ai, which the account's
+/// `manifest.json` lists, carrying the skill `notes` and the server `docs`.
 fn synced_plugin_home(state: &Value) -> FakeFileSystem {
-    let plugin = in_home(r".claude\plugins\synced\org1_acct1\demo~g3");
+    let account = in_home(r".claude\plugins\synced\org1_acct1");
+    let plugin = account.join("demo~g3");
     let fs = signed_in(state)
+        .with_file(
+            account.join("manifest.json"),
+            json!({ "plugins": [{ "name": "demo", "generation": 3 }] }).to_string(),
+        )
         .with_file(
             plugin.join(r".claude-plugin\plugin.json"),
             json!({ "name": "demo" }).to_string(),

@@ -333,10 +333,9 @@ try {
   const offline = { HTTPS_PROXY: closedPort, HTTP_PROXY: closedPort, NO_PROXY: "127.0.0.1" };
   const keptPluginsGate = cachedGate(pluginsGate);
   cacheGate(true, pluginsGate);
-  // The folder `<name>~g<n>` from 2.1.310, `<name>` before, as the
-  // account's own synced plugins have it.
-  const listedPlugins = fs.existsSync(path.join(pluginBucket, "manifest.json")) ? json(path.join(pluginBucket, "manifest.json")).plugins : [];
-  const generation = listedPlugins.some((x) => "generation" in x) ? 1 : undefined;
+  // Generation 2, the folder `<name>~g2`, as the account's own synced
+  // plugins have it; no version writes `<name>~g1` (#494).
+  const generation = 2;
   syncedPlugin(pluginBucket, "cd-throwaway-synced", { generation, skills: ["cd-throwaway-pskill"] });
   syncedPlugin(otherPlugins, "cd-throwaway-elsewhere", { generation });
   // What a session read of the account's: its synced skills, and the
@@ -353,7 +352,7 @@ try {
   });
 
   await p.check("plugins[synced]", "a synced plugin is read only while the gate `tengu_claudeai_plugins_sync_enabled` is on: not while it is held off, cached off or not cached at all, and only one the account's `manifest.json` lists", async () => {
-    const unlisted = path.join(pluginBucket, generation === undefined ? "cd-throwaway-unlisted" : "cd-throwaway-unlisted~g1");
+    const unlisted = path.join(pluginBucket, `cd-throwaway-unlisted~g${generation}`);
     write(path.join(unlisted, ".claude-plugin", "plugin.json"), { name: "cd-throwaway-unlisted", version: "1.0.0" });
     const loaded = async (env) => (await session({ env })).plugins.filter((n) => n.startsWith("cd-throwaway"));
     const heldOff = await loaded({ ...offline, ...noFetch });

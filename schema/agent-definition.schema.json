@@ -2207,6 +2207,17 @@
                 "null"
               ]
             },
+            "listed": {
+              "description": "A file in the folder the plugins' folders are in that lists the\nplugins the Agent loads, such as the `manifest.json` of each of\nClaude Code's accounts. Without it, the Agent loads every plugin.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginList"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "block": {
               "type": "string",
               "const": "plugin-folders"
@@ -2524,6 +2535,46 @@
         "folder",
         "kind_field",
         "kind"
+      ]
+    },
+    "PluginList": {
+      "description": "A strict JSON file in the folder the plugins' folders are in, such as a\nClaude Code account's `manifest.json`, whose rows name the folders of\nthe plugins the Agent loads: a row's folder is its name, or with a\ngeneration of 2 or more, its name, the plugins' `id_separator` and its\ngeneration, such as `demo~g2`. A row whose name is no string names no\nfolder, and one whose generation is no whole number is taken to have\nnone. The Agent loads no plugin of a folder no row names, the file\nbeing missing or not parsing too, and the plugin's Entries are Unread.\nFolder names are compared as Windows compares them, without regard to\ncase.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "A `/`-separated path relative to the folder the plugins' folders\nare in.",
+          "type": "string"
+        },
+        "root": {
+          "description": "The key path of the array of rows.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "description": "The field of a row that holds the plugin's name.",
+          "type": "string"
+        },
+        "generation": {
+          "description": "The field of a row that holds the plugin's generation.",
+          "type": "string"
+        },
+        "deletes_unlisted": {
+          "description": "Whether the Agent deletes the folder of a plugin no row names the\nnext time it updates its plugins, as Claude Code's next sync round\ndoes.",
+          "type": "boolean",
+          "default": false
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "root",
+        "name",
+        "generation"
       ]
     },
     "PluginNames": {
