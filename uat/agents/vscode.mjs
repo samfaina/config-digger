@@ -543,6 +543,18 @@ if (runs("manifests")) {
 // `.claude-plugin\plugin.json`; `sc`, whose root `plugin.json` has an
 // Open Plugins `$schema` and a `name` with spaces around it, beside a
 // `.plugin\plugin.json` of another name; and `nm`, with no manifest.
+// #548's Open Plugins plugins, repos of their own too, whose root
+// `plugin.json` has an Open Plugins `$schema`: `op`, with an `mcp.json`, a
+// top-level `mcpServers` in that manifest and a `.plugin\plugin.json`
+// whose `mcpServers` names a file; `cs`, `cl`, `cq`, `ci`, `cx` and `co`,
+// whose `extensions["com.github.copilot"].mcpServers` names
+// `./servers.json`, lists it padded beside an empty path, names it in
+// `paths`, holds a server inline, names it `exclusive` and names
+// `../servers.json`, each beside an `mcp.json` and a `servers.json` at the
+// root and in `com.github.copilot`; `cw`, whose `mcp.json` and
+// `com.github.copilot\servers.json` name one server; `ol`, whose two files
+// are links, one leaving the plugin's folder; and `pr`, whose `mcp.json`
+// server takes `${PLUGIN_ROOT}` and other references in its arguments.
 // `tests/vscode.rs` reads the same plugins.
 if (runs("broken-manifest")) {
   const dir = fresh("broken-manifest", base);
@@ -577,6 +589,48 @@ if (runs("broken-manifest")) {
     ".plugin/plugin.json": manifest("sc-open"),
   });
   lay("nm", {});
+  const openManifest = (tag, extra = {}) => ({ $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json", ...manifest(tag), ...extra });
+  lay("op", {
+    "plugin.json": openManifest("op", { mcpServers: { "cd-throwaway-op-top": server("op-top") } }),
+    "mcp.json": dotMcp("op-mcp"),
+    ".plugin/plugin.json": manifest("op-open", { mcpServers: "./open.json" }),
+    "open.json": dotMcp("op-open"),
+  });
+  const copilot = {
+    cs: "./servers.json",
+    cl: [" ./servers.json ", ""],
+    cq: { paths: ["./servers.json"] },
+    ci: { "cd-throwaway-ci-inline": server("ci-inline") },
+    cx: { paths: ["./servers.json"], exclusive: true },
+    co: "../servers.json",
+    cw: "./servers.json",
+    ol: "./servers.json",
+  };
+  const copilotManifest = (tag, mcpServers) => openManifest(tag, { extensions: { "com.github.copilot": { mcpServers } } });
+  for (const [tag, mcpServers] of Object.entries(copilot)) {
+    lay(tag, {
+      "plugin.json": copilotManifest(tag, mcpServers),
+      "mcp.json": dotMcp(`${tag}-mcp`),
+      "servers.json": dotMcp(`${tag}-root`),
+      "com.github.copilot/servers.json": dotMcp(`${tag}-copilot`),
+    });
+  }
+  // `cw`'s two files name one server; `ol`'s `mcp.json` links to a file
+  // beside its folder, and its `com.github.copilot\servers.json` to one at
+  // its root.
+  write(path.join(repo("cw"), "mcp.json"), { mcpServers: { "cd-throwaway-cw-same": server("cw-mcp") } });
+  write(path.join(repo("cw"), "com.github.copilot", "servers.json"), { mcpServers: { "cd-throwaway-cw-same": server("cw-copilot") } });
+  write(path.join(repo("ol"), "..", "ol-outside.json"), dotMcp("ol-outside"));
+  write(path.join(repo("ol"), "inside.json"), dotMcp("ol-inside"));
+  for (const [link, target] of [["mcp.json", "../ol-outside.json"], ["com.github.copilot/servers.json", "../inside.json"]]) {
+    fs.rmSync(path.join(repo("ol"), link));
+    fs.symlinkSync(target, path.join(repo("ol"), link), "file");
+  }
+  // `pr`'s `mcp.json` server takes the plugin's folder in its arguments.
+  lay("pr", {
+    "plugin.json": openManifest("pr"),
+    "mcp.json": { mcpServers: { "cd-throwaway-pr-root": server("pr-root", { args: [script, "pr-root", "${PLUGIN_ROOT}", "${CLAUDE_PLUGIN_ROOT}", "${CD_PROBE_BARE}"] }) } },
+  });
   const listedFolders = marketplace(plugins, [
     ["listed", { "plugin.json": manifest("listed-manifest"), ".mcp.json": dotMcp("listed-dot") }],
     ["unlisted", { "plugin.json": manifest("unlisted-manifest"), ".mcp.json": dotMcp("unlisted-dot") }],
@@ -622,6 +676,13 @@ if (runs("broken-manifest")) {
   for (const tag of ["nn", "bn", "an", "sc", "nm"]) {
     const name = fromMinor(141) ? `cd-throwaway-${tag}-item` : (unlistedNames[tag] ?? `cd-throwaway-${tag}-item`);
     installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: ` ${label(tag)} `, name });
+  }
+  // Each item names an Open Plugins plugin as each version does: 1.129.1,
+  // which has no such format, by `op`'s `.plugin\plugin.json` and the other
+  // plugins' `plugin.json`, and 1.135.0 by the `$schema` manifest's `name`.
+  for (const tag of ["op", "pr", ...Object.keys(copilot)]) {
+    const name = tag === "op" && !fromMinor(135) ? "cd-throwaway-op-open" : `cd-throwaway-${tag}`;
+    installed.installed.push({ pluginUri: fileUri(repo(tag)), marketplace: label(tag), name });
   }
   write(path.join(plugins, "installed.json"), installed);
   const seen = await launch(dir, fresh("proj", dir));
@@ -672,12 +733,53 @@ if (runs("broken-manifest")) {
   // Found beside #531's checks: config-digger reads such a plugin's
   // `.mcp.json`, which VS Code does not, reading an Open Plugins plugin's
   // servers from `mcp.json` [binary].
-  await p.check("locations[plugin-mcp]", "the `.mcp.json` server of a plugin whose root `plugin.json` has an Open Plugins `$schema` does not start from 1.135.0 on; on 1.129.1, which takes the `.plugin\plugin.json`, it does", async () =>
+  await p.check("locations[plugin-mcp]", "the `.mcp.json` server of a plugin whose root `plugin.json` has an Open Plugins `$schema` does not start from 1.135.0 on; on 1.129.1, which takes the `.plugin\\plugin.json`, it does", async () =>
     same(unlisted("sc", []).servers, fromMinor(135) ? [] : ["sc-dot"]),
   );
   await p.check("plugins[agent-plugins]", "VS Code does not load a plugin of a marketplace with no list that has no manifest: neither its servers nor its skills", async () =>
     same(unlisted("nm", [label("nm"), "nm", "cd-throwaway-nm-item"]), { names: [], servers: [] }),
   );
+  // #548: from 1.135.0 an Open Plugins plugin's servers file is `mcp.json`,
+  // and `extensions["com.github.copilot"].mcpServers` takes the place of
+  // every manifest's `mcpServers`, its paths read in `com.github.copilot`
+  // [binary]. 1.129.1 reads such a plugin as any other.
+  const started = (tag) => seen.tags.filter((t) => t.startsWith(`${tag}-`)).sort();
+  await p.check("locations[open-plugin-mcp]", "an Open Plugins plugin starts its `mcp.json`'s server from 1.135.0 on, and neither its `.mcp.json`'s, nor its root manifest's top-level `mcpServers`, nor the file its `.plugin\\plugin.json`'s `mcpServers` names; 1.129.1 starts the `.mcp.json`'s and that file's", async () =>
+    same({ op: started("op"), names: plugin("op").names }, fromMinor(135) ? { op: ["op-mcp"], names: ["cd-throwaway-op"] } : { op: ["op-dot", "op-open"], names: ["cd-throwaway-op-open"] }),
+  );
+  await p.check("locations[open-plugin-manifest-mcp]", "a path in an Open Plugins plugin's `extensions[\"com.github.copilot\"].mcpServers` names a file in its `com.github.copilot` folder, whose server starts beside the `mcp.json`'s, from 1.135.0 on; 1.129.1 starts the `.mcp.json`'s alone", async () =>
+    same(started("cs"), fromMinor(135) ? ["cs-copilot", "cs-mcp"] : ["cs-dot"]),
+  );
+  await p.check("locations[open-plugin-manifest-mcp]", "an inline object in `extensions[\"com.github.copilot\"].mcpServers` takes the place of the `mcp.json` from 1.135.0 on", async () =>
+    same(started("ci"), fromMinor(135) ? ["ci-inline"] : ["ci-dot"]),
+  );
+  await p.check("locations[open-plugin-manifest-mcp]", "`{ paths, exclusive: true }` in `extensions[\"com.github.copilot\"].mcpServers` reads the named file in `com.github.copilot` without the `mcp.json` from 1.135.0 on", async () =>
+    same(started("cx"), fromMinor(135) ? ["cx-copilot"] : ["cx-dot"]),
+  );
+  await p.check("locations[open-plugin-manifest-mcp]", "a path in `extensions[\"com.github.copilot\"].mcpServers` that leaves `com.github.copilot`, `../servers.json`, names no file: only the `mcp.json`'s server starts from 1.135.0 on", async () =>
+    same(started("co"), fromMinor(135) ? ["co-mcp"] : ["co-dot"]),
+  );
+  await p.check("locations[open-plugin-manifest-mcp]", "a list's paths and `{ paths }`'s in `extensions[\"com.github.copilot\"].mcpServers` name files in `com.github.copilot` read after the `mcp.json`, each trimmed, an empty one naming no file, from 1.135.0 on", async () =>
+    same({ cl: started("cl"), cq: started("cq") }, fromMinor(135) ? { cl: ["cl-copilot", "cl-mcp"], cq: ["cq-copilot", "cq-mcp"] } : { cl: ["cl-dot"], cq: ["cq-dot"] }),
+  );
+  await p.check("locations[open-plugin-mcp]", "of a server an Open Plugins plugin's `mcp.json` and a file in `com.github.copilot` both name, the `mcp.json`'s starts, from 1.135.0 on", async () =>
+    same(started("cw"), fromMinor(135) ? ["cw-mcp"] : ["cw-dot"]),
+  );
+  await p.check("locations[open-plugin-mcp]", "VS Code reads an Open Plugins plugin's `mcp.json` and the files `com.github.copilot` names only while their real path stays in the plugin's folder: an `mcp.json` linked to a file beside the folder adds nothing, a `com.github.copilot\\servers.json` linked to a file at its root starts, from 1.135.0 on", async () =>
+    same(started("ol"), fromMinor(135) ? ["ol-inside"] : ["ol-dot"]),
+  );
+  // VS Code writes the folder as the URI's `fsPath`, its drive in lower
+  // case, so the arguments are compared in lower case.
+  await p.check("locations[open-plugin-mcp]", "in an Open Plugins plugin's server, VS Code leaves `${CLAUDE_PLUGIN_ROOT}` and a bare `${CD_PROBE_BARE}` as written from 1.135.0 on, and `${PLUGIN_ROOT}` on 1.135.0, which 1.141.0 and later replace with the plugin's folder", async () => {
+    const args = seen.started["pr-root"]?.args.map((a) => a.toLowerCase());
+    const root = fromMinor(141) ? repo("pr").toLowerCase() : "${plugin_root}";
+    return same(
+      { started: started("pr"), args },
+      fromMinor(135)
+        ? { started: ["pr-root"], args: [root, "${claude_plugin_root}", "${cd_probe_bare}"] }
+        : { started: ["pr-dot"], args: undefined },
+    );
+  });
 }
 
 // ---------------------------------------------------------------- a plugin VS Code installs from a marketplace

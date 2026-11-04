@@ -577,7 +577,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 4,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -3110,6 +3110,126 @@ export const fixtures: Fixtures = {
             "agent": "vscode",
             "home": "default",
             "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
             "name": "cd-throwaway-vsplugin-server",
             "state": "effective",
             "entries": [
@@ -4067,7 +4187,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 4,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -7462,6 +7582,126 @@ export const fixtures: Fixtures = {
             "agent": "vscode",
             "home": "default",
             "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
             "name": "cd-throwaway-project",
             "state": "blocked",
             "entries": [
@@ -8719,7 +8959,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 4,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -11763,6 +12003,126 @@ export const fixtures: Fixtures = {
             "agent": "vscode",
             "home": "default",
             "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
             "name": "cd-throwaway-vsplugin-server",
             "state": "effective",
             "entries": [
@@ -13803,7 +14163,7 @@ export const fixtures: Fixtures = {
             "installations": [],
             "out_of_range": false,
             "last_ran": null,
-            "entries": 2,
+            "entries": 4,
             "notes": [
               {
                 "code": "no_installation_found",
@@ -15552,7 +15912,7 @@ export const fixtures: Fixtures = {
               "installations": [],
               "out_of_range": false,
               "last_ran": null,
-              "entries": 2,
+              "entries": 4,
               "notes": [
                 {
                   "code": "no_installation_found",
@@ -15692,7 +16052,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-8a0",
+      "id": "20261001-120000-315",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15718,7 +16078,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-620",
+      "id": "20261001-120000-4ee",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15741,10 +16101,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee"
     },
     {
-      "id": "20261001-120000-c0f",
+      "id": "20261001-120000-3db",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -15772,7 +16132,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-8a0",
+        "id": "20261001-120000-315",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -16232,7 +16592,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -16252,7 +16612,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -16271,7 +16631,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -16280,7 +16640,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-620",
+        "id": "20261001-120000-4ee",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -16303,7 +16663,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee"
       },
       "project": null,
       "changes": [
@@ -16740,7 +17100,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -16778,16 +17138,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -16802,7 +17162,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-c0f",
+        "id": "20261001-120000-3db",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -17261,7 +17621,7 @@ export const fixtures: Fixtures = {
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -17281,7 +17641,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -17294,10 +17654,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-c0f",
+          "operation": "20261001-120000-3db",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db\\1-config.toml"
         }
       ]
     },
@@ -17305,10 +17665,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-8a0",
+          "operation": "20261001-120000-315",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315\\2-manifest.json"
         }
       ]
     }
@@ -23232,14 +23592,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-8a0"
+        "operation": "20261001-120000-315"
       },
       "preview": {
         "plan_id": "plan-56",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-8a0 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-8a0",
+          "title": "Undo 20261001-120000-315 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-315",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -23295,15 +23655,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-8a0"
+        "operation": "20261001-120000-315"
       },
       "preview": {
         "plan_id": "plan-57",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-8a0 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-315 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-8a0",
+          "backup_of": "20261001-120000-315",
           "project": null,
           "changes": [],
           "effective": [],
@@ -23311,11 +23671,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-8a0",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-8a0 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-315",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-315 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -23324,15 +23684,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-620"
+        "operation": "20261001-120000-4ee"
       },
       "preview": {
         "plan_id": "plan-58",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-620 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-4ee \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-620",
+          "backup_of": "20261001-120000-4ee",
           "project": null,
           "changes": [],
           "effective": [],
@@ -23340,10 +23700,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-620",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-620 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-4ee",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-4ee can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -23352,14 +23712,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-c0f"
+        "operation": "20261001-120000-3db"
       },
       "preview": {
         "plan_id": "plan-59",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-c0f \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-c0f",
+          "title": "Undo 20261001-120000-3db \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-3db",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -23845,15 +24205,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-c0f"
+        "operation": "20261001-120000-3db"
       },
       "preview": {
         "plan_id": "plan-60",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-c0f \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-3db \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-c0f",
+          "backup_of": "20261001-120000-3db",
           "project": null,
           "changes": [],
           "effective": [],
@@ -23861,10 +24221,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-c0f can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-3db can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -23874,11 +24234,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-c0f",
+      "operation": "20261001-120000-3db",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c0f",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-c0f: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-3db",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-3db: verified.",
       "hints": []
     }
   },
@@ -23926,8 +24286,8 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "af1046f",
-    "date": "2026-11-03",
+    "commit": "83fa40d",
+    "date": "2026-11-04",
     "platform": "Windows x64",
     "pages": [
       {

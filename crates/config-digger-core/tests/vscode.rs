@@ -2693,6 +2693,243 @@ fn a_manifest_s_paths_are_trimmed_and_an_empty_one_names_no_file() {
     }
 }
 
+/// The `$schema` of an Open Plugins manifest.
+const OPEN_PLUGINS_SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
+
+/// A file of servers holding only `cd-throwaway-<server>`.
+fn servers_file(server: &str) -> String {
+    format!(r#"{{ "mcpServers": {{ "cd-throwaway-{server}": {{ "command": "x" }} }} }}"#)
+}
+
+/// The plugin `tag` of a repo of the probe's with no list, as its
+/// `broken-manifest` launch lays it, whose root `plugin.json` is `manifest`,
+/// with `files` beside it: its server Entries, each `<name> <state> <file
+/// name>`, sorted, and the Read failures of its folder. It also holds a
+/// `.mcp.json` with the server `cd-throwaway-<tag>-dot`.
+fn repo_servers(tag: &str, manifest: &str, files: &[(&str, &str)]) -> (Vec<String>, Vec<PathBuf>) {
+    let mut manifests = vec![("plugin.json", manifest)];
+    manifests.extend_from_slice(files);
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(tag, &repo_marketplace(tag), &manifests)],
+    );
+    let inventory = inventory(&fs);
+    let folder = market_clone().with_file_name(tag);
+    let failures = inventory
+        .read_failures
+        .iter()
+        .filter(|failure| failure.path.starts_with(&folder))
+        .map(|failure| failure.path.clone())
+        .collect();
+    (plugin_server_states(&inventory), failures)
+}
+
+/// An Open Plugins plugin's root `plugin.json`, `fields` after its
+/// `$schema` and `name`.
+fn open_manifest(tag: &str, fields: &str) -> String {
+    format!(r#"{{ "$schema": "{OPEN_PLUGINS_SCHEMA}", "name": "cd-throwaway-{tag}"{fields} }}"#)
+}
+
+/// An Open Plugins plugin's root `plugin.json` whose
+/// `extensions["com.github.copilot"].mcpServers` holds `mcp_servers`.
+fn copilot_manifest(tag: &str, mcp_servers: &str) -> String {
+    open_manifest(
+        tag,
+        &format!(
+            r#", "extensions": {{ "com.github.copilot": {{ "mcpServers": {mcp_servers} }} }}"#
+        ),
+    )
+}
+
+#[test]
+fn an_open_plugins_plugin_s_servers_come_from_its_mcp_json_not_its_dot_mcp_json_nor_a_manifest_s_mcp_servers()
+ {
+    // The probe's `op`: the root manifest's own `mcpServers` and
+    // `.plugin\plugin.json`'s, which other plugins read, add nothing.
+    let manifest = open_manifest(
+        "op",
+        r#", "mcpServers": { "cd-throwaway-op-top": { "command": "x" } }"#,
+    );
+    let (mcp, open, file) = (
+        servers_file("op-mcp"),
+        servers_file("op-open"),
+        servers_file("op-file"),
+    );
+    let dot_plugin_manifest = r#"{ "name": "cd-throwaway-op-open", "mcpServers": "./open.json" }"#;
+
+    let (servers, failures) = repo_servers(
+        "op",
+        &manifest,
+        &[
+            ("mcp.json", &mcp),
+            (".plugin/plugin.json", dot_plugin_manifest),
+            ("open.json", &open),
+            ("servers.json", &file),
+        ],
+    );
+
+    assert_eq!(servers, ["cd-throwaway-op-mcp effective mcp.json"]);
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+/// The Open Plugins plugin `tag`, whose
+/// `extensions["com.github.copilot"].mcpServers` holds `mcp_servers`,
+/// beside an `mcp.json` with `cd-throwaway-<tag>-mcp`, and a
+/// `servers.json` at its root with `cd-throwaway-<tag>-root` and in
+/// `com.github.copilot` with `cd-throwaway-<tag>-copilot`: its server
+/// Entries and Read failures, as `repo_servers` gives them.
+fn copilot_servers(tag: &str, mcp_servers: &str) -> (Vec<String>, Vec<PathBuf>) {
+    let mcp = servers_file(&format!("{tag}-mcp"));
+    let root = servers_file(&format!("{tag}-root"));
+    let copilot = servers_file(&format!("{tag}-copilot"));
+    repo_servers(
+        tag,
+        &copilot_manifest(tag, mcp_servers),
+        &[
+            ("mcp.json", &mcp),
+            ("servers.json", &root),
+            ("com.github.copilot/servers.json", &copilot),
+        ],
+    )
+}
+
+#[test]
+fn an_open_plugins_plugin_s_server_file_is_read_only_while_its_real_path_stays_in_the_plugin() {
+    // `mcp.json` links to a file beside the plugin's folder, and
+    // `com.github.copilot\servers.json` to one at the plugin's root.
+    let folder = market_clone().with_file_name("ol");
+    let manifest = copilot_manifest("ol", r#""./servers.json""#);
+    let fs = with_repos(
+        with_home(vscode()),
+        &[("ol", &repo_marketplace("ol"), &[("plugin.json", &manifest)])],
+    )
+    .with_file(
+        folder.with_file_name("outside.json"),
+        servers_file("ol-outside"),
+    )
+    .with_file(folder.join("inside.json"), servers_file("ol-inside"))
+    .with_file_symlink(folder.join("mcp.json"), r"..\outside.json")
+    .with_file_symlink(
+        folder.join(r"com.github.copilot\servers.json"),
+        r"..\inside.json",
+    );
+
+    assert_eq!(
+        plugin_server_states(&inventory(&fs)),
+        ["cd-throwaway-ol-inside effective servers.json"]
+    );
+}
+
+#[test]
+fn a_plugin_whose_schema_is_no_open_plugins_one_keeps_its_dot_mcp_json_and_manifest_servers() {
+    // `$schema` is another of the site's, so the root `plugin.json` is read
+    // as a manifest of the other formats.
+    let manifest = r#"{ "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json", "name": "cd-throwaway-ns", "mcpServers": "./servers.json", "extensions": { "com.github.copilot": { "mcpServers": "./servers.json" } } }"#;
+    let (mcp, root, copilot) = (
+        servers_file("ns-mcp"),
+        servers_file("ns-root"),
+        servers_file("ns-copilot"),
+    );
+
+    let (servers, failures) = repo_servers(
+        "ns",
+        manifest,
+        &[
+            ("mcp.json", &mcp),
+            ("servers.json", &root),
+            ("com.github.copilot/servers.json", &copilot),
+        ],
+    );
+
+    assert_eq!(
+        servers,
+        [
+            "cd-throwaway-ns-dot effective .mcp.json",
+            "cd-throwaway-ns-root effective servers.json",
+        ]
+    );
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn an_open_plugins_plugin_s_inline_copilot_servers_take_the_place_of_its_mcp_json() {
+    let inline = r#"{ "cd-throwaway-ci-inline": { "command": "x" } }"#;
+
+    let (servers, failures) = copilot_servers("ci", inline);
+
+    assert_eq!(servers, ["cd-throwaway-ci-inline effective plugin.json"]);
+    assert_eq!(failures, Vec::<PathBuf>::new());
+}
+
+#[test]
+fn an_open_plugins_plugin_s_copilot_paths_name_files_in_com_github_copilot() {
+    let both = [
+        "cd-throwaway-cp-copilot effective servers.json",
+        "cd-throwaway-cp-mcp effective mcp.json",
+    ];
+    let cases: [(&str, &[&str]); 5] = [
+        (r#"" ./servers.json ""#, &both),
+        (r#"[ " ./servers.json ", "" ]"#, &both),
+        (r#"{ "paths": ["./servers.json"] }"#, &both),
+        (
+            r#"{ "paths": ["./servers.json"], "exclusive": true }"#,
+            &["cd-throwaway-cp-copilot effective servers.json"],
+        ),
+        // The root's `servers.json`, outside `com.github.copilot`.
+        (
+            r#""../servers.json""#,
+            &["cd-throwaway-cp-mcp effective mcp.json"],
+        ),
+    ];
+    for (value, expected) in cases {
+        let (servers, failures) = copilot_servers("cp", value);
+
+        assert_eq!(servers, expected, "{value}");
+        assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");
+    }
+}
+
+#[test]
+fn an_open_plugins_plugin_s_mcp_json_server_shadows_the_one_of_its_name_in_com_github_copilot() {
+    // The probe's `cw`.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(
+            "cw",
+            &repo_marketplace("cw"),
+            &[
+                (
+                    "plugin.json",
+                    &copilot_manifest("cw", r#""./servers.json""#),
+                ),
+                ("mcp.json", &servers_file("cw-same")),
+                ("com.github.copilot/servers.json", &servers_file("cw-same")),
+            ],
+        )],
+    );
+
+    let folder = market_clone().with_file_name("cw");
+    assert_eq!(
+        states(item(&inventory(&fs), "cd-throwaway-cw-same")),
+        [
+            (
+                "effective".to_owned(),
+                format!(
+                    r"{}\mcp.json#mcpServers.cd-throwaway-cw-same",
+                    folder.display()
+                )
+            ),
+            (
+                "shadowed".to_owned(),
+                format!(
+                    r"{}\com.github.copilot\servers.json#mcpServers.cd-throwaway-cw-same",
+                    folder.display()
+                )
+            ),
+        ]
+    );
+}
+
 /// Whether a VS Code server Item of an agent plugin is listed.
 fn any_plugin_server(inventory: &Inventory) -> bool {
     inventory

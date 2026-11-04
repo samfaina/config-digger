@@ -1,6 +1,7 @@
 // Section 27: a Cursor plugin whose first manifest does not parse, which
 // Cursor reads past to the next one. Section 31: a VS Code agent plugin
 // whose manifest does not parse, which VS Code reads around the error.
+// Section 37: a VS Code agent plugin of the Open Plugins format.
 import { expect } from "@playwright/test";
 import { inventoryShown, ROOT } from "./app";
 import { uatStep } from "./step";
@@ -93,5 +94,44 @@ uatStep("31.1", async ({ page, open, check }) => {
   );
   await check("La tarjeta dice también «VS Code reads what is around the error, and config-digger lists what it keeps.».", async () => {
     await expect(card.locator(".note")).toHaveText("VS Code reads what is around the error, and config-digger lists what it keeps.");
+  });
+});
+
+/** The throwaway Open Plugins plugin of VS Code, in the fixtures' user folder. */
+const OPENPLUGIN = String.raw`${ROOT}\claude-code-home\.vscode\agent-plugins\cd-throwaway.invalid\cd-throwaway\cd-throwaway-openplugin`;
+
+uatStep("37.1", async ({ page, open, check }) => {
+  await open();
+  await inventoryShown(page);
+  await page.locator(".agent-tile", { hasText: /^VS Code/ }).click();
+  const row = (name: string) => page.locator(".item-row", { has: page.locator(".item-name", { hasText: name }) });
+
+  await check("El Item «cd-throwaway-openplugin-server» sale «Effective».", async () => {
+    await expect(row("cd-throwaway-openplugin-server").locator(".state-pill")).toHaveText("Effective");
+  });
+  await check(
+    "Bajo su nombre sale «plugin · E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server».",
+    async () => {
+      await expect(row("cd-throwaway-openplugin-server").locator(".item-location")).toHaveText(
+        String.raw`plugin · ${OPENPLUGIN}\mcp.json#mcpServers.cd-throwaway-openplugin-server`,
+      );
+    },
+  );
+  await check("El Item «cd-throwaway-openplugin-copilot» sale «Effective».", async () => {
+    await expect(row("cd-throwaway-openplugin-copilot").locator(".state-pill")).toHaveText("Effective");
+  });
+  await check(
+    "Bajo su nombre sale «plugin · E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot».",
+    async () => {
+      await expect(row("cd-throwaway-openplugin-copilot").locator(".item-location")).toHaveText(
+        String.raw`plugin · ${OPENPLUGIN}\com.github.copilot\servers.json#mcpServers.cd-throwaway-openplugin-copilot`,
+      );
+    },
+  );
+  await check("No sale ningún Item «cd-throwaway-openplugin-dot».", async () => {
+    await expect(page.locator(".item-name", { hasText: "cd-throwaway-openplugin-dot" })).toHaveCount(0);
+  });
+  await check("No sale ningún Item «cd-throwaway-openplugin-top».", async () => {
+    await expect(page.locator(".item-name", { hasText: "cd-throwaway-openplugin-top" })).toHaveCount(0);
   });
 });

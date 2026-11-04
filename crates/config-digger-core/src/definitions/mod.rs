@@ -869,7 +869,7 @@ pub(crate) struct PluginName {
 }
 
 /// A string a file must hold, in an object, for a place of a plugin's name
-/// in it to be tried.
+/// in it to be tried, or for a plugin to be of a format.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NameGate {
@@ -894,6 +894,65 @@ impl NameGate {
                     text.starts_with(&self.starts_with) && text.ends_with(&self.ends_with)
                 })
     }
+
+    fn validate(&self) -> Result<(), String> {
+        blocks::validate_key_path(&self.key_path)
+    }
+}
+
+/// A string a JSON file of a plugin's folder holds, in an object, that
+/// tells the plugin's format, as an Open Plugins `$schema` in the root
+/// `plugin.json` of a VS Code agent plugin. A location in plugins reads
+/// its path only in the plugins of one format, as its anchor's `only_when`
+/// or `unless` says.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PluginGate {
+    /// A `/`-separated path relative to the plugin's folder.
+    pub file: String,
+    /// The dialect the Agent reads the file in. Omitted for strict JSON.
+    pub dialect: Option<JsonDialect>,
+    /// What the Agent does with the file when it does not parse:
+    /// `reads_around_error` reads the string from what parses on both
+    /// sides of the error, as VS Code reads a plugin's manifest. Without
+    /// it, a file that does not parse holds no string.
+    pub on_read_failure: Option<ReadFailureReaction>,
+    /// The string the file holds.
+    pub holds: NameGate,
+}
+
+impl PluginGate {
+    /// How the file is parsed.
+    pub fn format(&self) -> JsonFormat {
+        JsonFormat::of(self.dialect)
+    }
+
+    /// Whether the string is read from what parses around an error in the
+    /// file.
+    pub fn reads_around_error(&self) -> bool {
+        self.on_read_failure == Some(ReadFailureReaction::ReadsAroundError)
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        blocks::validate_relative(&self.file)?;
+        self.holds.validate()?;
+        reads_around_error_only(self.on_read_failure, "a plugin's format", &self.file)
+    }
+}
+
+/// Refuses any reaction but `reads_around_error` of `what`, read in `file`,
+/// to a file that does not parse.
+fn reads_around_error_only(
+    reaction: Option<ReadFailureReaction>,
+    what: &str,
+    file: &str,
+) -> Result<(), String> {
+    match reaction {
+        None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
+        Some(_) => Err(format!(
+            "{what} in `{file}` reacts to a file that does not parse with `reads_around_error` only"
+        )),
+    }
 }
 
 impl PluginName {
@@ -913,15 +972,9 @@ impl PluginName {
         blocks::validate_key_path(&self.key_path)?;
         blocks::validate_rejected(&self.rejected_unless_path_object_or_list)?;
         if let Some(gate) = &self.only_when {
-            blocks::validate_key_path(&gate.key_path)?;
+            gate.validate()?;
         }
-        match self.on_read_failure {
-            None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
-            Some(_) => Err(format!(
-                "a plugin's name in `{}` reacts to a file that does not parse with `reads_around_error` only",
-                self.file
-            )),
-        }
+        reads_around_error_only(self.on_read_failure, "a plugin's name", &self.file)
     }
 }
 
@@ -1224,6 +1277,17 @@ pub(crate) struct References {
     /// of paths, as VS Code reads a plugin manifest's `mcpServers` that
     /// holds `paths`.
     pub paths_object: Option<PathsObject>,
+    /// A `/`-separated path relative to the plugin's folder of the folder
+    /// a path at the root or the `default` is relative to, a path
+    /// leaving it naming no file, as VS Code reads the paths of an Open Plugins plugin's
+    /// `extensions["com.github.copilot"].mcpServers` in its
+    /// `com.github.copilot` folder. Omitted for the plugin's folder.
+    pub base: Option<String>,
+    /// Whether a file a path names is read only while its real path, its
+    /// links resolved, stays in the plugin's real folder, as VS Code reads
+    /// the files an Open Plugins plugin's manifest names.
+    #[serde(default)]
+    pub real_path_in_plugin: bool,
 }
 
 /// An object that holds a list of paths, read as a list at the root is,
@@ -2411,8 +2475,8 @@ impl AgentDefinition {
                 if let Some(bundles) = &references.bundles {
                     bundles.validate().map_err(context)?;
                 }
-                if let Some(default) = &references.default {
-                    blocks::validate_relative(default).map_err(context)?;
+                for path in references.default.iter().chain(&references.base) {
+                    blocks::validate_relative(path).map_err(context)?;
                 }
                 self.validate_first(location, references).map_err(context)?;
             }
@@ -5727,6 +5791,45 @@ on_read_failure = "ignores_file"
         ] {
             let text = with_manifest_references(extra);
             assert!(error(&text).contains(message), "{extra}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn references_name_files_only_in_a_relative_base() {
+        let text = with_manifest_references(r#", base = "com.github.copilot""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        for base in [r#""""#, r#""C:/elsewhere""#, r#""../up""#] {
+            let text = with_manifest_references(&format!(", base = {base}"));
+            assert!(parse("test.toml", &text).is_err(), "{base}");
+        }
+    }
+
+    /// `with_manifest_references` whose manifest anchor reads its path
+    /// `only_when` its `plugin.json` holds a `$schema`, read in reaction to
+    /// a file that does not parse with `reaction`.
+    fn with_gate_reacting(reaction: &str) -> String {
+        let anchor =
+            r#"anchor = { block = "plugin", plugins = "installed", path = "plugin.json" }"#;
+        let gated = format!(
+            r#"anchor = {{ block = "plugin", plugins = "installed", path = "plugin.json", only_when = {{ file = "plugin.json", on_read_failure = "{reaction}", holds = {{ key_path = ["$schema"], starts_with = "https://", ends_with = ".json" }} }} }}"#
+        );
+        let text = with_manifest_references("");
+        assert!(text.contains(anchor), "the manifest has no `{anchor}`");
+        text.replace(anchor, &gated)
+    }
+
+    #[test]
+    fn a_plugin_s_format_reacts_to_a_file_that_does_not_parse_by_reading_around_the_error_only() {
+        let around = with_gate_reacting("reads_around_error");
+        assert!(parse("test.toml", &around).is_ok(), "{}", error(&around));
+        for reaction in ["reads_next_path", "ignores_file", "unknown", "fails_plugin"] {
+            let text = with_gate_reacting(reaction);
+            assert!(
+                error(&text).contains("a plugin's format in `plugin.json` reacts"),
+                "{reaction}: {}",
+                error(&text)
+            );
         }
     }
 
