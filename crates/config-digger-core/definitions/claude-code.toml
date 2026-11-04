@@ -246,8 +246,8 @@ registries = [
 # `.claude/settings.local.json` turns it off does not load it [test]
 # (#555). `named_in` reads such a record in every other Project whose own
 # two files name its id, and in every Project when the user settings name
-# it, `true` or `false`: its Entries there are switched by the layered
-# plugin switches, so a plugin they turn off is Disabled, Enable on offer,
+# it, `true` or `false`: its Entries there are switched by the plugin's
+# switches below, so a plugin they turn off is Disabled, Enable on offer,
 # and Disable's `false` in the Project's local file keeps it listed. The
 # first session in a folder no record applies in, the user settings
 # turning the plugin on, installs it at user scope, adding a `user` record
@@ -814,8 +814,9 @@ enable_offered = false
 # Enable sets `true` there; in a Project it sets the local `true` over
 # the shared or user settings that turn the plugin off, as the local
 # settings win [docs, test] (`sets_over_later_layers`). The shared Project
-# settings belong to the team, so config-digger only reads them. A plugin no settings file names is off
-# [test]. These switches are repeated for skills below.
+# settings belong to the team, so config-digger only reads them. A plugin
+# no settings file names is off [test]. These switches are repeated for
+# skills below.
 [[items.mcp.disable]]
 block = "json-field"
 switch = { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }

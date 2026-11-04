@@ -3694,8 +3694,8 @@ fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
 /// reach, such as a skill folder through a linked folder, is
 /// kept once, from the location the Agent ranks highest, and the nearest
 /// Project folder among equals, and of equals one that applies in every
-/// Project over one keyed to a Project. An Entry keyed to one Project and
-/// another keyed to a second Project are not the same.
+/// Project over each one keyed to a Project. An Entry keyed to one Project
+/// and another keyed to a second Project are not the same.
 fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) -> Vec<ScannedEntry> {
     let rank = |entry: &ScannedEntry| {
         let definition = &definitions[entry.agent_index];
@@ -3706,7 +3706,7 @@ fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) ->
     };
     let mut kept: Vec<ScannedEntry> = Vec::new();
     for entry in entries {
-        let same = kept.iter().position(|known| {
+        let same = |known: &ScannedEntry| {
             known.agent_index == entry.agent_index
                 && known.home == entry.home
                 && known.path == entry.path
@@ -3714,21 +3714,32 @@ fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) ->
                 && (known.project.is_none()
                     || entry.project.is_none()
                     || known.project == entry.project)
-        });
+        };
         // Of one rank, an Entry that applies in every Project takes the
         // place of one bound to a Project, which it covers too, whatever
         // the order they were read in, such as a plugin's file both its
         // record bound to a Project and its user-scope record read.
-        let wider = |known: &ScannedEntry| {
-            rank(&entry) == rank(known) && known.project.is_some() && entry.project.is_none()
+        let replaces = |known: &ScannedEntry| {
+            rank(&entry) < rank(known)
+                || (rank(&entry) == rank(known)
+                    && known.project.is_some()
+                    && entry.project.is_none())
         };
-        match same {
-            Some(index) if rank(&entry) < rank(&kept[index]) || wider(&kept[index]) => {
-                kept[index] = entry;
-            }
-            Some(_) => {}
-            None => kept.push(entry),
+        let Some(index) = kept.iter().position(same) else {
+            kept.push(entry);
+            continue;
+        };
+        if !replaces(&kept[index]) {
+            continue;
         }
+        // One that applies in every Project takes the place of each other
+        // it is the same as and replaces, each bound to another Project.
+        let mut at = 0;
+        kept.retain(|known| {
+            at += 1;
+            at - 1 <= index || !(same(known) && replaces(known))
+        });
+        kept[index] = entry;
     }
     kept
 }

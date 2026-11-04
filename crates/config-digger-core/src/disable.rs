@@ -407,10 +407,12 @@ fn read_layers<'a>(
                 continue;
             }
             let disables = mechanism.disables(value, key, folder);
-            let over_this = |over: usize| {
-                !mechanism.enable_offered() || layers[over].mechanism.sets_over_writable_layers()
+            // Whether Enable may set the layer `over` over this one.
+            let may_set_over = |over: usize| {
+                !mechanism.enable_offered() || layers[over].mechanism.sets_over_later_layers()
             };
-            if let Some(over) = over.filter(|&over| over < layer && disables && over_this(over)) {
+            if let Some(over) = over.filter(|&over| over < layer && disables && may_set_over(over))
+            {
                 set_over(&layers[over], folder, disabling);
                 return;
             }

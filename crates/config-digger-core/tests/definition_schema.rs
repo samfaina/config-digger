@@ -153,13 +153,15 @@ fn the_schema_accepts_a_file_of_the_agent_home_that_names_plugins_for_every_proj
 #[test]
 fn the_schema_accepts_a_switch_enable_sets_over_the_later_layers() {
     let definition = claude_code();
-    let set_over: Vec<&Value> = definition["items"]["mcp"]["disable"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|switch| switch["sets_over_later_layers"] == true)
-        .collect();
+    for kind in ["mcp", "skill"] {
+        let set_over: Vec<&Value> = definition["items"][kind]["disable"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|switch| switch["sets_over_later_layers"] == true)
+            .collect();
 
-    assert_eq!(set_over.len(), 1);
+        assert_eq!(set_over.len(), 1, "{kind}");
+    }
     assert_eq!(errors(&definition), Vec::<String>::new());
 }

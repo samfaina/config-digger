@@ -497,3 +497,47 @@ fn enable_of_the_plugin_s_skill_where_the_user_settings_turn_it_off_writes_the_p
     );
     assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
 }
+
+#[test]
+fn a_user_scope_record_after_two_records_bound_to_projects_leaves_one_copy_in_each() {
+    let third = r"E:\third";
+    let fs = recorded(
+        user_switched(fixture(), true).with_folder(third),
+        json!([
+            record("project", Some(REPO)),
+            record("project", Some(third)),
+            record("user", None)
+        ]),
+    );
+    let core = core(&fs);
+    let options = ScanOptions {
+        projects: vec![
+            PathBuf::from(REPO),
+            PathBuf::from(third),
+            PathBuf::from(OTHER),
+        ],
+    };
+    let snapshot = core.scan(&options).unwrap();
+
+    for project in [REPO, third, OTHER] {
+        let inventory = core.resolve(&snapshot, &in_project(project));
+        assert_eq!(carried(&inventory), demo("effective", ""), "{project}");
+    }
+}
+
+#[test]
+fn enable_in_a_project_of_a_user_scope_plugin_the_user_settings_turn_off_writes_its_local_settings()
+{
+    let fs = recorded(
+        user_switched(fixture(), false),
+        json!([record("user", None)]),
+    );
+
+    act_in_other(&fs, Action::Enable);
+
+    assert_eq!(
+        other_local(&fs),
+        json!({ "enabledPlugins": { "demo@acme": true } })
+    );
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+}

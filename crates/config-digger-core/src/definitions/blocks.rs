@@ -1189,6 +1189,11 @@ impl Anchor {
         }
     }
 
+    /// Whether it names a file or folder in the Agent home.
+    pub fn in_home(&self) -> bool {
+        matches!(self, Anchor::Home(_))
+    }
+
     /// Whether it names the workspace file a Project is, rather than a path
     /// in a Project folder.
     pub fn project_file(&self) -> bool {
@@ -2653,8 +2658,7 @@ impl Validate for NamingFile {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
         self.anchor.one_file()?;
-        let in_home = matches!(self.anchor, Anchor::Home(_));
-        if !in_home && (!self.anchor.in_project() || self.anchor.project_file()) {
+        if !self.anchor.in_home() && (!self.anchor.in_project() || self.anchor.project_file()) {
             return Err(
                 "the files that name plugins lie in the Project folder or the Agent home".into(),
             );
@@ -6472,10 +6476,11 @@ pub(crate) trait Disables {
         None
     }
 
-    /// Whether Enable sets the switch to `enabled_over_later_layers` over a
-    /// later layer config-digger writes too, not only over one it only
-    /// reads, so that Enable writes the file Disable writes.
-    fn sets_over_writable_layers(&self) -> bool {
+    /// Whether Enable sets the switch to the value
+    /// [`Self::enabled_over_later_layers`] gives over a later layer
+    /// config-digger writes too, not only over one it only reads, so that
+    /// Enable writes the file Disable writes.
+    fn sets_over_later_layers(&self) -> bool {
         false
     }
 
@@ -6707,8 +6712,8 @@ impl Disables for Switched<'_> {
         self.block().enabled_over_later_layers()
     }
 
-    fn sets_over_writable_layers(&self) -> bool {
-        self.block().sets_over_writable_layers()
+    fn sets_over_later_layers(&self) -> bool {
+        self.block().sets_over_later_layers()
     }
 
     fn by_id(&self) -> bool {
@@ -7221,7 +7226,7 @@ impl Disables for JsonField {
         })
     }
 
-    fn sets_over_writable_layers(&self) -> bool {
+    fn sets_over_later_layers(&self) -> bool {
         self.sets_over_later_layers
     }
 
