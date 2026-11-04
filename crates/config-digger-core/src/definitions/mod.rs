@@ -869,7 +869,7 @@ pub(crate) struct PluginName {
 }
 
 /// A string a file must hold, in an object, for a place of a plugin's name
-/// in it to be tried.
+/// in it to be tried, or for a plugin to be of a format.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NameGate {
@@ -884,24 +884,20 @@ pub(crate) struct NameGate {
 impl NameGate {
     /// Whether `document` holds the string.
     pub fn opens(&self, document: &serde_json::Value) -> bool {
-        holds_string(document, &self.key_path, &self.starts_with, &self.ends_with)
+        document.is_object()
+            && self
+                .key_path
+                .iter()
+                .try_fold(document, |value, key| value.get(key))
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|text| {
+                    text.starts_with(&self.starts_with) && text.ends_with(&self.ends_with)
+                })
     }
-}
 
-/// Whether `document` is an object holding, at `key_path`, a string that
-/// starts with `starts_with` and ends with `ends_with`.
-fn holds_string(
-    document: &serde_json::Value,
-    key_path: &[String],
-    starts_with: &str,
-    ends_with: &str,
-) -> bool {
-    document.is_object()
-        && key_path
-            .iter()
-            .try_fold(document, |value, key| value.get(key))
-            .and_then(serde_json::Value::as_str)
-            .is_some_and(|text| text.starts_with(starts_with) && text.ends_with(ends_with))
+    fn validate(&self) -> Result<(), String> {
+        blocks::validate_key_path(&self.key_path)
+    }
 }
 
 /// A string a JSON file of a plugin's folder holds, in an object, that
@@ -921,12 +917,8 @@ pub(crate) struct PluginGate {
     /// sides of the error, as VS Code reads a plugin's manifest. Without
     /// it, a file that does not parse holds no string.
     pub on_read_failure: Option<ReadFailureReaction>,
-    /// The key path of the string, one key per segment.
-    pub key_path: Vec<String>,
-    /// The text it starts with.
-    pub starts_with: String,
-    /// The text it ends with.
-    pub ends_with: String,
+    /// The string the file holds.
+    pub holds: NameGate,
 }
 
 impl PluginGate {
@@ -941,21 +933,25 @@ impl PluginGate {
         self.on_read_failure == Some(ReadFailureReaction::ReadsAroundError)
     }
 
-    /// Whether `document`, the file parsed, holds the string.
-    pub fn opens(&self, document: &serde_json::Value) -> bool {
-        holds_string(document, &self.key_path, &self.starts_with, &self.ends_with)
-    }
-
     fn validate(&self) -> Result<(), String> {
         blocks::validate_relative(&self.file)?;
-        blocks::validate_key_path(&self.key_path)?;
-        match self.on_read_failure {
-            None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
-            Some(_) => Err(format!(
-                "a plugin's format in `{}` reacts to a file that does not parse with `reads_around_error` only",
-                self.file
-            )),
-        }
+        self.holds.validate()?;
+        reads_around_error_only(self.on_read_failure, "a plugin's format", &self.file)
+    }
+}
+
+/// Refuses any reaction but `reads_around_error` of `what`, read in `file`,
+/// to a file that does not parse.
+fn reads_around_error_only(
+    reaction: Option<ReadFailureReaction>,
+    what: &str,
+    file: &str,
+) -> Result<(), String> {
+    match reaction {
+        None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
+        Some(_) => Err(format!(
+            "{what} in `{file}` reacts to a file that does not parse with `reads_around_error` only"
+        )),
     }
 }
 
@@ -976,15 +972,9 @@ impl PluginName {
         blocks::validate_key_path(&self.key_path)?;
         blocks::validate_rejected(&self.rejected_unless_path_object_or_list)?;
         if let Some(gate) = &self.only_when {
-            blocks::validate_key_path(&gate.key_path)?;
+            gate.validate()?;
         }
-        match self.on_read_failure {
-            None | Some(ReadFailureReaction::ReadsAroundError) => Ok(()),
-            Some(_) => Err(format!(
-                "a plugin's name in `{}` reacts to a file that does not parse with `reads_around_error` only",
-                self.file
-            )),
-        }
+        reads_around_error_only(self.on_read_failure, "a plugin's name", &self.file)
     }
 }
 
@@ -5801,6 +5791,45 @@ on_read_failure = "ignores_file"
         ] {
             let text = with_manifest_references(extra);
             assert!(error(&text).contains(message), "{extra}: {}", error(&text));
+        }
+    }
+
+    #[test]
+    fn references_name_files_only_in_a_relative_base() {
+        let text = with_manifest_references(r#", base = "com.github.copilot""#);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+
+        for base in [r#""""#, r#""C:/elsewhere""#, r#""../up""#] {
+            let text = with_manifest_references(&format!(", base = {base}"));
+            assert!(parse("test.toml", &text).is_err(), "{base}");
+        }
+    }
+
+    /// `with_manifest_references` whose manifest anchor reads its path
+    /// `only_when` its `plugin.json` holds a `$schema`, read in reaction to
+    /// a file that does not parse with `reaction`.
+    fn with_gate_reacting(reaction: &str) -> String {
+        let anchor =
+            r#"anchor = { block = "plugin", plugins = "installed", path = "plugin.json" }"#;
+        let gated = format!(
+            r#"anchor = {{ block = "plugin", plugins = "installed", path = "plugin.json", only_when = {{ file = "plugin.json", on_read_failure = "{reaction}", holds = {{ key_path = ["$schema"], starts_with = "https://", ends_with = ".json" }} }} }}"#
+        );
+        let text = with_manifest_references("");
+        assert!(text.contains(anchor), "the manifest has no `{anchor}`");
+        text.replace(anchor, &gated)
+    }
+
+    #[test]
+    fn a_plugin_s_format_reacts_to_a_file_that_does_not_parse_by_reading_around_the_error_only() {
+        let around = with_gate_reacting("reads_around_error");
+        assert!(parse("test.toml", &around).is_ok(), "{}", error(&around));
+        for reaction in ["reads_next_path", "ignores_file", "unknown", "fails_plugin"] {
+            let text = with_gate_reacting(reaction);
+            assert!(
+                error(&text).contains("a plugin's format in `plugin.json` reacts"),
+                "{reaction}: {}",
+                error(&text)
+            );
         }
     }
 

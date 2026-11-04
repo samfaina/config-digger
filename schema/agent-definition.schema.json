@@ -874,20 +874,9 @@
             }
           ]
         },
-        "key_path": {
-          "description": "The key path of the string, one key per segment.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "starts_with": {
-          "description": "The text it starts with.",
-          "type": "string"
-        },
-        "ends_with": {
-          "description": "The text it ends with.",
-          "type": "string"
+        "holds": {
+          "description": "The string the file holds.",
+          "$ref": "#/$defs/NameGate"
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"
@@ -896,9 +885,7 @@
       "additionalProperties": false,
       "required": [
         "file",
-        "key_path",
-        "starts_with",
-        "ends_with"
+        "holds"
       ]
     },
     "JsonDialect": {
@@ -959,6 +946,36 @@
           "type": "string",
           "const": "stops_agent"
         }
+      ]
+    },
+    "NameGate": {
+      "description": "A string a file must hold, in an object, for a place of a plugin's name\nin it to be tried, or for a plugin to be of a format.",
+      "type": "object",
+      "properties": {
+        "key_path": {
+          "description": "The key path of the string, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "starts_with": {
+          "description": "The text it starts with.",
+          "type": "string"
+        },
+        "ends_with": {
+          "description": "The text it ends with.",
+          "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key_path",
+        "starts_with",
+        "ends_with"
       ]
     },
     "AccountDefinition": {
@@ -2987,36 +3004,6 @@
       "required": [
         "file",
         "key_path"
-      ]
-    },
-    "NameGate": {
-      "description": "A string a file must hold, in an object, for a place of a plugin's name\nin it to be tried.",
-      "type": "object",
-      "properties": {
-        "key_path": {
-          "description": "The key path of the string, one key per segment.",
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "starts_with": {
-          "description": "The text it starts with.",
-          "type": "string"
-        },
-        "ends_with": {
-          "description": "The text it ends with.",
-          "type": "string"
-        },
-        "unverified": {
-          "$ref": "#/$defs/Unverified"
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "key_path",
-        "starts_with",
-        "ends_with"
       ]
     },
     "Replaces": {

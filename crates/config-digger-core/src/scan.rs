@@ -4092,24 +4092,24 @@ impl Scanner<'_> {
                 .iter()
                 .filter(|plugin| anchor.plugins.names(&plugin.plugins))
             {
-                if !self.of_format(anchor, plugin) {
+                if !self.gates_let_through(anchor, plugin) {
                     continue;
                 }
                 let replaced =
-                    self.read_plugin_location(home, definition, location, plugin, &anchor.path);
+                    self.read_plugin_location(home, definition, location, anchor, plugin);
                 if let Some(first) = first.filter(|_| !replaced)
                     && let Some(first_anchor) = first.anchor.plugin()
-                    && self.of_format(first_anchor, plugin)
+                    && self.gates_let_through(first_anchor, plugin)
                 {
-                    self.read_plugin_location(home, definition, first, plugin, &first_anchor.path);
+                    self.read_plugin_location(home, definition, first, first_anchor, plugin);
                 }
             }
         }
     }
 
-    /// Whether `plugin` is of the format whose plugins `anchor` reads its
-    /// path in, as its `only_when` and `unless` say.
-    fn of_format(&mut self, anchor: &PluginAnchor, plugin: &ScannedPlugin) -> bool {
+    /// Whether the `only_when` and `unless` gates of `anchor` let its path
+    /// be read in `plugin`, a plugin of the format they name.
+    fn gates_let_through(&mut self, anchor: &PluginAnchor, plugin: &ScannedPlugin) -> bool {
         anchor.gates().all(|(gate, holds)| {
             let document = self.plugin_json(
                 &plugin.folder,
@@ -4117,7 +4117,7 @@ impl Scanner<'_> {
                 &gate.format(),
                 gate.reads_around_error(),
             );
-            document.is_some_and(|document| gate.opens(&document)) == holds
+            document.is_some_and(|document| gate.holds.opens(&document)) == holds
         })
     }
 
@@ -5251,20 +5251,14 @@ impl Scanner<'_> {
         home: &FoundHome,
         definition: &AgentDefinition,
         location: &LocationDefinition,
+        anchor: &PluginAnchor,
         plugin: &ScannedPlugin,
-        relative: &RelativePaths,
     ) -> bool {
         let start = self.entries.len();
         let failures = self.reader.failures.len();
         let path = self
-            .plugin_path(home, location, plugin, relative)
-            .filter(|path| {
-                let checked = location
-                    .anchor
-                    .plugin()
-                    .is_some_and(|anchor| anchor.real_path_in_plugin);
-                !checked || self.stays_in_plugin(plugin, path)
-            });
+            .plugin_path(home, location, plugin, &anchor.path)
+            .filter(|path| !anchor.real_path_in_plugin || self.stays_in_plugin(plugin, path));
         let replaces_first = match (&location.references, path) {
             (None, path) if let Format::ManifestSkills(block) = &location.format => {
                 self.read_manifest_skills(home, location, block, plugin, path);
@@ -5305,14 +5299,17 @@ impl Scanner<'_> {
     }
 
     /// Whether the real path of the file at `path`, its links resolved,
-    /// stays in the real folder of `plugin`, or nothing is there.
+    /// stays in the real folder of `plugin`, or nothing is there. A folder
+    /// with no real path is compared as written, as VS Code does.
     fn stays_in_plugin(&self, plugin: &ScannedPlugin, path: &Path) -> bool {
         let fs = self.reader.fs;
-        match (fs.real_path(path), fs.real_path(&plugin.folder)) {
-            (Some(real), Some(folder)) => real.starts_with(folder),
-            (None, _) => true,
-            (Some(_), None) => false,
-        }
+        let Some(real) = fs.real_path(path) else {
+            return true;
+        };
+        let folder = fs
+            .real_path(&plugin.folder)
+            .unwrap_or_else(|| paths::lexical(&plugin.folder));
+        real.starts_with(folder)
     }
 
     /// The path of `plugin` that `location` reads of those `relative`

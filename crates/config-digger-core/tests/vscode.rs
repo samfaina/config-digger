@@ -2755,14 +2755,14 @@ fn an_open_plugins_plugin_s_servers_come_from_its_mcp_json_not_its_dot_mcp_json_
         servers_file("op-open"),
         servers_file("op-file"),
     );
-    let open_manifest = r#"{ "name": "cd-throwaway-op-open", "mcpServers": "./open.json" }"#;
+    let dot_plugin_manifest = r#"{ "name": "cd-throwaway-op-open", "mcpServers": "./open.json" }"#;
 
     let (servers, failures) = repo_servers(
         "op",
         &manifest,
         &[
             ("mcp.json", &mcp),
-            (".plugin/plugin.json", open_manifest),
+            (".plugin/plugin.json", dot_plugin_manifest),
             ("open.json", &open),
             ("servers.json", &file),
         ],
@@ -2869,7 +2869,7 @@ fn an_open_plugins_plugin_s_copilot_paths_name_files_in_com_github_copilot() {
     ];
     let cases: [(&str, &[&str]); 5] = [
         (r#"" ./servers.json ""#, &both),
-        (r#"[ "./servers.json" ]"#, &both),
+        (r#"[ " ./servers.json ", "" ]"#, &both),
         (r#"{ "paths": ["./servers.json"] }"#, &both),
         (
             r#"{ "paths": ["./servers.json"], "exclusive": true }"#,
@@ -2887,6 +2887,47 @@ fn an_open_plugins_plugin_s_copilot_paths_name_files_in_com_github_copilot() {
         assert_eq!(servers, expected, "{value}");
         assert_eq!(failures, Vec::<PathBuf>::new(), "{value}");
     }
+}
+
+#[test]
+fn an_open_plugins_plugin_s_mcp_json_server_shadows_the_one_of_its_name_in_com_github_copilot() {
+    // The probe's `cw`.
+    let fs = with_repos(
+        with_home(vscode()),
+        &[(
+            "cw",
+            &repo_marketplace("cw"),
+            &[
+                (
+                    "plugin.json",
+                    &copilot_manifest("cw", r#""./servers.json""#),
+                ),
+                ("mcp.json", &servers_file("cw-same")),
+                ("com.github.copilot/servers.json", &servers_file("cw-same")),
+            ],
+        )],
+    );
+
+    let folder = market_clone().with_file_name("cw");
+    assert_eq!(
+        states(item(&inventory(&fs), "cd-throwaway-cw-same")),
+        [
+            (
+                "effective".to_owned(),
+                format!(
+                    r"{}\mcp.json#mcpServers.cd-throwaway-cw-same",
+                    folder.display()
+                )
+            ),
+            (
+                "shadowed".to_owned(),
+                format!(
+                    r"{}\com.github.copilot\servers.json#mcpServers.cd-throwaway-cw-same",
+                    folder.display()
+                )
+            ),
+        ]
+    );
 }
 
 /// Whether a VS Code server Item of an agent plugin is listed.
