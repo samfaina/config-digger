@@ -8,7 +8,7 @@ use crate::definitions::blocks::{
     Disables, DownWalk, EnvMap, Fallback, FindsBy, FolderMarketplaces, Format, Gate, GateStore,
     HoldsHere, InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder,
     ListPlugins, ListedIn, ListedMarketplaces, Locate, Locator, LookUp, Malformed, ManifestCause,
-    ManifestFailure, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn, NamingSettings,
+    ManifestFailure, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn, NamingFile,
     NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList,
     PluginPlace, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk,
     Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback,
@@ -4141,7 +4141,7 @@ impl Scanner<'_> {
         // Whether each plugin of `found` is named by its record or manifest,
         // rather than by its id.
         let mut named_by_plugin = Vec::new();
-        // Whether each plugin of `found` is read from its marketplace's folder.
+        // The places in `found` of the plugins read from their marketplace's folder.
         let mut in_marketplace_folder = Vec::new();
         for record in records {
             let folder = paths::lexical(Path::new(&record.folder));
@@ -4226,7 +4226,9 @@ impl Scanner<'_> {
                 },
             };
             named_by_plugin.push(named.is_some());
-            in_marketplace_folder.push(read_from_marketplace);
+            if read_from_marketplace {
+                in_marketplace_folder.push(found.len());
+            }
             let name = named.unwrap_or_else(|| {
                 if (plugins.registry.folder_fallback() || unnamed.is_some())
                     && let Some(name) = folder.file_name()
@@ -4267,15 +4269,12 @@ impl Scanner<'_> {
         if plugins.same_names_invalid {
             self.record_name_clashes(home, &mut found, &named_by_plugin);
         }
-        let recorded = found.len();
         if plugins.registry.project_reach() == ProjectReach::Checkouts {
             self.copy_to_other_checkouts(&mut found);
         }
         let named_in = plugins.registry.named_in();
         if !named_in.is_empty() {
-            let from_records = (0..recorded).filter(|&at| in_marketplace_folder[at]);
-            let from_records: Vec<usize> = from_records.collect();
-            self.copy_to_naming_projects(home, named_in, &from_records, &mut found);
+            self.copy_to_naming_projects(home, named_in, &in_marketplace_folder, &mut found);
         }
         found
     }
@@ -4288,7 +4287,7 @@ impl Scanner<'_> {
     fn copy_to_naming_projects(
         &mut self,
         home: &FoundHome,
-        named_in: &[NamingSettings],
+        named_in: &[NamingFile],
         from_records: &[usize],
         found: &mut Vec<ScannedPlugin>,
     ) {
@@ -4308,9 +4307,12 @@ impl Scanner<'_> {
                     known.id == found[at].id
                         && known.project.as_ref().is_none_or(|project| project == key)
                 };
-                if found.iter().any(applies) || !self.names(home, named_in, folder, &found[at].id) {
+                if found.iter().any(applies)
+                    || !self.project_names_plugin(home, named_in, folder, &found[at].id)
+                {
                     continue;
                 }
+                // Pushed at once, so that a later record of the id finds it.
                 let copy = ScannedPlugin {
                     project: Some(key.clone()),
                     ..found[at].clone()
@@ -4322,10 +4324,10 @@ impl Scanner<'_> {
 
     /// Whether a file of `named_in` in the Project folder `folder` names
     /// the plugin `id`.
-    fn names(
+    fn project_names_plugin(
         &mut self,
         home: &FoundHome,
-        named_in: &[NamingSettings],
+        named_in: &[NamingFile],
         folder: &Path,
         id: &str,
     ) -> bool {

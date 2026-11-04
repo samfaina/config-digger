@@ -2043,7 +2043,7 @@ impl PluginRegistry {
 
     /// The files of a Project that bring in a plugin read from its
     /// marketplace's folder by naming its id, if any.
-    pub fn named_in(&self) -> &[NamingSettings] {
+    pub fn named_in(&self) -> &[NamingFile] {
         match self {
             PluginRegistry::JsonPluginRecords(block) => &block.named_in,
             _ => &[],
@@ -2588,12 +2588,14 @@ pub(crate) struct JsonPluginRecords {
     /// whose plugin is read from its marketplace's folder, also applies in
     /// every other Project among the Projects whose own files name its id,
     /// whatever the value, such as Claude Code's `enabledPlugins` in the
-    /// Project's two settings files. Of several records of one id, the
+    /// Project's two settings files. A plugin read from its record's
+    /// folder, one its marketplace's manifest fails included, reaches no
+    /// such Project. Of several records of one id, the
     /// first applies there. A Project a plugin of that id already applies
     /// in, by a record bound to it, a record bound to no Project or
     /// `project_reach`, gets no other. Without it, none.
     #[serde(default)]
-    pub named_in: Vec<NamingSettings>,
+    pub named_in: Vec<NamingFile>,
     /// The field of a record that holds its version.
     pub version: Option<String>,
     /// The marketplaces the plugins come from, when a plugin of a
@@ -2608,14 +2610,14 @@ pub(crate) struct JsonPluginRecords {
 /// `.claude/settings.json` and its `enabledPlugins`.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NamingSettings {
+pub(crate) struct NamingFile {
     /// The file, in the Project folder.
     pub anchor: Anchor,
     /// The key path of the object whose keys are plugin ids.
     pub key_path: Vec<String>,
 }
 
-impl Validate for NamingSettings {
+impl Validate for NamingFile {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
         self.anchor.one_file()?;
@@ -2629,7 +2631,7 @@ impl Validate for NamingSettings {
     }
 }
 
-impl NamingSettings {
+impl NamingFile {
     /// Whether `text` names the plugin `id` at the key path, whatever the
     /// value; a file that does not parse names none.
     pub fn names(&self, text: &str, id: &str) -> bool {

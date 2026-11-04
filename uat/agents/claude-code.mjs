@@ -1050,22 +1050,27 @@ function verbatimSkill(dir, folder) {
     const s = await session(home, c);
     return same({ projectPaths, loads: await loads(c, "cd-throwaway-wx"), folder: s.pluginFolders["cd-throwaway-wx"] }, { projectPaths: [a, b], loads: true, folder: path.join(market, "cd-throwaway-wx") });
   });
-  await p.check("plugins[installed]", "a plugin read from its copy in the cache, its marketplace entry naming no folder below the marketplace's, loads in its record's Project and not in a folder outside its repository whose own settings turn it on", async () => {
+  await p.check("plugins[installed]", "a plugin read from its copy in the cache, its marketplace entry's `source` a `github` object or `../x`, loads in its record's Project and not in a folder outside its repository whose own settings turn it on", async () => {
     await install(main, "cd-throwaway-wc");
     const manifest = path.join(market, ".claude-plugin", "marketplace.json");
     const kept = fs.readFileSync(manifest, "utf8");
     const elsewhere = unrelated("cache-copy");
     switchIn(elsewhere, "settings.json", "cd-throwaway-wc", true);
+    const seen = {};
     try {
-      const entries = JSON.parse(kept);
-      entries.plugins = entries.plugins.map((entry) => (entry.name === "cd-throwaway-wc" ? { ...entry, source: "../elsewhere" } : entry));
-      write(manifest, entries);
-      const s = await session(home, main);
-      const inCache = s.pluginFolders["cd-throwaway-wc"]?.startsWith(path.join(home, "plugins", "cache")) ?? false;
-      return same({ main: await loads(main, "cd-throwaway-wc"), inCache, elsewhere: await loads(elsewhere, "cd-throwaway-wc") }, { main: true, inCache: true, elsewhere: false });
+      for (const [label, source] of [["github", { source: "github", repo: "cd-throwaway/none" }], ["outside", "../elsewhere"]]) {
+        const entries = JSON.parse(kept);
+        entries.plugins = entries.plugins.map((entry) => (entry.name === "cd-throwaway-wc" ? { ...entry, source } : entry));
+        write(manifest, entries);
+        const s = await session(home, main);
+        const inCache = s.pluginFolders["cd-throwaway-wc"]?.startsWith(path.join(home, "plugins", "cache")) ?? false;
+        seen[label] = { main: await loads(main, "cd-throwaway-wc"), inCache, elsewhere: await loads(elsewhere, "cd-throwaway-wc") };
+      }
     } finally {
       write(manifest, kept);
     }
+    const expected = { main: true, inCache: true, elsewhere: false };
+    return same(seen, { github: expected, outside: expected });
   });
   // Found while probing #547, a Ticket to file: the user settings bring
   // the plugin into any folder.

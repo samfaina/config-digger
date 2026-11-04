@@ -2061,10 +2061,10 @@
               "$ref": "#/$defs/ProjectReach"
             },
             "named_in": {
-              "description": "With `project` and `marketplaces`, the files of a Project that name\nplugins by their ids, in any order: a record bound to one Project,\nwhose plugin is read from its marketplace's folder, also applies in\nevery other Project among the Projects whose own files name its id,\nwhatever the value, such as Claude Code's `enabledPlugins` in the\nProject's two settings files. Of several records of one id, the\nfirst applies there. A Project a plugin of that id already applies\nin, by a record bound to it, a record bound to no Project or\n`project_reach`, gets no other. Without it, none.",
+              "description": "With `project` and `marketplaces`, the files of a Project that name\nplugins by their ids, in any order: a record bound to one Project,\nwhose plugin is read from its marketplace's folder, also applies in\nevery other Project among the Projects whose own files name its id,\nwhatever the value, such as Claude Code's `enabledPlugins` in the\nProject's two settings files. A plugin read from its record's\nfolder, one its marketplace's manifest fails included, reaches no\nsuch Project. Of several records of one id, the\nfirst applies there. A Project a plugin of that id already applies\nin, by a record bound to it, a record bound to no Project or\n`project_reach`, gets no other. Without it, none.",
               "type": "array",
               "items": {
-                "$ref": "#/$defs/NamingSettings"
+                "$ref": "#/$defs/NamingFile"
               }
             },
             "version": {
@@ -2409,7 +2409,7 @@
         }
       ]
     },
-    "NamingSettings": {
+    "NamingFile": {
       "description": "A strict JSON file of each Project folder whose object at `key_path`\nnames plugins by their ids, its keys, such as Claude Code's\n`.claude/settings.json` and its `enabledPlugins`.",
       "type": "object",
       "properties": {
