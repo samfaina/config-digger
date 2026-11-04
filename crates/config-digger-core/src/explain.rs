@@ -2534,7 +2534,10 @@ pub(crate) fn unlisted(agent_name: &str, reasons: &[Unlisted]) -> String {
     )
 }
 
-/// Why config-digger never writes an Entry of a read-only Provenance.
+/// Why config-digger never writes an Entry of a read-only Provenance: it
+/// never Removes one, and Disables and Enables a copy of the user's account
+/// only through a switch the Agent keeps for it outside the copy, by its
+/// name, such as Claude Code's `skillOverrides` for a synced skill.
 const READ_ONLY: &str =
     "this Entry is managed, or a copy of the user's account, and config-digger only reads it";
 

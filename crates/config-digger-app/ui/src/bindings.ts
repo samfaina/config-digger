@@ -512,8 +512,9 @@ export type DisableNotOffered =
  */
 "unread" | 
 /**
- *  The Entry is managed, or a copy of the user's account, and
- *  config-digger only reads it.
+ *  The Entry is managed, or a copy of the user's account whose every
+ *  switch is in the copy or is the whole plugin's, and config-digger
+ *  only reads it.
  */
 "read_only" | 
 /**
@@ -1595,7 +1596,10 @@ export type Provenance =
 "managed" | 
 /**
  *  A copy the Agent keeps of configuration in the user's account, such as
- *  skills synced from claude.ai, which config-digger only reads.
+ *  skills synced from claude.ai. config-digger never writes the copy, nor
+ *  Removes it, but Disables and Enables an Entry through a switch the
+ *  Agent keeps for it by its name outside the copy, such as Claude
+ *  Code's `skillOverrides`.
  */
 "cloud_mirror" | 
 /**
@@ -1866,7 +1870,7 @@ export type ReasonCode =
 export type RemoveNotOffered = 
 /**
  *  The Entry is managed, or a copy of the user's account, and
- *  config-digger only reads it.
+ *  config-digger only reads its files.
  */
 "read_only" | 
 /**

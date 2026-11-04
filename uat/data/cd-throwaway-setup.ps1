@@ -112,9 +112,14 @@ Write-TestFile "$Root\project\.mcp.json" @"
   }
 }
 "@
+# `cd-throwaway-shared-off-skill`, a skill synced in claude-code-synced-home's
+# account, is `off` under its folder alone in these shared settings, which
+# config-digger only reads: Enable in the Project writes `on` under its
+# `anthropic-skills:` name in the Project's local settings. Step 38.2 walks it.
 Write-TestFile "$Root\project\.claude\settings.json" @"
 {
-  "enableAllProjectMcpServers": true
+  "enableAllProjectMcpServers": true,
+  "skillOverrides": { "cd-throwaway-shared-off-skill": "off" }
 }
 "@
 Write-TestFile "$Root\project\.claude\skills\cd-throwaway-project-skill\SKILL.md" @"
@@ -307,7 +312,17 @@ description: Throwaway skill for testing config-digger. Does nothing.
 # skill of the home, is `off` in these user settings: Enable in the Project
 # writes `on` for it in the Project's local settings, which decides over
 # the user's. Step 36.2 walks it.
-foreach ($folder in "synced\cd-org_cd-acct\cd-throwaway-spread-skill", "cd-throwaway-user-off-skill") {
+# `cd-throwaway-toggle-skill`, synced too, no settings file names: Disable
+# in the Project writes `off` for it in the Project's local settings, and
+# Enable takes it away. Step 38.1 walks it. `cd-throwaway-shared-off-skill`
+# is `off` in the Project's shared settings, above. Step 38.2 walks it.
+$folders = @(
+    "synced\cd-org_cd-acct\cd-throwaway-spread-skill",
+    "cd-throwaway-user-off-skill",
+    "synced\cd-org_cd-acct\cd-throwaway-toggle-skill",
+    "synced\cd-org_cd-acct\cd-throwaway-shared-off-skill"
+)
+foreach ($folder in $folders) {
     $name = Split-Path $folder -Leaf
     Write-TestFile "$Root\claude-code-synced-home\.claude\skills\$folder\SKILL.md" @"
 ---

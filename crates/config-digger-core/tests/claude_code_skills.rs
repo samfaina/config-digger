@@ -7,7 +7,7 @@ use config_digger_core::api::{
     Action, Advice, Context, Core, DisableOption, EnableOption, Entry, Error, Inventory, Item,
     Narrowing, Plan, ScanOptions, Targets, WarningClass,
 };
-use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem};
+use config_digger_core::ports::fake::{self, FakeEnvironment, FakeFileSystem, FakeGitIndex};
 use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 
@@ -175,7 +175,7 @@ fn enterprise_skills_are_read_from_program_files_as_managed_and_read_only() {
 }
 
 #[test]
-fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
+fn synced_skills_sit_below_an_account_folder_as_a_cloud_mirror_never_removed() {
     let synced = in_home(r".claude\skills\synced\org_acct");
     let fs = with_skill(claude_home(), synced.join("pdf"), &skill_md("pdf"))
         .with_file(synced.join("manifest.json"), "{}")
@@ -198,7 +198,9 @@ fn synced_skills_sit_below_an_account_folder_as_a_read_only_cloud_mirror() {
     );
     assert_eq!(entry["scope"], "user");
     assert_eq!(entry["provenance"], "cloud_mirror");
-    assert_eq!(entry["disable"]["code"], "read_only");
+    // Disable writes the local settings, which only a Project has.
+    assert_eq!(entry["disable"]["code"], "no_mechanism");
+    assert_eq!(entry["remove"]["code"], "read_only");
 }
 
 #[test]
@@ -959,7 +961,7 @@ fn disable_by_name_reaches_every_skill_of_the_item_and_warns_of_wide_reach() {
 }
 
 #[test]
-fn a_read_only_skill_cannot_be_disabled_or_removed() {
+fn a_synced_skill_is_disabled_in_the_local_settings_but_never_removed() {
     let synced = in_home(r".claude\skills\synced\org_acct\pdf");
     let fs = with_skill(
         claude_home().with_folder(PROJECT),
@@ -967,6 +969,11 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
         &skill_md("pdf"),
     );
     let core = core(&fs);
+    let before = inventory(&core, &in_project());
+    match &skill(&before, "anthropic-skills:pdf").entries[0].disable {
+        DisableOption::Offered { path, .. } => assert_eq!(*path, settings_local()),
+        other => panic!("Disable not offered: {other:?}"),
+    }
 
     let disable = plan(
         &core,
@@ -974,8 +981,29 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
         Action::Disable,
         &["anthropic-skills:pdf"],
     )
-    .err()
     .unwrap();
+    let outcome = core.execute(disable, &[]).unwrap();
+
+    assert_eq!(
+        json_of(&fs, settings_local()),
+        json!({ "skillOverrides": { "anthropic-skills:pdf": "off" } })
+    );
+    assert_eq!(
+        state_and_switch(&fs, "anthropic-skills:pdf"),
+        (
+            "disabled".to_owned(),
+            Some(format!(
+                "{}#skillOverrides.anthropic-skills:pdf",
+                settings_local().display()
+            ))
+        )
+    );
+    // Undo takes away what Disable wrote in the file it created, which it
+    // leaves holding nothing, as for any Operation (ADR 0003).
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(json_of(&fs, settings_local()), json!({}));
+
     let remove = plan(
         &core,
         &in_project(),
@@ -984,13 +1012,6 @@ fn a_read_only_skill_cannot_be_disabled_or_removed() {
     )
     .err()
     .unwrap();
-
-    assert_eq!(code(disable.code), "blocked");
-    assert!(
-        disable.message.contains("only reads it"),
-        "{}",
-        disable.message
-    );
     assert_eq!(code(remove.code), "blocked");
     assert!(
         remove.message.contains("only reads it"),
@@ -1141,36 +1162,177 @@ fn a_synced_skill_off_under_its_anthropic_skills_name_is_disabled_by_that_key_wh
 }
 
 #[test]
-fn a_synced_skill_off_under_both_keys_stays_read_only() {
+fn a_synced_skill_off_under_both_keys_in_the_local_settings_is_enabled_by_deleting_both() {
+    let local = settings_local();
     let fs = synced_pdf_overridden(
-        &settings_local(),
+        &local,
         json!({ "anthropic-skills:pdf": "off", "pdf": "off" }),
     );
     let core = core(&fs);
+    let before = values_of(&fs, &[&local]);
 
     let inventory = inventory(&core, &in_project());
 
     let entry = &skill(&inventory, "anthropic-skills:pdf").entries[0];
     assert_eq!(code(entry.state), "disabled");
     assert!(
-        matches!(&entry.enable, Some(EnableOption::NotOffered { sentence }) if sentence.contains("only reads it")),
+        matches!(&entry.enable, Some(EnableOption::Offered { .. })),
         "{:?}",
         entry.enable
     );
-    let refused = plan(
+    let enable = plan(
         &core,
         &in_project(),
         Action::Enable,
         &["anthropic-skills:pdf"],
     )
-    .err()
     .unwrap();
-    assert_eq!(code(refused.code), "blocked");
-    assert!(
-        refused.message.contains("only reads it"),
-        "{}",
-        refused.message
+    let outcome = core.execute(enable, &[]).unwrap();
+
+    assert_eq!(json_of(&fs, &local), json!({ "skillOverrides": {} }));
+    assert_eq!(
+        state_and_switch(&fs, "anthropic-skills:pdf"),
+        ("effective".to_owned(), None)
     );
+    core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+        .unwrap();
+    assert_eq!(values_of(&fs, &[&local]), before);
+}
+
+#[test]
+fn an_unread_synced_skill_in_a_project_offers_nothing_whatever_its_local_settings_hold() {
+    // Signed out: the home names the account but keeps no credentials.
+    let signed_out = FakeFileSystem::new().with_file(
+        in_home(".claude.json"),
+        json!({ "oauthAccount": { "organizationUuid": "org", "accountUuid": "acct" } }).to_string(),
+    );
+    let fs = with_skill(
+        signed_out.with_folder(PROJECT),
+        in_home(r".claude\skills\synced\org_acct\pdf"),
+        &skill_md("pdf"),
+    );
+    for overrides in [json!({}), json!({ "anthropic-skills:pdf": "off" })] {
+        let fs = with_overrides(fs.clone(), &[(&settings_local(), overrides.clone())]);
+        let core = core(&fs);
+
+        let inventory = inventory(&core, &in_project());
+
+        let entry = entry_json(&skill(&inventory, "anthropic-skills:pdf").entries[0]);
+        assert_eq!(entry["state"], "unread", "{overrides} {entry}");
+        assert_eq!(entry["disable"]["code"], "unread", "{overrides} {entry}");
+        assert_ne!(entry["enable"]["status"], "offered", "{overrides} {entry}");
+        assert_eq!(entry["remove"]["code"], "read_only", "{overrides} {entry}");
+        for action in [Action::Disable, Action::Enable, Action::Remove] {
+            let refused = plan(&core, &in_project(), action, &["anthropic-skills:pdf"])
+                .err()
+                .unwrap();
+            assert_eq!(code(refused.code), "blocked", "{overrides} {action:?}");
+        }
+    }
+}
+
+/// What Disable and Enable offer the skill `name` and what their plans
+/// answer, in a Project whose local settings are git-versioned, with the
+/// Entry's name and locator left out, so that two skills compare.
+fn under_versioned_local_settings(fs: &FakeFileSystem, name: &str) -> Vec<String> {
+    let env = FakeEnvironment::with_home(HOME).with_var("LOCALAPPDATA", LOCAL_APP_DATA);
+    let mut ports = fake::ports(fs.clone(), env);
+    ports.git = Box::new(FakeGitIndex::default().with_versioned(settings_local()));
+    let core = Core::new(ports).unwrap();
+    let inventory = inventory(&core, &in_project());
+    let entry = &skill(&inventory, name).entries[0];
+    let without_name = |text: String| {
+        text.replace(&entry.locator, "<locator>")
+            .replace(name, "<name>")
+    };
+    let answer = |action| match plan(&core, &in_project(), action, &[name]) {
+        Ok(plan) => format!("planned, warning of {:?}", plan.warnings()),
+        Err(error) => format!("{}: {}", code(error.code), error.message),
+    };
+    vec![
+        without_name(format!("{:?}", entry.disable)),
+        // Enable of the synced skill deletes its two keys, which it says.
+        match &entry.enable {
+            Some(EnableOption::Offered { .. }) => "Enable offered".to_owned(),
+            other => without_name(format!("{other:?}")),
+        },
+        without_name(answer(Action::Disable)),
+        without_name(answer(Action::Enable)),
+    ]
+}
+
+#[test]
+fn under_git_versioned_local_settings_a_synced_skill_is_disabled_and_enabled_as_a_project_skill_is()
+{
+    let synced = with_skill(
+        claude_home().with_folder(PROJECT),
+        in_home(r".claude\skills\synced\org_acct\pdf"),
+        &skill_md("pdf"),
+    );
+    let project = with_skill(
+        claude_home().with_folder(PROJECT),
+        project_skill("pdf"),
+        &skill_md("pdf"),
+    );
+    for overrides in [
+        json!({}),
+        json!({ "pdf": "off", "anthropic-skills:pdf": "off" }),
+    ] {
+        let local = json!({ "skillOverrides": overrides }).to_string();
+        let synced = under_versioned_local_settings(
+            &synced.clone().with_file(settings_local(), local.clone()),
+            "anthropic-skills:pdf",
+        );
+        let project = under_versioned_local_settings(
+            &project.clone().with_file(settings_local(), local),
+            "pdf",
+        );
+        assert_eq!(synced, project, "{overrides}");
+    }
+}
+
+#[test]
+fn enable_of_a_synced_skill_off_by_its_folder_in_the_shared_or_the_user_settings_writes_on_in_the_local_settings()
+ {
+    let local = settings_local();
+    for lower in [settings_shared(), settings_user()] {
+        let fs = with_overrides(
+            with_skill(
+                claude_home().with_folder(PROJECT),
+                in_home(r".claude\skills\synced\org_acct\pdf"),
+                &skill_md("pdf"),
+            ),
+            &[(&lower, json!({ "pdf": "off" }))],
+        );
+        let core = core(&fs);
+        let before = values_of(&fs, &[&local, &lower]);
+        let case = lower.display();
+
+        let enable = plan(
+            &core,
+            &in_project(),
+            Action::Enable,
+            &["anthropic-skills:pdf"],
+        )
+        .unwrap();
+        let outcome = core.execute(enable, &[]).unwrap();
+
+        assert_eq!(
+            json_of(&fs, &local),
+            json!({ "skillOverrides": { "anthropic-skills:pdf": "on" } }),
+            "{case}"
+        );
+        assert_eq!(values_of(&fs, &[&lower]), before[1..], "{case}");
+        assert_eq!(
+            state_and_switch(&fs, "anthropic-skills:pdf"),
+            ("effective".to_owned(), None),
+            "{case}"
+        );
+        core.execute(core.plan_undo(&outcome.operation).unwrap(), &[])
+            .unwrap();
+        assert_eq!(values_of(&fs, &[&lower]), before[1..], "{case}");
+        assert_eq!(json_of(&fs, &local), json!({}), "{case}");
+    }
 }
 
 #[test]

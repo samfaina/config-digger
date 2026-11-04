@@ -3808,7 +3808,7 @@
           "const": "managed"
         },
         {
-          "description": "A copy the Agent keeps of configuration held in the user's account,\nsuch as skills synced from claude.ai. config-digger only reads it.",
+          "description": "A copy the Agent keeps of configuration held in the user's account,\nsuch as skills synced from claude.ai. config-digger never writes the\ncopy, nor Removes its Entries, but writes the switches the Agent\nkeeps for one of its Entries, by its name, in files outside the copy,\nsuch as Claude Code's `skillOverrides`. A switch in the copy, or in a\nplugin's folder, or one of a whole plugin, it only reads.",
           "type": "string",
           "const": "cloud-mirror"
         },

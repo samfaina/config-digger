@@ -2496,7 +2496,7 @@ impl AgentDefinition {
             }
             // Its key paths are in the TOML it holds, not in its own text.
             if matches!(location.format, Format::TomlFragments(_))
-                && !location.provenance.read_only()
+                && !location.provenance.files_read_only()
             {
                 return Err(context(
                     "a toml-fragments location is read only: its provenance must be".into(),
@@ -2950,7 +2950,7 @@ impl AgentDefinition {
                                     && fallback.format.file().is_some()
                                     && !fallback.anchor.in_project()
                                     && fallback.anchor.plugin().is_none()
-                                    && !fallback.provenance.read_only()
+                                    && !fallback.provenance.files_read_only()
                             });
                         if fallback.is_none() {
                             return Err(context(format!(

@@ -582,12 +582,48 @@ fn switch_keys<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Vec<Cow<'e, 
     keys
 }
 
+/// Whether config-digger writes the switch of `mechanism` for `entry`, an
+/// Entry of `location`: the switch covers it, and its Provenance lets
+/// config-digger write it. An Entry of a plugin is Disabled through the
+/// plugin's own switch, or through a switch per Entry the definition says
+/// holds plugin Entries by an id that names their plugin. A switch keyed by
+/// plugin never holds an Entry of no plugin.
+fn writable(mechanism: Switched, location: &LocationDefinition, entry: &ScannedEntry) -> bool {
+    mechanism.covers(&location.id)
+        && mechanism.covers_plugin(plugin_scope(entry))
+        && if entry.plugin.is_some() {
+            mechanism.switch().plugins() || mechanism.holds_plugin_entries()
+        } else {
+            !mechanism.switch().plugins()
+        }
+        && location.provenance.writes_switch(mechanism)
+}
+
+/// Whether config-digger only reads `entry`, an Entry of `location`: it
+/// writes none of its files, and no switch that covers it.
+fn entry_read_only(
+    definition: &AgentDefinition,
+    location: &LocationDefinition,
+    entry: &ScannedEntry,
+) -> bool {
+    location.provenance.files_read_only()
+        && !definition
+            .rules(location.kind)
+            .disable
+            .iter()
+            .filter_map(DisableMechanism::switched)
+            .any(|mechanism| writable(mechanism, location, entry))
+}
+
 /// What Enable writes to lift `disabling`, the switches that Disable an
 /// Entry of `location` and the partial switches it takes away, as a sentence. Or why it is not offered:
-/// config-digger only reads the Entry, or one of them is a switch it only
-/// reads.
+/// config-digger writes no switch of one of them for the Entry, as it only
+/// reads its Provenance, or one of them is a switch it only reads.
 pub(crate) fn enable(location: &LocationDefinition, disabling: &[&Hit]) -> Result<String, String> {
-    if location.provenance.read_only() {
+    if !disabling
+        .iter()
+        .all(|hit| location.provenance.writes_switch(hit.mechanism))
+    {
         return Err(explain::read_only_enable());
     }
     if let Some(hit) = disabling.iter().find(|hit| hit.mechanism.policy()) {
@@ -674,7 +710,7 @@ pub(crate) fn choose(
             explain::mirrored_option("Disable", &mirror.owner, mirror.source_folder.as_deref());
         return Err((DisableNotOffered::Mirrored, sentence));
     }
-    if location.provenance.read_only() {
+    if entry_read_only(definition, location, entry) {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }
     let context = project.map(|project| project.key);
@@ -692,10 +728,6 @@ pub(crate) fn choose(
     if let Some(block) = merged_field {
         return through_merged_field(definition, snapshot, entry, project, block);
     }
-    // An Entry of a plugin is Disabled through the plugin's own switch, or
-    // through a switch per Entry the definition says holds plugin Entries
-    // by an id that names their plugin. A switch keyed by plugin never
-    // holds an Entry of no plugin.
     let in_plugin = entry.plugin.is_some();
     let mechanisms = &definition.rules(location.kind).disable;
     let mut switched: Vec<(usize, Switched)> = mechanisms
@@ -703,8 +735,7 @@ pub(crate) fn choose(
         .enumerate()
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
         .filter(|(_, mechanism)| {
-            mechanism.covers(&location.id)
-                && mechanism.covers_plugin(plugin_scope(entry))
+            writable(*mechanism, location, entry)
                 && switch_read(
                     definition,
                     snapshot,
@@ -713,11 +744,6 @@ pub(crate) fn choose(
                     project.map(|project| project.key),
                 )
                 && mechanism.disable_offered()
-                && if in_plugin {
-                    mechanism.switch().plugins() || mechanism.holds_plugin_entries()
-                } else {
-                    !mechanism.switch().plugins()
-                }
         })
         .collect();
     switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));
@@ -934,7 +960,7 @@ fn through_merged_field(
             }
             continue;
         }
-        if layer.provenance.read_only() {
+        if layer.provenance.files_read_only() {
             continue;
         }
         if let Some(above) = highest_above(rank).filter(|_| block.requires_unset_above) {
@@ -1425,7 +1451,7 @@ pub(crate) fn deleted_by_enable(
             field_of(setter, field)
         };
         let versioned = snapshot.versioned.contains(&setter.path);
-        if versioned || layer.provenance.read_only() {
+        if versioned || layer.provenance.files_read_only() {
             let at = locator::render(&setter.path, &key_path);
             return Err(explain::turned_off_enable(field, &at, versioned));
         }
@@ -1435,7 +1461,7 @@ pub(crate) fn deleted_by_enable(
             syntax: merged_syntax(layer),
         });
     }
-    if !deleted.is_empty() && location.provenance.read_only() {
+    if !deleted.is_empty() && location.provenance.files_read_only() {
         return Err(explain::read_only_enable());
     }
     Ok(deleted)

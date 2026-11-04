@@ -3087,7 +3087,7 @@ fn remove(
             how_to_remove: None,
         };
     }
-    if location.provenance.read_only() {
+    if location.provenance.files_read_only() {
         return api::RemoveOption::NotOffered {
             code: api::RemoveNotOffered::ReadOnly,
             sentence: explain::read_only_remove_option(),
