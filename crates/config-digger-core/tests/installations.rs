@@ -180,8 +180,10 @@ fn the_agent_lists_its_tested_range() {
     );
 }
 
-// #549: 2.1.316 to 2.1.309 read `CLAUDE_CODE_OAUTH_TOKEN` in the Project's
-// settings otherwise than the definition says, so they left the range.
+// #549: 2.1.299 to 2.1.309 left the range, since they read
+// `CLAUDE_CODE_OAUTH_TOKEN` in the Project's settings otherwise than the
+// definition says, and 2.1.302 fails the check of a home with no
+// `oauthAccount`.
 #[test]
 fn a_version_the_range_left_is_noted_as_older_than_it() {
     let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 309, 0])));
