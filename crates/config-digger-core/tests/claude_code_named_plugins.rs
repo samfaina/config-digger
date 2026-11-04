@@ -312,3 +312,188 @@ fn a_local_scope_record_is_listed_where_the_settings_name_it_too() {
 
     assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
 }
+
+/// `fs` whose user settings turn `demo@acme` on or off (#555).
+fn user_switched(fs: FakeFileSystem, on: bool) -> FakeFileSystem {
+    fs.with_file(
+        in_home(r".claude\settings.json"),
+        json!({ "enabledPlugins": { "demo@acme": on } }).to_string(),
+    )
+}
+
+#[test]
+fn a_project_none_of_whose_files_name_the_plugin_lists_it_when_the_user_settings_turn_it_on() {
+    let fs = user_switched(fixture(), true);
+
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+    assert_eq!(carried(&inventory_at(&fs, REPO)), demo("effective", ""));
+}
+
+#[test]
+fn a_project_none_of_whose_files_name_the_plugin_lists_it_disabled_when_the_user_settings_turn_it_off_and_enable_turns_it_on()
+ {
+    let fs = user_switched(fixture(), false);
+    assert_eq!(
+        carried(&inventory_at(&fs, OTHER)),
+        demo("disabled", "plugin_disabled")
+    );
+
+    act_in_other(&fs, Action::Enable);
+
+    assert_eq!(
+        other_local(&fs),
+        json!({ "enabledPlugins": { "demo@acme": true } })
+    );
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+}
+
+#[test]
+fn disable_where_the_user_settings_alone_turn_the_plugin_on_writes_the_project_s_local_settings_and_it_still_lists_the_plugin()
+ {
+    let fs = user_switched(fixture(), true);
+
+    act_in_other(&fs, Action::Disable);
+
+    assert_eq!(
+        other_local(&fs),
+        json!({ "enabledPlugins": { "demo@acme": false } })
+    );
+    assert_eq!(
+        carried(&inventory_at(&fs, OTHER)),
+        demo("disabled", "plugin_disabled")
+    );
+    assert_eq!(carried(&inventory_at(&fs, REPO)), demo("effective", ""));
+}
+
+#[test]
+fn a_project_whose_own_settings_and_the_user_settings_name_the_plugin_lists_it_once() {
+    let fs = switched(user_switched(fixture(), true), OTHER, "settings.json", true);
+
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+    assert_eq!(carried(&inventory_at(&fs, REPO)), demo("effective", ""));
+}
+
+#[test]
+fn where_the_user_settings_name_the_plugin_a_user_scope_record_leaves_one_copy_in_each_project() {
+    // The record Claude Code writes in the first session the user settings
+    // bring the plugin into, as `claude-code.mjs` found.
+    let fs = recorded(
+        user_switched(fixture(), true),
+        json!([record("project", Some(REPO)), record("user", None)]),
+    );
+
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+    assert_eq!(carried(&inventory_at(&fs, REPO)), demo("effective", ""));
+}
+
+#[test]
+fn a_linked_worktree_of_the_record_s_repository_lists_the_plugin_once_where_the_user_settings_name_it()
+ {
+    let worktree = r"E:\repo-wt";
+    let fs = user_switched(fixture(), true)
+        .with_folder(Path::new(REPO).join(r".git\worktrees\wt"))
+        .with_file(
+            Path::new(worktree).join(".git"),
+            "gitdir: E:/repo/.git/worktrees/wt\n",
+        );
+    let core = core(&fs);
+    let options = ScanOptions {
+        projects: vec![
+            PathBuf::from(REPO),
+            PathBuf::from(worktree),
+            PathBuf::from(OTHER),
+        ],
+    };
+    let snapshot = core.scan(&options).unwrap();
+
+    for project in [REPO, worktree, OTHER] {
+        let inventory = core.resolve(&snapshot, &in_project(project));
+        assert_eq!(carried(&inventory), demo("effective", ""), "{project}");
+    }
+}
+
+/// [`fixture`] whose marketplace's entry gives no path below its folder,
+/// so that Claude Code reads the plugin's copy in the cache.
+fn read_from_the_cache(fs: FakeFileSystem) -> FakeFileSystem {
+    fs.with_file(
+        Path::new(MARKET).join(r".claude-plugin\marketplace.json"),
+        json!({ "name": "acme", "plugins": [{ "name": "demo", "source": "../elsewhere" }] })
+            .to_string(),
+    )
+}
+
+#[test]
+fn a_plugin_read_from_its_copy_in_the_cache_is_not_listed_where_the_user_settings_alone_name_it() {
+    // Claude Code does not load it in a folder no record applies in, as
+    // `claude-code.mjs` found, until that session installs it at user scope.
+    let fs = read_from_the_cache(user_switched(fixture(), true));
+
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), Vec::new());
+    assert_eq!(
+        carried(&inventory_at(&fs, REPO)),
+        demo_in(Path::new(CACHE), "effective", "")
+    );
+}
+
+#[test]
+fn a_plugin_read_from_its_copy_in_the_cache_is_listed_everywhere_once_claude_code_installs_it_at_user_scope()
+ {
+    let fs = recorded(
+        read_from_the_cache(user_switched(fixture(), true)),
+        json!([record("project", Some(REPO)), record("user", None)]),
+    );
+
+    assert_eq!(
+        carried(&inventory_at(&fs, OTHER)),
+        demo_in(Path::new(CACHE), "effective", "")
+    );
+}
+
+#[test]
+fn a_local_scope_record_is_listed_where_the_user_settings_alone_name_it() {
+    let fs = recorded(
+        user_switched(fixture(), true),
+        json!([record("local", Some(REPO))]),
+    );
+
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+}
+
+#[test]
+fn a_project_whose_shared_settings_turn_the_plugin_off_enables_it_in_its_local_settings() {
+    let fs = switched(fixture(), OTHER, "settings.json", false);
+    assert_eq!(
+        carried(&inventory_at(&fs, OTHER)),
+        demo("disabled", "plugin_disabled")
+    );
+
+    act_in_other(&fs, Action::Enable);
+
+    assert_eq!(
+        other_local(&fs),
+        json!({ "enabledPlugins": { "demo@acme": true } })
+    );
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+}
+
+#[test]
+fn enable_of_the_plugin_s_skill_where_the_user_settings_turn_it_off_writes_the_project_s_local_settings()
+ {
+    let fs = user_switched(fixture(), false);
+    let core = core(&fs);
+    let snapshot = core.scan(&scan_options()).unwrap();
+    let targets = Targets {
+        selectors: vec!["demo:notes".to_owned()],
+        ..Targets::default()
+    };
+    let plan = core
+        .plan(&snapshot, &in_project(OTHER), Action::Enable, &targets)
+        .unwrap();
+    core.execute(plan, &[WarningClass::WideReach]).unwrap();
+
+    assert_eq!(
+        other_local(&fs),
+        json!({ "enabledPlugins": { "demo@acme": true } })
+    );
+    assert_eq!(carried(&inventory_at(&fs, OTHER)), demo("effective", ""));
+}

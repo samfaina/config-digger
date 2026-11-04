@@ -359,7 +359,9 @@ fn set_for<'a>(
 /// a layer whose switch Enable takes away leaves the next to decide; when
 /// that is one config-digger only reads that Disables the Entry, an
 /// earlier layer that Enable can set over the later ones, such as Claude
-/// Code's local `skillOverrides`, is set instead, and decides.
+/// Code's local `skillOverrides`, is set instead, and decides. So it is
+/// over a later layer config-digger writes, when the earlier one
+/// `sets_over_later_layers`, such as Claude Code's local `enabledPlugins`.
 fn read_layers<'a>(
     layers: &[Layer<'a>],
     every_layer: bool,
@@ -405,9 +407,10 @@ fn read_layers<'a>(
                 continue;
             }
             let disables = mechanism.disables(value, key, folder);
-            if let Some(over) =
-                over.filter(|&over| over < layer && disables && !mechanism.enable_offered())
-            {
+            let over_this = |over: usize| {
+                !mechanism.enable_offered() || layers[over].mechanism.sets_over_writable_layers()
+            };
+            if let Some(over) = over.filter(|&over| over < layer && disables && over_this(over)) {
                 set_over(&layers[over], folder, disabling);
                 return;
             }
