@@ -736,7 +736,9 @@ function verbatimSkill(dir, folder) {
   skill(path.join(main, ".claude", "skills", "cd-throwaway-main-only"), ["description: main root"]);
   skill(path.join(main, ".claude", "skills", "cd-throwaway-shared"), ["description: main shared"]);
   skill(path.join(main, "sub", ".claude", "skills", "cd-throwaway-main-sub"), ["description: main sub"]);
-  write(path.join(main, ".mcp.json"), { mcpServers: { "cd-throwaway-main": stdio("main") } });
+  // Not `stdio("main")`: `cmd /c main` runs Windows' `main.cpl` where
+  // `PATHEXT` holds `.CPL`, whose window keeps the folder it started in.
+  write(path.join(main, ".mcp.json"), { mcpServers: { "cd-throwaway-main": stdio("cd-throwaway-main") } });
   const worktree = async (folder) => {
     await git(main, "worktree", "add", "-q", folder);
     return folder;

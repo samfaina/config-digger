@@ -57,7 +57,7 @@ fn home(core: &Core, id: &str) -> Home {
 
 #[test]
 fn the_native_installation_shows_the_version_of_its_executable() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
 
     let home = home(&core(&fs), "claude-code");
 
@@ -65,7 +65,7 @@ fn the_native_installation_shows_the_version_of_its_executable() {
         panic!("one Installation: {:?}", home.installations);
     };
     assert_eq!(installation.path, native_claude());
-    assert_eq!(installation.version.as_deref(), Some("2.1.299"));
+    assert_eq!(installation.version.as_deref(), Some("2.1.316"));
     assert!(!installation.out_of_range);
     assert!(!home.out_of_range);
     assert_eq!(home.notes, []);
@@ -77,7 +77,7 @@ fn note_codes(home: &Home) -> Vec<AgentNoteCode> {
 
 #[test]
 fn a_newer_version_is_noted_as_outside_the_tested_range() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 319, 0])));
 
     let home = home(&core(&fs), "claude-code");
 
@@ -93,7 +93,7 @@ fn a_newer_version_is_noted_as_outside_the_tested_range() {
     );
     assert_eq!(
         note.sentence,
-        "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.299 to 2.1.309)."
+        "Claude Code 2.1.319 is newer than the versions this definition was tested with (2.1.314 to 2.1.318)."
     );
 }
 
@@ -106,20 +106,20 @@ fn an_older_version_is_treated_like_a_newer_one() {
     assert!(home.installations[0].out_of_range);
     assert_eq!(
         home.notes[0].sentence,
-        "Claude Code 2.0.9 is older than the versions this definition was tested with (2.1.299 to 2.1.309)."
+        "Claude Code 2.0.9 is older than the versions this definition was tested with (2.1.314 to 2.1.318)."
     );
 }
 
 #[test]
 fn the_version_is_read_again_at_every_scan() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
     let core = core(&fs);
     assert_eq!(note_codes(&home(&core, "claude-code")), []);
 
-    fs.put_file(native_claude(), fake::executable(Some([2, 1, 311, 0])));
+    fs.put_file(native_claude(), fake::executable(Some([2, 1, 320, 0])));
 
     let home = home(&core, "claude-code");
-    assert_eq!(home.installations[0].version.as_deref(), Some("2.1.311"));
+    assert_eq!(home.installations[0].version.as_deref(), Some("2.1.320"));
     assert_eq!(
         note_codes(&home),
         [AgentNoteCode::VersionOutsideTestedRange]
@@ -176,7 +176,28 @@ fn the_agent_lists_its_tested_range() {
     let tested = agents[0].tested.as_ref().expect("a tested range");
     assert_eq!(
         (tested.min.as_str(), tested.max.as_str()),
-        ("2.1.299", "2.1.309")
+        ("2.1.314", "2.1.318")
+    );
+}
+
+// #549: 2.1.299 to 2.1.309 left the range, since they read
+// `CLAUDE_CODE_OAUTH_TOKEN` in the Project's settings otherwise than the
+// definition says, and 2.1.302 fails the check of a home with no
+// `oauthAccount`.
+#[test]
+fn a_version_the_range_left_is_noted_as_older_than_it() {
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 309, 0])));
+
+    let home = home(&core(&fs), "claude-code");
+
+    assert!(home.installations[0].out_of_range);
+    assert_eq!(
+        note_codes(&home),
+        [AgentNoteCode::VersionOutsideTestedRange]
+    );
+    assert_eq!(
+        home.notes[0].sentence,
+        "Claude Code 2.1.309 is older than the versions this definition was tested with (2.1.314 to 2.1.318)."
     );
 }
 
@@ -187,7 +208,7 @@ fn the_version_that_last_ran_against_the_home_is_shown_beside_the_installations(
             PathBuf::from(HOME).join(".claude.json"),
             r#"{ "lastReleaseNotesSeen": "2.1.284", "mcpServers": {} }"#,
         )
-        .with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+        .with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
 
     let home = home(&core(&fs), "claude-code");
 
@@ -209,12 +230,12 @@ fn core_with_app_data(fs: &FakeFileSystem) -> Core {
 fn every_installation_that_reads_the_home_is_checked_and_any_out_of_range_flags_it() {
     let desktop = PathBuf::from(APP_DATA).join(r"Claude\claude-code\2.1.284\claude.exe");
     let msix = PathBuf::from(LOCAL_APP_DATA).join(
-        r"Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\2.1.299\635c1867224a\claude.exe",
+        r"Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code\2.1.316\635c1867224a\claude.exe",
     );
     let fs = fixture()
-        .with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])))
+        .with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])))
         .with_file(&desktop, fake::executable(Some([2, 1, 284, 0])))
-        .with_file(&msix, fake::executable(Some([2, 1, 299, 0])));
+        .with_file(&msix, fake::executable(Some([2, 1, 316, 0])));
 
     let home = home(&core_with_app_data(&fs), "claude-code");
 
@@ -233,9 +254,9 @@ fn every_installation_that_reads_the_home_is_checked_and_any_out_of_range_flags_
     assert_eq!(
         installed,
         [
-            ("native", Some("2.1.299"), false),
+            ("native", Some("2.1.316"), false),
             ("claude-desktop", Some("2.1.284"), true),
-            ("claude-desktop-msix", Some("2.1.299"), false),
+            ("claude-desktop-msix", Some("2.1.316"), false),
         ]
     );
     let [note] = home.notes.as_slice() else {
@@ -247,14 +268,14 @@ fn every_installation_that_reads_the_home_is_checked_and_any_out_of_range_flags_
 #[test]
 fn claude_desktop_s_copy_is_found_in_each_package_s_moved_data_folder() {
     let anthropic_pbc = PathBuf::from(LOCAL_APP_DATA).join(
-        r"Claude-Data\anthropicpbc.claude_fnn82j28hfe8t\claude-code\2.1.299\635c1867224a\claude.exe",
+        r"Claude-Data\anthropicpbc.claude_fnn82j28hfe8t\claude-code\2.1.316\635c1867224a\claude.exe",
     );
     let moved = PathBuf::from(LOCAL_APP_DATA)
-        .join(r"Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.299\635c1867224a\claude.exe");
+        .join(r"Claude-Data\claude_pzs8sxrjxfjjc\claude-code\2.1.316\635c1867224a\claude.exe");
     let fs = fixture()
-        .with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])))
-        .with_file(&anthropic_pbc, fake::executable(Some([2, 1, 299, 0])))
-        .with_file(&moved, fake::executable(Some([2, 1, 299, 0])));
+        .with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])))
+        .with_file(&anthropic_pbc, fake::executable(Some([2, 1, 316, 0])))
+        .with_file(&moved, fake::executable(Some([2, 1, 316, 0])));
 
     let home = home(&core_with_app_data(&fs), "claude-code");
 
@@ -286,7 +307,7 @@ fn remove_notes(core: &Core) -> Plan {
 
 #[test]
 fn an_operation_on_the_agent_gets_the_note_as_an_informational_line_and_still_applies() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 319, 0])));
     let core = core(&fs);
 
     let plan = remove_notes(&core);
@@ -301,7 +322,7 @@ fn an_operation_on_the_agent_gets_the_note_as_an_informational_line_and_still_ap
         info,
         [(
             InfoCode::VersionOutsideTestedRange,
-            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.299 to 2.1.309)."
+            "Claude Code 2.1.319 is newer than the versions this definition was tested with (2.1.314 to 2.1.318)."
         )]
     );
     assert_eq!(plan.preview().info[0].path, native_claude());
@@ -325,7 +346,7 @@ fn every_note_of_the_agent_home_becomes_an_informational_line() {
 
 #[test]
 fn an_operation_on_an_agent_within_its_tested_range_has_no_version_line() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
 
     let plan = remove_notes(&core(&fs));
 
@@ -334,7 +355,7 @@ fn an_operation_on_an_agent_within_its_tested_range_has_no_version_line() {
 
 #[test]
 fn an_undo_of_an_operation_on_the_agent_gets_the_line_too() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 310, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 319, 0])));
     let core = core(&fs);
     let outcome = core.execute(remove_notes(&core), &[]).unwrap();
 
@@ -353,7 +374,7 @@ fn executable_reads(fs: &FakeFileSystem, run: impl FnOnce()) -> usize {
 
 #[test]
 fn an_undo_reads_the_versions_once_though_it_scans_twice() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
     let core = core(&fs);
     let one_scan = executable_reads(&fs, || {
         core.scan(&ScanOptions::default()).unwrap();
@@ -381,7 +402,7 @@ fn a_plan_predicting_with_another_scan_reads_no_version_again() {
 "#,
         )
         .with_folder(&project)
-        .with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+        .with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
     let core = core(&fs);
     let snapshot = core
         .scan(&ScanOptions {
@@ -407,7 +428,7 @@ fn a_plan_predicting_with_another_scan_reads_no_version_again() {
 
 #[test]
 fn each_of_two_scans_reads_the_versions() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
     let core = core(&fs);
     let scan = || {
         core.scan(&ScanOptions::default()).unwrap();
@@ -444,7 +465,7 @@ fn with_no_installation_found_the_running_agent_warning_never_fires() {
 
 #[test]
 fn with_an_installation_found_the_running_agent_warning_fires() {
-    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 299, 0])));
+    let fs = fixture().with_file(native_claude(), fake::executable(Some([2, 1, 316, 0])));
 
     let plan = remove_notes(&claude_code_running(&fs));
 
@@ -459,7 +480,7 @@ fn an_npm_installation_reads_its_package_json() {
         .with_file(npm.join("claude.cmd"), "@node cli.js %*\r\n")
         .with_file(
             npm.join(r"node_modules\@anthropic-ai\claude-code\package.json"),
-            r#"{ "name": "@anthropic-ai/claude-code", "version": "2.1.299" }"#,
+            r#"{ "name": "@anthropic-ai/claude-code", "version": "2.1.316" }"#,
         );
 
     let home = home(&core_with_app_data(&fs), "claude-code");
@@ -469,7 +490,7 @@ fn an_npm_installation_reads_its_package_json() {
     };
     assert_eq!(
         (installation.id.as_str(), installation.version.as_deref()),
-        ("npm", Some("2.1.299"))
+        ("npm", Some("2.1.316"))
     );
     assert_eq!(note_codes(&home), []);
 }

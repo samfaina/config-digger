@@ -56,7 +56,7 @@ impl Harness {
     fn with_native_claude_code(self) -> Self {
         let native = self.path(".local/bin/claude.exe");
         std::fs::create_dir_all(native.parent().unwrap()).unwrap();
-        std::fs::write(native, executable(Some([2, 1, 299, 0]))).unwrap();
+        std::fs::write(native, executable(Some([2, 1, 316, 0]))).unwrap();
         self
     }
 
@@ -3001,7 +3001,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     );
     let native = harness.path(r".local\bin\claude.exe");
     std::fs::create_dir_all(native.parent().unwrap()).unwrap();
-    std::fs::write(&native, executable(Some([2, 1, 310, 0]))).unwrap();
+    std::fs::write(&native, executable(Some([2, 1, 319, 0]))).unwrap();
 
     let json = harness.run(&["agents", "--json"]);
     let text = harness.run(&["agents", "--wide"]);
@@ -3010,10 +3010,10 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     let agent = &json.document()["agents"][0];
     assert_eq!(
         agent["tested"],
-        json!({ "min": "2.1.299", "max": "2.1.309" })
+        json!({ "min": "2.1.314", "max": "2.1.318" })
     );
     let home = &agent["homes"][0];
-    assert_eq!(home["installations"][0]["version"], "2.1.310");
+    assert_eq!(home["installations"][0]["version"], "2.1.319");
     assert_eq!(home["installations"][0]["out_of_range"], true);
     assert_eq!(home["last_ran"], "2.1.284");
     let codes: Vec<&Value> = home["notes"]
@@ -3038,8 +3038,8 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
             "default",
             "definition",
             "default",
-            "2.1.310!",
-            "2.1.299-2.1.309"
+            "2.1.319!",
+            "2.1.314-2.1.318"
         ]
     );
     assert!(
@@ -3049,7 +3049,7 @@ fn agents_shows_the_installed_and_tested_versions_and_marks_one_out_of_range() {
     );
     assert!(
         text.stdout.contains(
-            "Claude Code 2.1.310 is newer than the versions this definition was tested with (2.1.299 to 2.1.309)."
+            "Claude Code 2.1.319 is newer than the versions this definition was tested with (2.1.314 to 2.1.318)."
         ),
         "{}",
         text.stdout
@@ -3107,7 +3107,7 @@ fn agents_says_when_no_installation_is_found_and_still_exits_0() {
             "definition",
             "default",
             "none",
-            "2.1.299-2.1.309"
+            "2.1.314-2.1.318"
         ]
     );
     assert!(

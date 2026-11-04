@@ -4,11 +4,15 @@
 # for `%ProgramFiles%` and the policy values, claude-code-machine.mjs in
 # Windows Sandbox, and, for the skills synced from claude.ai,
 # claude-account.mjs with a claude.ai account
-# (docs/research/release-gate.md). They pass on 2.1.299 to 2.1.309;
-# 2.1.286 reads plain-string lists and skill names as before 2.1.299.
+# (docs/research/release-gate.md). They pass on 2.1.314 to 2.1.318.
+# 2.1.299 to 2.1.309 left the range (#549): there `CLAUDE_CODE_OAUTH_TOKEN`
+# in the Project's `.claude/settings.json` takes the synced skills off,
+# which the definition does not model (#493), and 2.1.302 fails the check
+# of a home with no `oauthAccount` (#491). 2.1.286 reads plain-string
+# lists and skill names as before 2.1.299.
 
 format_version = 1
-verified = { min = "2.1.299", max = "2.1.309" }
+verified = { min = "2.1.314", max = "2.1.318" }
 
 [agent]
 id = "claude-code"
@@ -102,10 +106,11 @@ credentials = { block = "home", root = "credentials_file" }
 # which ranks above the user's [docs]. In the `env` of a Project's
 # `.claude/settings.json` or `.claude/settings.local.json` it leaves Claude
 # Code on the account, which reads the synced skills and plugins there, on
-# 2.1.314, 2.1.316 and 2.1.317 [test]: neither map is a source of it.
-# 2.1.299 to 2.1.309 took only the synced skills off in the Project's
+# 2.1.314 to 2.1.318 [test]: neither map is a source of it. 2.1.299 to
+# 2.1.309 took only the synced skills off in the Project's
 # `.claude/settings.json` and kept the synced plugins [test]; config-digger
-# does not model that, as #493 decided.
+# does not model that, as #493 decided, and those versions lie outside
+# `verified` (#549).
 # Settings files rank managed (every source), local, Project, user, and a
 # higher file's variable wins [docs]. Set in the environment config-digger
 # runs in, those variables only may: Claude Code can start in another.
@@ -1150,22 +1155,20 @@ sources = [
 # settings over the Project's shared ones over the user's [binary]: the
 # first key that holds a value in any file decides, so a nested skill's
 # `<subfolder>:<name>` in one file decides over its bare `<name>` in
-# another, and of one key in two files the local settings decide over the
-# shared ones, which decide over the user's [test]. config-digger reads the
-# keys through `also_names` in that order and the three switches as
-# `layered`, in that order, so the prefixed key, when it holds a value in
-# any file, decides, and the bare key counts only while the prefixed one
-# is missing from every file (#510, #530). Disable writes `off` in the
+# another, as a synced skill's `anthropic-skills:<folder>` does over its
+# bare `<folder>`, and of one key in two files the local settings decide
+# over the shared ones, which decide over the user's [test]. config-digger
+# reads the keys through `also_names` in that order and the three switches
+# as `layered`, in that order, so the prefixed key, when it holds a value
+# in any file, decides, and the bare key counts only while the prefixed
+# one is missing from every file (#510, #530). Disable writes `off` in the
 # local settings, which decides over the other two files. Enable deletes
 # the Entry's keys there that hold `off`, and when the shared or user
 # settings would still turn the skill off, writes `"on"` under its listed
 # name there instead, as the `/skills` menu does [binary]. Each of the
 # three switches marks what the probe did not test.
 [[items.skill.disable]]
-unverified = [
-  "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill.",
-  "Of a synced skill's two keys in two settings files, `anthropic-skills:<folder>` is taken to decide, as the 2.1.316 binary reads the merged settings; `claude-account.mjs` tests it, and the owner has not rerun it.",
-]
+unverified = "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill."
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
@@ -1182,10 +1185,7 @@ locations = ["managed-skills", "user-skills", "project-skills", "nested-skills",
 # reads the shared Project settings, which belong to the team, and the user
 # settings, which apply in every Project.
 [[items.skill.disable]]
-unverified = [
-  "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
-  "Of a synced skill's two keys in two settings files, `anthropic-skills:<folder>` is taken to decide, as the 2.1.316 binary reads the merged settings; `claude-account.mjs` tests it, and the owner has not rerun it.",
-]
+unverified = "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings."
 block = "json-field"
 switch = { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"
@@ -1199,10 +1199,7 @@ locations = ["managed-skills", "user-skills", "project-skills", "nested-skills",
 enable_offered = false
 
 [[items.skill.disable]]
-unverified = [
-  "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings.",
-  "Of a synced skill's two keys in two settings files, `anthropic-skills:<folder>` is taken to decide, as the 2.1.316 binary reads the merged settings; `claude-account.mjs` tests it, and the owner has not rerun it.",
-]
+unverified = "A nested skill is taken to be turned off or limited here, under either of its keys, as in the Project's local settings."
 block = "json-field"
 switch = { anchor = { block = "home", root = "settings_file" }, key_path = ["skillOverrides", "{name}"], also_names = ["{own_name}"], store_class = "plain" }
 target = "name"

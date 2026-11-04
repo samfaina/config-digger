@@ -391,21 +391,6 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
             "plugins[installed].registry.marketplaces",
             "cannot open or decode",
         ),
-        (
-            "claude-code.toml",
-            "items.skill.disable[0]",
-            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
-        ),
-        (
-            "claude-code.toml",
-            "items.skill.disable[1]",
-            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
-        ),
-        (
-            "claude-code.toml",
-            "items.skill.disable[2]",
-            "two keys in two settings files, `anthropic-skills:<folder>` is taken to decide",
-        ),
         ("claude-code.toml", "plugins[synced]", "`~g<generation>`"),
         (
             "claude-code.toml",
@@ -446,6 +431,14 @@ fn the_built_in_marks_are_listed_with_their_file_location_and_sentence() {
     // reads them, so no mark names it.
     assert!(
         !marks.iter().any(|mark| mark.sentence.contains("#510")),
+        "{marks:#?}"
+    );
+    // #549's runs of `claude-account.mjs` test a synced skill's two keys in
+    // two settings files, so no mark names them.
+    assert!(
+        !marks
+            .iter()
+            .any(|mark| mark.sentence.contains("two keys in two settings files")),
         "{marks:#?}"
     );
     // #531 shows a manifest broken before its `name` naming the plugin by
