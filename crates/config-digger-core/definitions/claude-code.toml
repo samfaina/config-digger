@@ -1165,8 +1165,10 @@ sources = [
 # local settings, which decides over the other two files. Enable deletes
 # the Entry's keys there that hold `off`, and when the shared or user
 # settings would still turn the skill off, writes `"on"` under its listed
-# name there instead, as the `/skills` menu does [binary]. Each of the
-# three switches marks what the probe did not test.
+# name there instead, as the `/skills` menu does [binary]. config-digger
+# Disables and Enables a synced skill there too, as `anthropic-skills:<folder>`,
+# though it never writes nor Removes the skill's folder (#550, ADR 0014).
+# Each of the three switches marks what the probe did not test.
 [[items.skill.disable]]
 unverified = "`name-only` and `user-invocable-only` are taken to limit a nested skill, under either of its keys, as they do another skill."
 block = "json-field"

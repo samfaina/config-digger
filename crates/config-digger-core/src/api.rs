@@ -2378,8 +2378,9 @@ pub enum DisableNotOffered {
     /// The Entry is Unread: the Agent never reads it, so it can only be
     /// Removed.
     Unread,
-    /// The Entry is managed, or a copy of the user's account, and
-    /// config-digger only reads it.
+    /// The Entry is managed, or a copy of the user's account whose every
+    /// switch is in the copy or is the whole plugin's, and config-digger
+    /// only reads it.
     ReadOnly,
     /// The Entry is in a Mirrored home, which config-digger never writes
     /// to, and the Agent home it is copied from holds no Entry it was
@@ -2417,7 +2418,7 @@ pub enum RemoveOption {
 #[serde(rename_all = "snake_case")]
 pub enum RemoveNotOffered {
     /// The Entry is managed, or a copy of the user's account, and
-    /// config-digger only reads it.
+    /// config-digger only reads its files.
     ReadOnly,
     /// The Entry is in a Mirrored home, which config-digger never writes
     /// to, and the Agent home it is copied from holds no Entry it was
@@ -2448,7 +2449,10 @@ pub enum Provenance {
     /// config-digger only reads.
     Managed,
     /// A copy the Agent keeps of configuration in the user's account, such as
-    /// skills synced from claude.ai, which config-digger only reads.
+    /// skills synced from claude.ai. config-digger never writes the copy, nor
+    /// Removes it, but Disables and Enables an Entry through a switch the
+    /// Agent keeps for it by its name outside the copy, such as Claude
+    /// Code's `skillOverrides`.
     CloudMirror,
     /// A skill folder a skill manager installed, as its definition
     /// recognises it. Remove touches that folder or link alone.

@@ -85,7 +85,7 @@ The level at which an Agent applies an Entry, such as managed, user, project or 
 _Avoid_: Level, layer, tier
 
 **Provenance**:
-How an Entry got where it is — a file entry, a versioned project file, a plugin or extension, a skill manager, something built into the Agent, something installed through the user's account, or managed/cloud configuration. Provenance decides how the Entry can be taken away.
+How an Entry got where it is — a file entry, a versioned project file, a plugin or extension, a skill manager, something built into the Agent, something installed through the user's account, or managed/cloud configuration. Provenance decides how the Entry can be taken away. A copy of an account's configuration is never Removed, while its switches are written where the Agent reads them from writable files, such as `skillOverrides` for a Claude Code synced skill (ADR 0014).
 _Avoid_: Origin, source, installer
 
 **Effective**:
@@ -129,7 +129,7 @@ Said of an Entry that the Agent will not use because of a gate outside the Entry
 _Avoid_: Pending, denied, untrusted
 
 **Unread**:
-Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, one kept for another account than the Signed-in account, one in a copy of an account's configuration that the Agent's list of that copy leaves out, such as a Claude Code synced plugin folder the account's `manifest.json` does not list, or one in a location the Agent reads only while a Feature gate, or one of the Agent's settings, has another value, such as another app's configuration VS Code discovers only once told to. It competes with nothing and can only be Removed, unless config-digger only reads it, as a copy of an account's configuration.
+Said of an Entry that the Agent never reads in any context, such as one in an Agent home its lookup order skips, one keyed to a missing Project, one kept for another account than the Signed-in account, one in a copy of an account's configuration that the Agent's list of that copy leaves out, such as a Claude Code synced plugin folder the account's `manifest.json` does not list, or one in a location the Agent reads only while a Feature gate, or one of the Agent's settings, has another value, such as another app's configuration VS Code discovers only once told to. It competes with nothing and can only be Removed, unless config-digger only reads its files: a copy of an account's configuration is never Removed, so nothing is offered for it.
 _Avoid_: Orphaned, stale, ignored
 
 **Signed-in account**:

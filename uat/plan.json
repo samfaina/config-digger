@@ -2587,6 +2587,88 @@
       ]
     },
     {
+      "id": "38",
+      "title": "Disable y Enable de una skill sincronizada",
+      "steps": [
+        {
+          "id": "38.1",
+          "title": "Disable y Enable de una skill sincronizada desde un Project",
+          "goal": "config-digger nunca escribe ni quita la carpeta de una skill sincronizada, pero sí sus interruptores de skillOverrides en los ajustes locales del Project: Disable escribe «off» bajo su nombre anthropic-skills: ahí, Enable lo quita, y Remove sigue sin ofrecerse.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "En el campo Project, elige E:\\cd-throwaway\\project.",
+            "Elige la skill anthropic-skills:cd-throwaway-toggle-skill y lee su tarjeta.",
+            "Pulsa Disable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Disable.",
+            "Pulsa Done.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.local.json en el Bloc de notas, mira su skillOverrides y ciérralo.",
+            "Pulsa Enable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Enable.",
+            "Pulsa Done.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.local.json en el Bloc de notas otra vez y mira su skillOverrides."
+          ],
+          "commands": [],
+          "expect": [
+            "Antes de Disable, el Item «anthropic-skills:cd-throwaway-toggle-skill» sale «Effective».",
+            "Bajo los botones de su tarjeta dice «Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project.».",
+            "Bajo los botones de su tarjeta dice «Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.».",
+            "Tras Disable, el Item «anthropic-skills:cd-throwaway-toggle-skill» sale «Disabled».",
+            "Tras Disable, los ajustes locales del Project tienen «\"anthropic-skills:cd-throwaway-toggle-skill\": \"off\"».",
+            "Tras Enable, el Item «anthropic-skills:cd-throwaway-toggle-skill» sale «Effective».",
+            "Tras Enable, los ajustes locales del Project ya no tienen «anthropic-skills:cd-throwaway-toggle-skill»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#550"
+          ]
+        },
+        {
+          "id": "38.2",
+          "title": "Enable de una skill sincronizada apagada por su carpeta en los ajustes compartidos escribe «on» en los locales",
+          "goal": "Una skill sincronizada apagada con «off» bajo su carpeta sola en los ajustes compartidos del Project, que config-digger solo lee, se enciende desde el Project: Enable escribe «on» bajo su nombre anthropic-skills: en los ajustes locales, que deciden sobre los compartidos, y deja los compartidos como estaban.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-synced-home. Si no sale, añádelo como en el paso 1.4.",
+            "En el campo Project, elige E:\\cd-throwaway\\project.",
+            "Elige la skill anthropic-skills:cd-throwaway-shared-off-skill y lee su tarjeta.",
+            "Pulsa Enable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Enable.",
+            "Pulsa Done.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.local.json en el Bloc de notas y mira su skillOverrides.",
+            "Abre E:\\cd-throwaway\\project\\.claude\\settings.json en el Bloc de notas y mira su skillOverrides."
+          ],
+          "commands": [],
+          "expect": [
+            "Antes de Enable, el Item «anthropic-skills:cd-throwaway-shared-off-skill» sale «Disabled».",
+            "Bajo los botones de su tarjeta dice «Enable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"on\" in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project.».",
+            "Tras Enable, el Item «anthropic-skills:cd-throwaway-shared-off-skill» sale «Effective».",
+            "Los ajustes locales del Project tienen «\"anthropic-skills:cd-throwaway-shared-off-skill\": \"on\"».",
+            "Los ajustes compartidos del Project siguen teniendo «\"cd-throwaway-shared-off-skill\": \"off\"»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#550"
+          ]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

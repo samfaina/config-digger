@@ -3595,7 +3595,11 @@ pub(crate) enum Provenance {
     /// enterprise skills. config-digger only reads it.
     Managed,
     /// A copy the Agent keeps of configuration held in the user's account,
-    /// such as skills synced from claude.ai. config-digger only reads it.
+    /// such as skills synced from claude.ai. config-digger never writes the
+    /// copy, nor Removes its Entries, but writes the switches the Agent
+    /// keeps for one of its Entries, by its name, in files outside the copy,
+    /// such as Claude Code's `skillOverrides`. A switch in the copy, or in a
+    /// plugin's folder, or one of a whole plugin, it only reads.
     CloudMirror,
     /// Part of a plugin the Agent installed. config-digger Disables it only
     /// through the plugin's own switch, with every Entry of the plugin, and
@@ -3616,15 +3620,31 @@ pub(crate) enum Provenance {
 }
 
 impl Provenance {
-    /// Whether config-digger only reads the Entries: it never Disables,
-    /// Enables or Removes them.
-    pub fn read_only(self) -> bool {
+    /// Whether config-digger only reads the Entries' own files: it never
+    /// writes them, nor Removes the Entries.
+    pub fn files_read_only(self) -> bool {
         match self {
             Provenance::File | Provenance::Plugin | Provenance::Extension => false,
             Provenance::Managed
             | Provenance::CloudMirror
             | Provenance::BuiltIn
             | Provenance::AccountManaged => true,
+        }
+    }
+
+    /// Whether config-digger Disables and Enables the Entries through a
+    /// switch of `target` in the file `anchor` names. Of a copy of the
+    /// user's account, only a switch outside the copy and any plugin's
+    /// folder that holds one Entry, by its name.
+    pub fn writes_switch(self, target: MechanismTarget, anchor: &Anchor) -> bool {
+        match self {
+            Provenance::File | Provenance::Plugin | Provenance::Extension => true,
+            Provenance::CloudMirror => {
+                target != MechanismTarget::Plugin
+                    && anchor.entry().is_none()
+                    && anchor.plugin().is_none()
+            }
+            Provenance::Managed | Provenance::BuiltIn | Provenance::AccountManaged => false,
         }
     }
 }
