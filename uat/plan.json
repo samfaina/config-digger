@@ -2669,6 +2669,235 @@
       ]
     },
     {
+      "id": "39",
+      "title": "Plugins de Claude Code con ámbito de proyecto fuera del Project de su registro",
+      "steps": [
+        {
+          "id": "39.1",
+          "title": "Un plugin instalado en un repo sale en un worktree enlazado del repo",
+          "goal": "Claude Code carga un plugin instalado con ámbito de proyecto en el checkout principal de un repo también en sus worktrees enlazados, encendido por los ajustes que el worktree saca del repo: config-digger lista su servidor y su skill en el worktree, Effective, como en el checkout principal.",
+          "instructions": [
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "Pulsa Add Agent home.",
+            "En el desplegable Agent, elige Claude Code.",
+            "Pulsa Choose….",
+            "En el selector de Windows, elige E:\\cd-throwaway\\claude-code-scope-home.",
+            "Pulsa Seleccionar carpeta.",
+            "Pulsa Add.",
+            "Vuelve al Inventario.",
+            "En Agent home, elige claude-code-scope-home.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-repo.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server y cd-throwaway-scoped:cd-throwaway-scoped-skill en la lista Items.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-worktree.",
+            "Busca los dos Items otra vez en la lista Items."
+          ],
+          "commands": [],
+          "expect": [
+            "Con E:\\cd-throwaway\\scope-repo elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Con E:\\cd-throwaway\\scope-repo elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».",
+            "Con E:\\cd-throwaway\\scope-worktree elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server».",
+            "Con E:\\cd-throwaway\\scope-worktree elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#480"
+          ],
+          "automation": [
+            {
+              "tool": "fake-ui",
+              "where": "ci",
+              "test": "crates/config-digger-app/ui/uat/scope.uat.ts > 39.1"
+            }
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados; nadie más abre la app real sobre claude-code-scope-home, así que una persona recorre el paso entero en la app real."
+        },
+        {
+          "id": "39.2",
+          "title": "Los ajustes propios de un Project fuera del repo encienden o apagan el plugin",
+          "goal": "Claude Code carga un plugin instalado con ámbito de proyecto y leído de la carpeta de su marketplace directory en cualquier Project cuyos ajustes propios lo nombran, encendido o apagado por esos ficheros: config-digger lo enseña Effective donde los ajustes compartidos lo encienden y Disabled donde los locales lo apagan.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-scope-home. Si no sale, añádelo como en el paso 39.1.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-on.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server y cd-throwaway-scoped:cd-throwaway-scoped-skill en la lista Items.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-off.",
+            "Busca los dos Items otra vez en la lista Items."
+          ],
+          "commands": [],
+          "expect": [
+            "Con E:\\cd-throwaway\\scope-on elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Con E:\\cd-throwaway\\scope-on elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill».",
+            "Con E:\\cd-throwaway\\scope-off elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Disabled».",
+            "Con E:\\cd-throwaway\\scope-off elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Disabled»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#547"
+          ],
+          "automation": [
+            {
+              "tool": "fake-ui",
+              "where": "ci",
+              "test": "crates/config-digger-app/ui/uat/scope.uat.ts > 39.2"
+            }
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados; nadie más abre la app real sobre claude-code-scope-home, así que una persona recorre el paso entero en la app real."
+        },
+        {
+          "id": "39.3",
+          "title": "Un Project fuera del repo que nada nombra no lista el plugin",
+          "goal": "Sin que los ajustes de usuario nombren el plugin, Claude Code no lo carga en un Project fuera del repo de su registro cuyos ficheros no lo nombran: config-digger no lista nada de él ahí.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-scope-home. Si no sale, añádelo como en el paso 39.1.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-none.",
+            "Busca cd-throwaway-scoped en la lista Items."
+          ],
+          "commands": [],
+          "expect": [
+            "No sale ningún Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server».",
+            "No sale ningún Item «cd-throwaway-scoped:cd-throwaway-scoped-skill»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset"
+          },
+          "covers": [
+            "#547"
+          ],
+          "automation": [
+            {
+              "tool": "fake-ui",
+              "where": "ci",
+              "test": "crates/config-digger-app/ui/uat/scope.uat.ts > 39.3"
+            }
+          ],
+          "manual": "El test del fake UI lee los fixtures grabados; nadie más abre la app real sobre claude-code-scope-home, así que una persona recorre el paso entero en la app real."
+        },
+        {
+          "id": "39.4",
+          "title": "Los ajustes de usuario en true traen el plugin a un Project que nada más nombra",
+          "goal": "Claude Code carga un plugin instalado con ámbito de proyecto y leído de la carpeta de su marketplace directory en cualquier Project cuando los ajustes de usuario lo nombran: con ellos en true, config-digger lista su servidor y su skill, Effective, en un Project cuyos ficheros no lo nombran.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-scope-home. Si no sale, añádelo como en el paso 39.1.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-none.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server y cd-throwaway-scoped:cd-throwaway-scoped-skill en la lista Items."
+          ],
+          "commands": [],
+          "expect": [
+            "El Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server».",
+            "El Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».",
+            "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba con el plugin en true en los ajustes de usuario",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -ScopedUser true"
+          },
+          "covers": [
+            "#555"
+          ]
+        },
+        {
+          "id": "39.5",
+          "title": "Enable de un plugin que los ajustes de usuario apagan escribe true en los ajustes locales del Project",
+          "goal": "Con los ajustes de usuario en false, el plugin sale Disabled en un Project que nada más nombra; Enable escribe true en los ajustes locales del Project, que deciden sobre los de usuario, y deja los de usuario como estaban.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-scope-home. Si no sale, añádelo como en el paso 39.1.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-none.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server y cd-throwaway-scoped:cd-throwaway-scoped-skill en la lista Items.",
+            "Elige el servidor plugin:cd-throwaway-scoped:cd-throwaway-scoped-server.",
+            "Pulsa Enable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Enable.",
+            "Pulsa Done.",
+            "Busca los dos Items otra vez en la lista Items.",
+            "Abre E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json en el Bloc de notas, mira su enabledPlugins y ciérralo.",
+            "Abre E:\\cd-throwaway\\claude-code-scope-home\\.claude\\settings.json en el Bloc de notas, mira su enabledPlugins y ciérralo."
+          ],
+          "commands": [],
+          "expect": [
+            "Antes de Enable, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Disabled».",
+            "Antes de Enable, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Disabled».",
+            "Tras Enable, los ajustes locales del Project tienen «\"cd-throwaway-scoped@cd-throwaway-scope-market\": true».",
+            "Los ajustes de usuario siguen teniendo «\"cd-throwaway-scoped@cd-throwaway-scope-market\": false».",
+            "Tras Enable, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Tras Enable, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba con el plugin en false en los ajustes de usuario",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -ScopedUser false"
+          },
+          "covers": [
+            "#555"
+          ]
+        },
+        {
+          "id": "39.6",
+          "title": "Disable de un plugin que los ajustes de usuario traen escribe false en los ajustes locales del Project",
+          "goal": "Con los ajustes de usuario en true, Disable en un Project que nada más nombra escribe false en los ajustes locales del Project, y el plugin sigue en la lista, Disabled.",
+          "instructions": [
+            "Abre config-digger.",
+            "Ve al Inventario.",
+            "En Agents, elige Claude Code.",
+            "En Agent home, elige claude-code-scope-home. Si no sale, añádelo como en el paso 39.1.",
+            "En el campo Project, elige E:\\cd-throwaway\\scope-none.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server en la lista Items.",
+            "Elige el servidor plugin:cd-throwaway-scoped:cd-throwaway-scoped-server.",
+            "Pulsa Disable.",
+            "Si el diálogo tiene casillas de aviso, márcalas.",
+            "En el diálogo, pulsa Disable.",
+            "Pulsa Done.",
+            "Busca plugin:cd-throwaway-scoped:cd-throwaway-scoped-server y cd-throwaway-scoped:cd-throwaway-scoped-skill en la lista Items.",
+            "Abre E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json en el Bloc de notas, mira su enabledPlugins y ciérralo.",
+            "Ve a Projects & homes.",
+            "Abre la pestaña Agent homes.",
+            "En la fila de E:\\cd-throwaway\\claude-code-scope-home, bajo Claude Code, pulsa Remove from list."
+          ],
+          "commands": [],
+          "expect": [
+            "Antes de Disable, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».",
+            "Tras Disable, los ajustes locales del Project tienen «\"cd-throwaway-scoped@cd-throwaway-scope-market\": false».",
+            "Tras Disable, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sigue en la lista y sale «Disabled».",
+            "Tras Disable, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sigue en la lista y sale «Disabled»."
+          ],
+          "setup": {
+            "label": "Restablecer los datos de prueba con el plugin en true en los ajustes de usuario",
+            "shell": "powershell",
+            "text": ".\\uat\\data\\cd-throwaway-setup.ps1 -Reset -ScopedUser true"
+          },
+          "covers": [
+            "#555"
+          ]
+        }
+      ]
+    },
+    {
       "id": "19",
       "title": "La regla de nombres de skills de Claude Code",
       "steps": [

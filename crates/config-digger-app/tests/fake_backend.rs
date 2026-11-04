@@ -119,10 +119,12 @@ fn every_item_is_a_throwaway_one() {
     assert!(names.contains(&"cd-throwaway-codex"), "{names:?}");
     assert!(names.contains(&"cd-throwaway-project"), "{names:?}");
     // Cursor names a plugin's server `plugin-<plugin>-<server>`, and Claude
-    // Code a skill synced from claude.ai `anthropic-skills:<skill>`.
+    // Code a plugin's server `plugin:<plugin>:<server>` and a skill synced
+    // from claude.ai `anthropic-skills:<skill>`.
     assert!(
         names.iter().all(|name| name
             .strip_prefix("plugin-")
+            .or_else(|| name.strip_prefix("plugin:"))
             .or_else(|| name.strip_prefix("anthropic-skills:"))
             .unwrap_or(name)
             .starts_with("cd-throwaway-")),

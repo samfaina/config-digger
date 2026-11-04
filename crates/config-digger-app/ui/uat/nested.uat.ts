@@ -2,8 +2,8 @@
 // folder, claude-code-home, as a Project the user added, in no git repo, so
 // config-digger leaves out the folders below it and notes why. They hold no
 // project-outside-git, whose checks stay with a person.
-import { expect, type Page } from "@playwright/test";
-import { inventoryShown, rail, ROOT, row } from "./app";
+import { expect } from "@playwright/test";
+import { inventoryShown, pickProject, rail, ROOT, row } from "./app";
 import { uatStep } from "./step";
 
 /** The user's folder in the fixtures, a Project the user added. */
@@ -15,13 +15,6 @@ const NOTE =
 
 /** Why the checks of project-outside-git stay with a person. */
 const NOT_RECORDED = "the fixtures hold no project-outside-git, which the step adds by hand in the real app";
-
-/** Picks the Project `path` in the Inventory's Project field. */
-async function pickProject(page: Page, path: string) {
-  await page.getByRole("combobox", { name: "Project", exact: true }).click();
-  await page.locator(".select-panel").getByRole("option").filter({ hasText: path }).first().click();
-  await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveText(path);
-}
 
 uatStep("28.2", async ({ page, open, check, leave }) => {
   await open();
