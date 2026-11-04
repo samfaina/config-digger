@@ -2041,6 +2041,15 @@ impl PluginRegistry {
         }
     }
 
+    /// The files of a Project that bring in a plugin read from its
+    /// marketplace's folder by naming its id, if any.
+    pub fn named_in(&self) -> &[NamingFile] {
+        match self {
+            PluginRegistry::JsonPluginRecords(block) => &block.named_in,
+            _ => &[],
+        }
+    }
+
     /// The marketplaces that say where its plugins' files are, if any.
     pub fn marketplaces(&self) -> Option<&FolderMarketplaces> {
         match self {
@@ -2574,6 +2583,19 @@ pub(crate) struct JsonPluginRecords {
     /// in. Without it, that Project alone.
     #[serde(default)]
     pub project_reach: ProjectReach,
+    /// With `project` and `marketplaces`, the files of a Project that name
+    /// plugins by their ids, in any order: a record bound to one Project,
+    /// whose plugin is read from its marketplace's folder, also applies in
+    /// every other Project among the Projects whose own files name its id,
+    /// whatever the value, such as Claude Code's `enabledPlugins` in the
+    /// Project's two settings files. A plugin read from its record's
+    /// folder, one its marketplace's manifest fails included, reaches no
+    /// such Project. Of several records of one id, the
+    /// first applies there. A Project a plugin of that id already applies
+    /// in, by a record bound to it, a record bound to no Project or
+    /// `project_reach`, gets no other. Without it, none.
+    #[serde(default)]
+    pub named_in: Vec<NamingFile>,
     /// The field of a record that holds its version.
     pub version: Option<String>,
     /// The marketplaces the plugins come from, when a plugin of a
@@ -2581,6 +2603,47 @@ pub(crate) struct JsonPluginRecords {
     /// the folder its record holds. Without it, every plugin is read from
     /// its record's folder.
     pub marketplaces: Option<FolderMarketplaces>,
+}
+
+/// A strict JSON file of each Project folder whose object at `key_path`
+/// names plugins by their ids, its keys, such as Claude Code's
+/// `.claude/settings.json` and its `enabledPlugins`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NamingFile {
+    /// The file, in the Project folder.
+    pub anchor: Anchor,
+    /// The key path of the object whose keys are plugin ids.
+    pub key_path: Vec<String>,
+}
+
+impl Validate for NamingFile {
+    fn validate(&self) -> Result<(), String> {
+        self.anchor.validate()?;
+        self.anchor.one_file()?;
+        if !self.anchor.in_project() || self.anchor.project_file() {
+            return Err("the files that name plugins lie in the Project folder".into());
+        }
+        if self.anchor.walk() != &ProjectWalk::None {
+            return Err("the files that name plugins cannot walk from the Project folder".into());
+        }
+        validate_key_path(&self.key_path)
+    }
+}
+
+impl NamingFile {
+    /// Whether `text` names the plugin `id` at the key path, whatever the
+    /// value; a file that does not parse names none.
+    pub fn names(&self, text: &str, id: &str) -> bool {
+        let Ok(document) = JsonFormat::STRICT.parse(text) else {
+            return false;
+        };
+        self.key_path
+            .iter()
+            .try_fold(&document, |value, key| value.get(key))
+            .and_then(Value::as_object)
+            .is_some_and(|plugins| plugins.contains_key(id))
+    }
 }
 
 /// The Projects a plugin record bound to one Project applies in.
@@ -2853,6 +2916,18 @@ impl Validate for JsonPluginRecords {
         }
         if self.project_reach != ProjectReach::Project && self.project.is_none() {
             return Err("a plugin registry's `project_reach` needs `project`".into());
+        }
+        if !self.named_in.is_empty() {
+            if self.project.is_none() || self.marketplaces.is_none() {
+                return Err(
+                    "a plugin registry's `named_in` needs `project` and `marketplaces`".into(),
+                );
+            }
+            for (index, settings) in self.named_in.iter().enumerate() {
+                settings
+                    .validate()
+                    .map_err(|e| format!("named_in[{index}]: {e}"))?;
+            }
         }
         if let Some(marketplaces) = &self.marketplaces {
             marketplaces.validate()?;

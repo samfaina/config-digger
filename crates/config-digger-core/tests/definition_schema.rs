@@ -118,3 +118,23 @@ fn the_schema_rejects_an_unknown_project_reach() {
 
     assert_ne!(errors(&definition), Vec::<String>::new());
 }
+
+#[test]
+fn the_schema_accepts_the_files_that_bring_a_plugin_record_into_a_project_naming_it() {
+    let mut definition = claude_code();
+
+    assert_eq!(
+        plugin_registry(&mut definition, "installed")["named_in"][1]["key_path"],
+        serde_json::json!(["enabledPlugins"])
+    );
+    assert_eq!(errors(&definition), Vec::<String>::new());
+}
+
+#[test]
+fn the_schema_rejects_a_file_naming_plugins_without_its_key_path() {
+    let mut definition = claude_code();
+    let named_in = &mut plugin_registry(&mut definition, "installed")["named_in"][0];
+    named_in.as_object_mut().unwrap().remove("key_path");
+
+    assert_ne!(errors(&definition), Vec::<String>::new());
+}

@@ -230,9 +230,9 @@ fn a_plugin_installed_from_a_worktree_is_listed_in_every_checkout_of_its_reposit
         .iter()
         .fold(fs, |fs, folder| switched(fs, folder, "settings.json", true));
     let projects = [MAIN, WORKTREE, OTHER_WORKTREE, other_repo, below_main];
-    // Claude Code loads the plugin in any folder whose own settings turn it
-    // on, as release-gate.md records, a Ticket not yet filed; config-digger
-    // reads it at the root of each checkout of its repository alone.
+    // A plugin read from its copy in the cache, as here, loads in no folder
+    // outside the checkouts of its repository; one read from its
+    // marketplace's folder does (#547, `claude_code_named_plugins`).
 
     for (project, expected) in [
         (WORKTREE, demo("disabled", "plugin_disabled")),

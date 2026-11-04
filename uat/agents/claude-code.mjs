@@ -870,7 +870,7 @@ function verbatimSkill(dir, folder) {
   };
   // One plugin per repository the probe installs it in, each with a server
   // and a skill.
-  const names = ["cd-throwaway-wp", "cd-throwaway-wl", "cd-throwaway-wq", "cd-throwaway-wb", "cd-throwaway-ws", "cd-throwaway-wm"];
+  const names = ["cd-throwaway-wp", "cd-throwaway-wl", "cd-throwaway-wq", "cd-throwaway-wb", "cd-throwaway-ws", "cd-throwaway-wm", "cd-throwaway-wn", "cd-throwaway-wo", "cd-throwaway-wc", "cd-throwaway-wx", "cd-throwaway-wu"];
   for (const name of names) {
     write(path.join(market, name, ".claude-plugin", "plugin.json"), { name, version: "1.0.0" });
     write(path.join(market, name, ".mcp.json"), { mcpServers: { [`${name}-srv`]: stdio(name) } });
@@ -1006,8 +1006,9 @@ function verbatimSkill(dir, folder) {
     return same(seen, { bare: expected, separate: expected, submodule: expected });
   });
 
-  // Found while probing #480, a Ticket: Claude Code does not hold a
-  // project-scope record to its `projectPath` at all.
+  // Found while probing #480, #547: Claude Code does not hold a
+  // project-scope record of a plugin it reads from its marketplace's
+  // folder to its `projectPath` at all.
   const otherRepo = path.join(dir, "other-repo");
   await gitInit(otherRepo);
   const plain = path.join(dir, "plain");
@@ -1016,6 +1017,74 @@ function verbatimSkill(dir, folder) {
     const seen = {};
     for (const [label, folder] of Object.entries({ otherRepo, superRepo, plain })) seen[label] = await loads(folder, "cd-throwaway-wm");
     return same(seen, { otherRepo: true, superRepo: true, plain: true });
+  });
+
+  // #547: what else brings such a plugin into a folder outside its
+  // record's repository, each folder of no repository.
+  const unrelated = (label) => {
+    const folder = path.join(dir, "unrelated", label);
+    fs.mkdirSync(folder, { recursive: true });
+    return folder;
+  };
+  await install(main, "cd-throwaway-wn");
+  await p.check("plugins[installed]", "a plugin installed at project scope loads in a folder outside its repository whose own `.claude/settings.local.json` alone turns it on, and not in one whose `.claude/settings.json` turns it on and whose `.claude/settings.local.json` turns it off", async () => {
+    const [localOn, localOff] = [unrelated("local-on"), unrelated("local-off")];
+    switchIn(localOn, "settings.local.json", "cd-throwaway-wn", true);
+    switchIn(localOff, "settings.json", "cd-throwaway-wn", true);
+    switchIn(localOff, "settings.local.json", "cd-throwaway-wn", false);
+    return same({ localOn: await loads(localOn, "cd-throwaway-wn"), localOff: await loads(localOff, "cd-throwaway-wn") }, { localOn: true, localOff: false });
+  });
+  await p.check("plugins[installed]", "a plugin installed at local scope loads in a folder outside its repository whose own `.claude/settings.json` or `.claude/settings.local.json` turns it on", async () => {
+    await install(main, "cd-throwaway-wo", "local");
+    const scope = json(installedFile).plugins[id("cd-throwaway-wo")]?.map((record) => record.scope);
+    const [shared, local] = [unrelated("local-scope-json"), unrelated("local-scope-local")];
+    switchIn(shared, "settings.json", "cd-throwaway-wo", true);
+    switchIn(local, "settings.local.json", "cd-throwaway-wo", true);
+    return same({ scope, shared: await loads(shared, "cd-throwaway-wo"), local: await loads(local, "cd-throwaway-wo") }, { scope: ["local"], shared: true, local: true });
+  });
+  await p.check("plugins[installed]", "of two project-scope records of one id bound to two folders, a plugin read from its marketplace's folder loads from that folder in a third folder whose own settings turn it on", async () => {
+    const [a, b, c] = [unrelated("record-a"), unrelated("record-b"), unrelated("record-c")];
+    await install(a, "cd-throwaway-wx");
+    const projectPaths = await install(b, "cd-throwaway-wx");
+    switchIn(c, "settings.json", "cd-throwaway-wx", true);
+    const s = await session(home, c);
+    return same({ projectPaths, loads: await loads(c, "cd-throwaway-wx"), folder: s.pluginFolders["cd-throwaway-wx"] }, { projectPaths: [a, b], loads: true, folder: path.join(market, "cd-throwaway-wx") });
+  });
+  await p.check("plugins[installed]", "a plugin read from its copy in the cache, its marketplace entry's `source` a `github` object or `../x`, loads in its record's Project and not in a folder outside its repository whose own settings turn it on", async () => {
+    await install(main, "cd-throwaway-wc");
+    const manifest = path.join(market, ".claude-plugin", "marketplace.json");
+    const kept = fs.readFileSync(manifest, "utf8");
+    const elsewhere = unrelated("cache-copy");
+    switchIn(elsewhere, "settings.json", "cd-throwaway-wc", true);
+    const seen = {};
+    try {
+      for (const [label, source] of [["github", { source: "github", repo: "cd-throwaway/none" }], ["outside", "../elsewhere"]]) {
+        const entries = JSON.parse(kept);
+        entries.plugins = entries.plugins.map((entry) => (entry.name === "cd-throwaway-wc" ? { ...entry, source } : entry));
+        write(manifest, entries);
+        const s = await session(home, main);
+        const inCache = s.pluginFolders["cd-throwaway-wc"]?.startsWith(path.join(home, "plugins", "cache")) ?? false;
+        seen[label] = { main: await loads(main, "cd-throwaway-wc"), inCache, elsewhere: await loads(elsewhere, "cd-throwaway-wc") };
+      }
+    } finally {
+      write(manifest, kept);
+    }
+    const expected = { main: true, inCache: true, elsewhere: false };
+    return same(seen, { github: expected, outside: expected });
+  });
+  // Found while probing #547, a Ticket to file: the user settings bring
+  // the plugin into any folder.
+  await install(main, "cd-throwaway-wu");
+  await p.check("plugins[installed]", "a plugin installed at project scope loads in a folder outside its repository none of whose files name it when the user settings turn it on", async () => {
+    const settings = path.join(home, "settings.json");
+    const kept = fs.readFileSync(settings, "utf8");
+    try {
+      const user = JSON.parse(kept);
+      write(settings, { ...user, enabledPlugins: { ...user.enabledPlugins, [id("cd-throwaway-wu")]: true } });
+      return same(await loads(unrelated("user-on"), "cd-throwaway-wu"), true);
+    } finally {
+      write(settings, kept);
+    }
   });
 }
 
