@@ -3,7 +3,7 @@
 // Projects outside that Project. The fixtures hold claude-code-scope-home as
 // a home the user added, with user settings that do not name the plugin.
 import { expect, type Page } from "@playwright/test";
-import { inventoryShown, ROOT, whole } from "./app";
+import { inventoryShown, itemRow, pickProject, ROOT } from "./app";
 import { uatStep } from "./step";
 
 /** The plugin's folder in its marketplace, which Claude Code reads it from. */
@@ -13,9 +13,9 @@ const PLUGIN = String.raw`${ROOT}\scope-market\plugins\cd-throwaway-scoped`;
 const SERVER = "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server";
 const SKILL = "cd-throwaway-scoped:cd-throwaway-scoped-skill";
 
-/** The Item row named `name` in the Items list. */
-function item(page: Page, name: string) {
-  return page.locator(".item-row", { has: page.locator(".item-name", { hasText: whole(name) }) });
+/** The State pill of the Item named `name`. */
+function pill(page: Page, name: string) {
+  return itemRow(page, name).locator(".state-pill");
 }
 
 /** Picks the Claude Code tile, the home claude-code-scope-home and the Project `path`. */
@@ -26,42 +26,35 @@ async function showScopeHome(page: Page, path: string) {
   await pickProject(page, path);
 }
 
-/** Picks the Project `path` in the Inventory's Project field. */
-async function pickProject(page: Page, path: string) {
-  await page.getByRole("combobox", { name: "Project", exact: true }).click();
-  await page.locator(".select-panel").getByRole("option").filter({ hasText: path }).first().click();
-  await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveText(path);
-}
-
 uatStep("39.1", async ({ page, open, check }) => {
   await open();
   const repo = String.raw`${ROOT}\scope-repo`;
   await showScopeHome(page, repo);
 
   await check("Con E:\\cd-throwaway\\scope-repo elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».", async () => {
-    await expect(item(page, SERVER).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SERVER)).toHaveText("Effective");
   });
   await check("Con E:\\cd-throwaway\\scope-repo elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».", async () => {
-    await expect(item(page, SKILL).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SKILL)).toHaveText("Effective");
   });
 
   await pickProject(page, String.raw`${ROOT}\scope-worktree`);
   await check("Con E:\\cd-throwaway\\scope-worktree elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».", async () => {
-    await expect(item(page, SERVER).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SERVER)).toHaveText("Effective");
   });
   await check(
     "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server».",
     async () => {
-      await expect(item(page, SERVER).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\.mcp.json#mcpServers.cd-throwaway-scoped-server`);
+      await expect(itemRow(page, SERVER).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\.mcp.json#mcpServers.cd-throwaway-scoped-server`);
     },
   );
   await check("Con E:\\cd-throwaway\\scope-worktree elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».", async () => {
-    await expect(item(page, SKILL).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SKILL)).toHaveText("Effective");
   });
   await check(
     "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill».",
     async () => {
-      await expect(item(page, SKILL).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\skills\\cd-throwaway-scoped-skill`);
+      await expect(itemRow(page, SKILL).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\skills\\cd-throwaway-scoped-skill`);
     },
   );
 });
@@ -71,24 +64,24 @@ uatStep("39.2", async ({ page, open, check }) => {
   await showScopeHome(page, String.raw`${ROOT}\scope-on`);
 
   await check("Con E:\\cd-throwaway\\scope-on elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Effective».", async () => {
-    await expect(item(page, SERVER).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SERVER)).toHaveText("Effective");
   });
   await check("Con E:\\cd-throwaway\\scope-on elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Effective».", async () => {
-    await expect(item(page, SKILL).locator(".state-pill")).toHaveText("Effective");
+    await expect(pill(page, SKILL)).toHaveText("Effective");
   });
   await check(
     "Bajo su nombre sale «plugin · E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill».",
     async () => {
-      await expect(item(page, SKILL).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\skills\\cd-throwaway-scoped-skill`);
+      await expect(itemRow(page, SKILL).locator(".item-location")).toHaveText(`plugin · ${PLUGIN}\\skills\\cd-throwaway-scoped-skill`);
     },
   );
 
   await pickProject(page, String.raw`${ROOT}\scope-off`);
   await check("Con E:\\cd-throwaway\\scope-off elegido, el Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server» sale «Disabled».", async () => {
-    await expect(item(page, SERVER).locator(".state-pill")).toHaveText("Disabled");
+    await expect(pill(page, SERVER)).toHaveText("Disabled");
   });
   await check("Con E:\\cd-throwaway\\scope-off elegido, el Item «cd-throwaway-scoped:cd-throwaway-scoped-skill» sale «Disabled».", async () => {
-    await expect(item(page, SKILL).locator(".state-pill")).toHaveText("Disabled");
+    await expect(pill(page, SKILL)).toHaveText("Disabled");
   });
 });
 
@@ -99,9 +92,9 @@ uatStep("39.3", async ({ page, open, check }) => {
   await expect(page.getByLabel("0 of 0 Items in use")).toBeVisible();
 
   await check("No sale ningún Item «plugin:cd-throwaway-scoped:cd-throwaway-scoped-server».", async () => {
-    await expect(item(page, SERVER)).toHaveCount(0);
+    await expect(itemRow(page, SERVER)).toHaveCount(0);
   });
   await check("No sale ningún Item «cd-throwaway-scoped:cd-throwaway-scoped-skill».", async () => {
-    await expect(item(page, SKILL)).toHaveCount(0);
+    await expect(itemRow(page, SKILL)).toHaveCount(0);
   });
 });

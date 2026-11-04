@@ -175,6 +175,22 @@ fn name_rule_adds_claude_code_skills_whose_folder_names_break_its_name_rule() {
 }
 
 #[test]
+fn the_scope_repo_has_a_linked_worktree_that_checks_out_its_settings() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("cd-throwaway");
+
+    let output = setup(&root, false);
+
+    assert!(output.status.success(), "{}", stderr(&output));
+    let worktree = root.join(r"scope-worktree\.git");
+    assert!(worktree.is_file(), "a linked worktree has a .git file");
+    assert!(
+        root.join(r"scope-worktree\.claude\settings.json").is_file(),
+        "the worktree checks out the repo's settings"
+    );
+}
+
+#[test]
 fn the_scope_homes_user_settings_name_its_plugin_only_with_scoped_user() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("cd-throwaway");
@@ -184,12 +200,6 @@ fn the_scope_homes_user_settings_name_its_plugin_only_with_scoped_user() {
 
     assert!(output.status.success(), "{}", stderr(&output));
     assert!(!settings.exists());
-    let worktree = root.join(r"scope-worktree\.git");
-    assert!(worktree.is_file(), "a linked worktree has a .git file");
-    assert!(
-        root.join(r"scope-worktree\.claude\settings.json").is_file(),
-        "the worktree checks out the repo's settings"
-    );
 
     for (value, expected) in [("true", true), ("False", false)] {
         let again = setup_with(&root, true, &["-ScopedUser", value]);

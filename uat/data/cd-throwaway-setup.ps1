@@ -432,6 +432,7 @@ $scopeHome = "$Root\claude-code-scope-home"
 $scopeMarket = "$Root\scope-market"
 $scopeMarketJson = $scopeMarket -replace '\\', '\\'
 $scopeRepo = "$Root\scope-repo"
+$scopeRepoJson = $scopeRepo -replace '\\', '\\'
 $scopeId = "cd-throwaway-scoped@cd-throwaway-scope-market"
 $scopeCached = "$scopeHome\.claude\plugins\cache\cd-throwaway-scope-market\cd-throwaway-scoped\1.0.0"
 $scopeCachedJson = $scopeCached -replace '\\', '\\'
@@ -483,31 +484,45 @@ Write-TestFile "$scopeHome\.claude\plugins\installed_plugins.json" @"
 {
   "version": 2,
   "plugins": {
-    "$scopeId": [{ "scope": "project", "projectPath": "$($scopeRepo -replace '\\', '\\')", "installPath": "$scopeCachedJson", "version": "1.0.0" }]
+    "$scopeId": [{ "scope": "project", "projectPath": "$scopeRepoJson", "installPath": "$scopeCachedJson", "version": "1.0.0" }]
   }
 }
 "@
+# A settings file whose `enabledPlugins` holds the plugin at $Value.
+function Write-ScopeSwitch([string]$Path, [string]$Value) {
+    Write-TestFile $Path "{ `"enabledPlugins`": { `"$scopeId`": $($Value.ToLower()) } }`n"
+}
 if ($ScopedUser) {
-    Write-TestFile "$scopeHome\.claude\settings.json" "{ `"enabledPlugins`": { `"$scopeId`": $($ScopedUser.ToLower()) } }`n"
+    Write-ScopeSwitch "$scopeHome\.claude\settings.json" $ScopedUser
 }
-Write-TestFile "$scopeRepo\.claude\settings.json" "{ `"enabledPlugins`": { `"$scopeId`": true } }`n"
-git init -q $scopeRepo
-if ($LASTEXITCODE -ne 0) {
-    throw "Cannot run git init in ${scopeRepo}: install Git for Windows."
-}
-git -C $scopeRepo -c core.autocrlf=false add .claude/settings.json
-git -C $scopeRepo -c user.name=cd-throwaway -c user.email=cd-throwaway@example.invalid -c commit.gpgsign=false commit -q -m "cd-throwaway"
-if ($LASTEXITCODE -ne 0) {
-    throw "Cannot commit .claude\settings.json in $scopeRepo."
-}
-git -C $scopeRepo worktree add -q "$Root\scope-worktree"
-if ($LASTEXITCODE -ne 0) {
-    throw "Cannot add the worktree $Root\scope-worktree of $scopeRepo."
-}
-Write-TestFile "$Root\scope-on\.claude\settings.json" "{ `"enabledPlugins`": { `"$scopeId`": true } }`n"
-Write-TestFile "$Root\scope-off\.claude\settings.json" "{ `"enabledPlugins`": { `"$scopeId`": true } }`n"
-Write-TestFile "$Root\scope-off\.claude\settings.local.json" "{ `"enabledPlugins`": { `"$scopeId`": false } }`n"
+Write-ScopeSwitch "$scopeRepo\.claude\settings.json" "true"
+Write-ScopeSwitch "$Root\scope-on\.claude\settings.json" "true"
+Write-ScopeSwitch "$Root\scope-off\.claude\settings.json" "true"
+Write-ScopeSwitch "$Root\scope-off\.claude\settings.local.json" "false"
 New-Item -ItemType Directory -Force "$Root\scope-none" | Out-Null
+# Windows Sandbox, where the Sandbox walk runs this script, has no Git: there
+# the repo is a plain folder and the worktree is missing, which no step it
+# walks reads.
+if (Get-Command git -ErrorAction SilentlyContinue) {
+    git init -q $scopeRepo
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot run git init in $scopeRepo."
+    }
+    git -C $scopeRepo -c core.autocrlf=false add .claude/settings.json
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot add .claude\settings.json to the git index of $scopeRepo."
+    }
+    git -C $scopeRepo -c user.name=cd-throwaway -c user.email=cd-throwaway@example.invalid -c commit.gpgsign=false commit -q -m "cd-throwaway"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot commit .claude\settings.json in $scopeRepo."
+    }
+    git -C $scopeRepo worktree add -q "$Root\scope-worktree"
+    if ($LASTEXITCODE -ne 0) {
+        throw "Cannot add the worktree $Root\scope-worktree of $scopeRepo."
+    }
+} else {
+    Write-Warning "Git is not installed, so $scopeRepo is no git repo and $Root\scope-worktree is missing: section 39 needs Git for Windows."
+}
 
 # Cursor as the fake backend sees it, with appdata as %APPDATA% and
 # claude-code-home as the user's folder: Cursor has run, and its local

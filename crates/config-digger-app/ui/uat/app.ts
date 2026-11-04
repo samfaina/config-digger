@@ -31,10 +31,22 @@ export async function inventoryShown(page: Page) {
   await page.locator(".item-row").first().waitFor();
 }
 
+/** The row of the Item named `name` in the Items list. */
+export function itemRow(page: Page, name: string): Locator {
+  return page.locator(".item-row", { has: page.locator(".item-name", { hasText: whole(name) }) });
+}
+
 /** Picks the Item named `name` in the Items list and waits for its Entries in Details. */
 export async function selectItem(page: Page, name: string) {
-  await page.locator(".item-row", { has: page.locator(".item-name", { hasText: whole(name) }) }).first().click();
+  await itemRow(page, name).first().click();
   await page.locator(".entry-card").first().waitFor();
+}
+
+/** Picks the Project `path` in the Inventory's Project field. */
+export async function pickProject(page: Page, path: string) {
+  await page.getByRole("combobox", { name: "Project", exact: true }).click();
+  await page.locator(".select-panel").getByRole("option").filter({ hasText: path }).first().click();
+  await expect(page.getByRole("combobox", { name: "Project", exact: true })).toHaveText(path);
 }
 
 /**
