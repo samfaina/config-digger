@@ -515,6 +515,76 @@ export const fixtures: Fixtures = {
             "entries": 1,
             "last_opened": [],
             "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -852,6 +922,42 @@ export const fixtures: Fixtures = {
             "out_of_range": false,
             "last_ran": null,
             "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -4233,6 +4339,76 @@ export const fixtures: Fixtures = {
             "entries": 1,
             "last_opened": [],
             "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -4570,6 +4746,42 @@ export const fixtures: Fixtures = {
             "out_of_range": false,
             "last_ran": null,
             "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -6700,6 +6912,141 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-project",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-project"
+                ],
+                "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "not_approved",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: Claude Code has not approved `cd-throwaway-project` from E:\\cd-throwaway\\project\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; the Project's own approvals count only once you trust the Project in Claude Code. config-digger never approves servers, nor trusts a Project."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-project",
+                    "--token",
+                    "••••"
+                  ]
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable adds `cd-throwaway-project` to `disabledMcpjsonServers` in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "skill",
+            "name": "cd-throwaway-project-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-project-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-project-skill` to \"off\" in E:\\cd-throwaway\\project\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-shape-home",
             "kind": "mcp",
             "name": "cd-throwaway-project",
@@ -8011,6 +8358,13 @@ export const fixtures: Fixtures = {
                   {
                     "agent": "claude-code",
                     "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-scope-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-scope-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
                     "home": "E:\\cd-throwaway\\claude-code-shape-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Effective."
@@ -8155,6 +8509,13 @@ export const fixtures: Fixtures = {
                     "home": "E:\\cd-throwaway\\claude-code-market-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-scope-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-scope-home): Effective."
                   },
                   {
                     "agent": "claude-code",
@@ -8381,6 +8742,13 @@ export const fixtures: Fixtures = {
                     "home": "E:\\cd-throwaway\\claude-code-market-home",
                     "state": "effective",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-market-home): Effective."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-scope-home",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-scope-home): Effective."
                   },
                   {
                     "agent": "claude-code",
@@ -9125,6 +9493,76 @@ export const fixtures: Fixtures = {
             "entries": 1,
             "last_opened": [],
             "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
           }
         ],
         "homes": [
@@ -9462,6 +9900,42 @@ export const fixtures: Fixtures = {
             "out_of_range": false,
             "last_ran": null,
             "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
             "notes": [
               {
                 "code": "cloud_connectors_not_on_disk",
@@ -11391,6 +11865,74 @@ export const fixtures: Fixtures = {
           },
           {
             "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-extra",
+            "state": "blocked",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-extra"
+                ],
+                "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+                "scope": "project",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "blocked",
+                "reason": {
+                  "code": "not_approved",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Blocked: Claude Code has not approved `cd-throwaway-extra` from E:\\cd-throwaway\\project-extra\\.mcp.json. Approve it in Claude Code, which asks about it when it starts in this Project; config-digger never approves servers."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Blocked: would otherwise be Effective."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-extra"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json",
+                  "sentence": "Disable adds `cd-throwaway-extra` to `disabledMcpjsonServers` in E:\\cd-throwaway\\project-extra\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "blocked",
+                    "sentence": "Also read by VS Code (home default): Blocked."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
             "home": "E:\\cd-throwaway\\claude-code-shape-home",
             "kind": "mcp",
             "name": "cd-throwaway-extra",
@@ -12310,6 +12852,13 @@ export const fixtures: Fixtures = {
                   {
                     "agent": "claude-code",
                     "agent_name": "Claude Code",
+                    "home": "E:\\cd-throwaway\\claude-code-scope-home",
+                    "state": "blocked",
+                    "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-scope-home): Blocked."
+                  },
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
                     "home": "E:\\cd-throwaway\\claude-code-shape-home",
                     "state": "blocked",
                     "sentence": "Also read by Claude Code (home E:\\cd-throwaway\\claude-code-shape-home): Blocked."
@@ -12329,6 +12878,19630 @@ export const fixtures: Fixtures = {
                     "sentence": "Also read by Claude Code (home default): Blocked."
                   }
                 ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "codex",
+            "home": "codex-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-codex",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+                "key_path": [
+                  "mcp_servers",
+                  "cd-throwaway-codex"
+                ],
+                "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_natively",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled",
+                  "sentence": "Disabled: `enabled = false` in E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled turns off the server Codex builds from every Entry of `cd-throwaway-codex`."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "args": [
+                    "-y",
+                    "cd-throwaway-codex",
+                    "--api-key",
+                    "••••"
+                  ],
+                  "command": "npx",
+                  "enabled": false
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ],
+        "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+            "project": "E:\\cd-throwaway\\project",
+            "location": {
+              "id": "local-mcp",
+              "key_path": [
+                "projects",
+                "E:/cd-throwaway/project",
+                "mcpServers"
+              ]
+            },
+            "kind": "shape",
+            "position": null,
+            "reaction": "unknown",
+            "sentence": "Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
+            "notes": [],
+            "warnings": []
+          }
+        ],
+        "store_read_failures": [],
+        "agent_flags": []
+      }
+    },
+    {
+      "project": "E:\\cd-throwaway\\scope-repo",
+      "inventory": {
+        "read_at": "2026-10-01T12:00:00Z",
+        "project": "E:\\cd-throwaway\\scope-repo",
+        "projects": [
+          {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-01",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-02",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-03",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-04",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-05",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-06",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-07",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-08",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-09",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-10",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-11",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-12",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-13",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-14",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-15",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-16",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-17",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-18",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-19",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-20",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-21",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-22",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-23",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-24",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-25",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-26",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-27",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-28",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-29",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-30",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 3,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-extra",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          }
+        ],
+        "homes": [
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\claude-code-home",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 4,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "codex",
+            "agent_name": "Codex",
+            "home": "codex-home",
+            "folder": "E:\\cd-throwaway\\codex-home",
+            "source": {
+              "kind": "environment",
+              "variable": "CODEX_HOME"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "user",
+              "project",
+              "system",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-desktop",
+            "agent_name": "Claude Desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Desktop's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "folder": "E:\\cd-throwaway\\claude-code-shape-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "folder": "E:\\cd-throwaway\\claude-code-synced-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 7,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "folder": "E:\\cd-throwaway\\claude-code-many-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 30,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "folder": "E:\\cd-throwaway\\claude-code-logout-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ],
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-logout-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "not_signed_in",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-logout-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-01",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-01",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-02",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-02",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-03",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-03",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-04",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-04",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-05",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-05",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-06",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-06",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-07",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-07",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-08",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-08",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-09",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-09",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-10",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-10",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-11",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-11",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-12",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-12",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-13",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-13"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-13",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-13"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-14",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-14"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-14",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-14"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-15",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-15"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-15",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-15"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-16",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-16"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-16",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-16"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-17",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-17"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-17",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-17"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-18",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-18"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-18",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-18"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-19",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-19"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-19",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-19"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-20",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-20"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-20",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-20"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-21",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-21"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-21",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-21"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-22",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-22"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-22",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-22"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-23",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-23"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-23",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-23"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-24",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-24"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-24",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-24"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-25",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-25"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-25",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-25"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-26",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-26"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-26",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-26"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-27",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-27"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-27",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-27"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-28",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-28"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-28",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-28"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-29",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-29"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-29",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-29"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-30",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-30"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-30",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-30"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-scoped-server"
+                ],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-scoped-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "skill",
+            "name": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-scoped-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-shape-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-shape-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-shape-user"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-overridden-skill` to \"off\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-shared-off-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-shared-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"off\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-spread-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-spread-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-spread-skill` to \"off\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-toggle-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-toggle-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-synced@synced",
+                  "name": "cd-throwaway-synced",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-synced-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-user-off-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_by_name",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json#skillOverrides.cd-throwaway-user-off-skill",
+                  "sentence": "Disabled by name: `skillOverrides.cd-throwaway-user-off-skill` is \"off\" in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json, so Claude Code skips the Entries with that name."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude.json#mcpServers.cd-throwaway-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-github"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_••••"
+                  }
+                },
+                "masked": [
+                  [
+                    "env",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-user-skill` to \"off\" in E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-desktop",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                "key_path": [
+                  "entries",
+                  "cd-throwaway-desktop"
+                ],
+                "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-desktop",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": {
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+                  "key_path": [
+                    "mcpServers",
+                    "cd-throwaway-desktop"
+                  ],
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "parked_at": "2026-10-01T12:00:00Z"
+                },
+                "state": "disabled",
+                "reason": {
+                  "code": "parked",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-desktop"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "codex",
+            "home": "codex-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-codex",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+                "key_path": [
+                  "mcp_servers",
+                  "cd-throwaway-codex"
+                ],
+                "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_natively",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled",
+                  "sentence": "Disabled: `enabled = false` in E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled turns off the server Codex builds from every Entry of `cd-throwaway-codex`."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "args": [
+                    "-y",
+                    "cd-throwaway-codex",
+                    "--api-key",
+                    "••••"
+                  ],
+                  "command": "npx",
+                  "enabled": false
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ],
+        "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+            "project": "E:\\cd-throwaway\\project",
+            "location": {
+              "id": "local-mcp",
+              "key_path": [
+                "projects",
+                "E:/cd-throwaway/project",
+                "mcpServers"
+              ]
+            },
+            "kind": "shape",
+            "position": null,
+            "reaction": "unknown",
+            "sentence": "Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
+            "notes": [],
+            "warnings": []
+          }
+        ],
+        "store_read_failures": [],
+        "agent_flags": []
+      }
+    },
+    {
+      "project": "E:\\cd-throwaway\\scope-worktree",
+      "inventory": {
+        "read_at": "2026-10-01T12:00:00Z",
+        "project": "E:\\cd-throwaway\\scope-worktree",
+        "projects": [
+          {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-01",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-02",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-03",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-04",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-05",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-06",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-07",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-08",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-09",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-10",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-11",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-12",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-13",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-14",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-15",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-16",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-17",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-18",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-19",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-20",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-21",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-22",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-23",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-24",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-25",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-26",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-27",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-28",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-29",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-30",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 3,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-extra",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          }
+        ],
+        "homes": [
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\claude-code-home",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 4,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "codex",
+            "agent_name": "Codex",
+            "home": "codex-home",
+            "folder": "E:\\cd-throwaway\\codex-home",
+            "source": {
+              "kind": "environment",
+              "variable": "CODEX_HOME"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "user",
+              "project",
+              "system",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-desktop",
+            "agent_name": "Claude Desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Desktop's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "folder": "E:\\cd-throwaway\\claude-code-shape-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "folder": "E:\\cd-throwaway\\claude-code-synced-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 7,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "folder": "E:\\cd-throwaway\\claude-code-many-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 30,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "folder": "E:\\cd-throwaway\\claude-code-logout-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ],
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-logout-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "not_signed_in",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-logout-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-01",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-01",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-02",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-02",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-03",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-03",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-04",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-04",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-05",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-05",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-06",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-06",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-07",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-07",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-08",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-08",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-09",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-09",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-10",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-10",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-11",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-11",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-12",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-12",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-13",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-13"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-13",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-13"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-14",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-14"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-14",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-14"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-15",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-15"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-15",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-15"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-16",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-16"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-16",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-16"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-17",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-17"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-17",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-17"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-18",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-18"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-18",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-18"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-19",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-19"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-19",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-19"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-20",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-20"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-20",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-20"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-21",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-21"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-21",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-21"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-22",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-22"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-22",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-22"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-23",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-23"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-23",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-23"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-24",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-24"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-24",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-24"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-25",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-25"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-25",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-25"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-26",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-26"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-26",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-26"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-27",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-27"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-27",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-27"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-28",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-28"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-28",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-28"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-29",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-29"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-29",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-29"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-30",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-30"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-30",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-30"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-scoped-server"
+                ],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-scoped-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "skill",
+            "name": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-scoped-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-shape-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-shape-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-shape-user"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-overridden-skill` to \"off\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-shared-off-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-shared-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"off\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-spread-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-spread-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-spread-skill` to \"off\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-toggle-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-toggle-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-synced@synced",
+                  "name": "cd-throwaway-synced",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-synced-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-user-off-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_by_name",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json#skillOverrides.cd-throwaway-user-off-skill",
+                  "sentence": "Disabled by name: `skillOverrides.cd-throwaway-user-off-skill` is \"off\" in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json, so Claude Code skips the Entries with that name."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude.json#mcpServers.cd-throwaway-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-github"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_••••"
+                  }
+                },
+                "masked": [
+                  [
+                    "env",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-user-skill` to \"off\" in E:\\cd-throwaway\\scope-worktree\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-desktop",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                "key_path": [
+                  "entries",
+                  "cd-throwaway-desktop"
+                ],
+                "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-desktop",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": {
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+                  "key_path": [
+                    "mcpServers",
+                    "cd-throwaway-desktop"
+                  ],
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "parked_at": "2026-10-01T12:00:00Z"
+                },
+                "state": "disabled",
+                "reason": {
+                  "code": "parked",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-desktop"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "codex",
+            "home": "codex-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-codex",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+                "key_path": [
+                  "mcp_servers",
+                  "cd-throwaway-codex"
+                ],
+                "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_natively",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled",
+                  "sentence": "Disabled: `enabled = false` in E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled turns off the server Codex builds from every Entry of `cd-throwaway-codex`."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "args": [
+                    "-y",
+                    "cd-throwaway-codex",
+                    "--api-key",
+                    "••••"
+                  ],
+                  "command": "npx",
+                  "enabled": false
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ],
+        "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+            "project": "E:\\cd-throwaway\\project",
+            "location": {
+              "id": "local-mcp",
+              "key_path": [
+                "projects",
+                "E:/cd-throwaway/project",
+                "mcpServers"
+              ]
+            },
+            "kind": "shape",
+            "position": null,
+            "reaction": "unknown",
+            "sentence": "Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
+            "notes": [],
+            "warnings": []
+          }
+        ],
+        "store_read_failures": [],
+        "agent_flags": []
+      }
+    },
+    {
+      "project": "E:\\cd-throwaway\\scope-on",
+      "inventory": {
+        "read_at": "2026-10-01T12:00:00Z",
+        "project": "E:\\cd-throwaway\\scope-on",
+        "projects": [
+          {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-01",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-02",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-03",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-04",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-05",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-06",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-07",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-08",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-09",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-10",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-11",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-12",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-13",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-14",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-15",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-16",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-17",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-18",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-19",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-20",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-21",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-22",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-23",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-24",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-25",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-26",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-27",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-28",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-29",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-30",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 3,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-extra",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          }
+        ],
+        "homes": [
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\claude-code-home",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 4,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "codex",
+            "agent_name": "Codex",
+            "home": "codex-home",
+            "folder": "E:\\cd-throwaway\\codex-home",
+            "source": {
+              "kind": "environment",
+              "variable": "CODEX_HOME"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "user",
+              "project",
+              "system",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-desktop",
+            "agent_name": "Claude Desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Desktop's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "folder": "E:\\cd-throwaway\\claude-code-shape-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "folder": "E:\\cd-throwaway\\claude-code-synced-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 7,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "folder": "E:\\cd-throwaway\\claude-code-many-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 30,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "folder": "E:\\cd-throwaway\\claude-code-logout-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ],
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-logout-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "not_signed_in",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-logout-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-01",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-01",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-02",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-02",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-03",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-03",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-04",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-04",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-05",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-05",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-06",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-06",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-07",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-07",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-08",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-08",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-09",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-09",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-10",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-10",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-11",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-11",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-12",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-12",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-13",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-13"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-13",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-13"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-14",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-14"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-14",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-14"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-15",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-15"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-15",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-15"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-16",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-16"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-16",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-16"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-17",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-17"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-17",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-17"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-18",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-18"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-18",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-18"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-19",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-19"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-19",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-19"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-20",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-20"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-20",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-20"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-21",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-21"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-21",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-21"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-22",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-22"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-22",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-22"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-23",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-23"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-23",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-23"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-24",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-24"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-24",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-24"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-25",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-25"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-25",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-25"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-26",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-26"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-26",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-26"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-27",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-27"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-27",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-27"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-28",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-28"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-28",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-28"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-29",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-29"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-29",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-29"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-30",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-30"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-30",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-30"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-scoped-server"
+                ],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-scoped-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "skill",
+            "name": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-scoped-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to false in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-scoped@cd-throwaway-scope-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-shape-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-shape-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-shape-user"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-overridden-skill` to \"off\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-shared-off-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-shared-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"off\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-spread-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-spread-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-spread-skill` to \"off\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-toggle-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-toggle-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-synced@synced",
+                  "name": "cd-throwaway-synced",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-synced-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-user-off-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_by_name",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json#skillOverrides.cd-throwaway-user-off-skill",
+                  "sentence": "Disabled by name: `skillOverrides.cd-throwaway-user-off-skill` is \"off\" in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json, so Claude Code skips the Entries with that name."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude.json#mcpServers.cd-throwaway-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-github"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_••••"
+                  }
+                },
+                "masked": [
+                  [
+                    "env",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-user-skill` to \"off\" in E:\\cd-throwaway\\scope-on\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-desktop",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                "key_path": [
+                  "entries",
+                  "cd-throwaway-desktop"
+                ],
+                "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-desktop",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": {
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+                  "key_path": [
+                    "mcpServers",
+                    "cd-throwaway-desktop"
+                  ],
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "parked_at": "2026-10-01T12:00:00Z"
+                },
+                "state": "disabled",
+                "reason": {
+                  "code": "parked",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-desktop"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "codex",
+            "home": "codex-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-codex",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+                "key_path": [
+                  "mcp_servers",
+                  "cd-throwaway-codex"
+                ],
+                "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_natively",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled",
+                  "sentence": "Disabled: `enabled = false` in E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled turns off the server Codex builds from every Entry of `cd-throwaway-codex`."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "args": [
+                    "-y",
+                    "cd-throwaway-codex",
+                    "--api-key",
+                    "••••"
+                  ],
+                  "command": "npx",
+                  "enabled": false
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ],
+        "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+            "project": "E:\\cd-throwaway\\project",
+            "location": {
+              "id": "local-mcp",
+              "key_path": [
+                "projects",
+                "E:/cd-throwaway/project",
+                "mcpServers"
+              ]
+            },
+            "kind": "shape",
+            "position": null,
+            "reaction": "unknown",
+            "sentence": "Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
+            "notes": [],
+            "warnings": []
+          }
+        ],
+        "store_read_failures": [],
+        "agent_flags": []
+      }
+    },
+    {
+      "project": "E:\\cd-throwaway\\scope-off",
+      "inventory": {
+        "read_at": "2026-10-01T12:00:00Z",
+        "project": "E:\\cd-throwaway\\scope-off",
+        "projects": [
+          {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-01",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-02",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-03",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-04",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-05",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-06",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-07",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-08",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-09",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-10",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-11",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-12",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-13",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-14",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-15",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-16",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-17",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-18",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-19",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-20",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-21",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-22",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-23",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-24",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-25",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-26",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-27",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-28",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-29",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-30",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 3,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-extra",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          }
+        ],
+        "homes": [
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\claude-code-home",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 4,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "codex",
+            "agent_name": "Codex",
+            "home": "codex-home",
+            "folder": "E:\\cd-throwaway\\codex-home",
+            "source": {
+              "kind": "environment",
+              "variable": "CODEX_HOME"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "user",
+              "project",
+              "system",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-desktop",
+            "agent_name": "Claude Desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Desktop's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "folder": "E:\\cd-throwaway\\claude-code-shape-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "folder": "E:\\cd-throwaway\\claude-code-synced-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 7,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "folder": "E:\\cd-throwaway\\claude-code-many-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 30,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "folder": "E:\\cd-throwaway\\claude-code-logout-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ],
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-logout-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "not_signed_in",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-logout-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-01",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-01",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-02",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-02",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-03",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-03",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-04",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-04",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-05",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-05",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-06",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-06",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-07",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-07",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-08",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-08",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-09",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-09",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-10",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-10",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-11",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-11",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-12",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-12",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-13",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-13"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-13",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-13"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-14",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-14"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-14",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-14"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-15",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-15"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-15",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-15"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-16",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-16"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-16",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-16"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-17",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-17"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-17",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-17"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-18",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-18"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-18",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-18"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-19",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-19"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-19",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-19"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-20",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-20"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-20",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-20"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-21",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-21"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-21",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-21"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-22",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-22"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-22",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-22"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-23",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-23"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-23",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-23"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-24",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-24"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-24",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-24"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-25",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-25"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-25",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-25"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-26",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-26"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-26",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-26"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-27",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-27"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-27",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-27"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-28",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-28"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-28",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-28"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-29",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-29"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-29",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-29"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-30",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-30"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-30",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-30"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "mcp",
+            "name": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-scoped-server"
+                ],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "plugin_disabled",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json#enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "sentence": "Disabled with its plugin cd-throwaway-scoped@cd-throwaway-scope-market: `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` is false in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project, so Claude Code skips every server and skill of the plugin."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-scoped-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to true in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "kind": "skill",
+            "name": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "name": "cd-throwaway-scoped",
+                  "scope": "project",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "plugin_disabled",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json#enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market",
+                  "sentence": "Disabled with its plugin cd-throwaway-scoped@cd-throwaway-scope-market: `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` is false in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project, so Claude Code skips every server and skill of the plugin."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-scoped-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `enabledPlugins.cd-throwaway-scoped@cd-throwaway-scope-market` to true in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-scoped@cd-throwaway-scope-market with `claude plugin uninstall cd-throwaway-scoped@cd-throwaway-scope-market --scope project`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-shape-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-shape-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-shape-user"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-overridden-skill` to \"off\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-shared-off-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-shared-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"off\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-spread-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-spread-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-spread-skill` to \"off\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-toggle-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-toggle-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-synced@synced",
+                  "name": "cd-throwaway-synced",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-synced-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-user-off-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_by_name",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json#skillOverrides.cd-throwaway-user-off-skill",
+                  "sentence": "Disabled by name: `skillOverrides.cd-throwaway-user-off-skill` is \"off\" in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json, so Claude Code skips the Entries with that name."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude.json#mcpServers.cd-throwaway-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-github"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_••••"
+                  }
+                },
+                "masked": [
+                  [
+                    "env",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-user-skill` to \"off\" in E:\\cd-throwaway\\scope-off\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-desktop",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                "key_path": [
+                  "entries",
+                  "cd-throwaway-desktop"
+                ],
+                "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-desktop",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": {
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+                  "key_path": [
+                    "mcpServers",
+                    "cd-throwaway-desktop"
+                  ],
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "parked_at": "2026-10-01T12:00:00Z"
+                },
+                "state": "disabled",
+                "reason": {
+                  "code": "parked",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-desktop"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-copilot",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-copilot"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\com.github.copilot\\servers.json#mcpServers.cd-throwaway-openplugin-copilot",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-copilot"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-openplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-openplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin\\mcp.json#mcpServers.cd-throwaway-openplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin",
+                  "name": "cd-throwaway-openplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-openplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-openplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-vsplugin-server",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-vsplugin-server"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\servers.json#mcpServers.cd-throwaway-vsplugin-server",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin",
+                  "name": "cd-throwaway-vsplugin",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-vsplugin-server"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: VS Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin in VS Code.",
+                  "how_to_remove": null
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "vscode",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since VS Code has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "mcp",
+            "name": "plugin-cd-throwaway-kit-cd-throwaway-next",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-next"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.claude-plugin\\plugin.json#mcpServers.cd-throwaway-next",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-kit",
+                  "name": "cd-throwaway-kit",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-next"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Cursor has no switch for this Entry here."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-kit in Cursor.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `dedupe_mcp_servers`: assumed on; cannot be read."
+                  },
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\appdata\\Cursor\\User\\globalStorage\\state.vscdb",
+                    "sentence": "Depends on Cursor gate `mcp_profile_scoped_global_disabled_state`: assumed on; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "cursor",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                  "sentence": "Disable moves `cd-throwaway-user-skill` out of E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill into config-digger's parked-Entry store E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, since Cursor has no switch for it; Enable puts it back."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "claude-code",
+                    "agent_name": "Claude Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Claude Code (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "codex",
+            "home": "codex-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-codex",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+                "key_path": [
+                  "mcp_servers",
+                  "cd-throwaway-codex"
+                ],
+                "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_natively",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled",
+                  "sentence": "Disabled: `enabled = false` in E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex.enabled turns off the server Codex builds from every Entry of `cd-throwaway-codex`."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "args": [
+                    "-y",
+                    "cd-throwaway-codex",
+                    "--api-key",
+                    "••••"
+                  ],
+                  "command": "npx",
+                  "enabled": false
+                },
+                "masked": [
+                  [
+                    "args",
+                    "3"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable deletes `mcp_servers.cd-throwaway-codex.enabled` in E:\\cd-throwaway\\codex-home\\config.toml."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          }
+        ],
+        "read_failures": [
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 67
+            },
+            "reaction": "reads_around_error",
+            "sentence": "VS Code cannot parse E:\\cd-throwaway\\claude-code-home\\.vscode\\agent-plugins\\cd-throwaway.invalid\\cd-throwaway\\cd-throwaway-vsplugin\\.claude-plugin\\plugin.json as JSONC with trailing commas (line 1, column 67).",
+            "notes": [
+              "VS Code reads what is around the error, and config-digger lists what it keeps."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "path": "E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json",
+            "project": null,
+            "location": null,
+            "kind": "parse",
+            "position": {
+              "line": 1,
+              "column": 30
+            },
+            "reaction": "reads_next_path",
+            "sentence": "Cursor cannot parse E:\\cd-throwaway\\claude-code-home\\.cursor\\plugins\\local\\cd-throwaway-kit\\.cursor-plugin\\plugin.json as strict JSON (line 1, column 30), so it reads no Entries from it.",
+            "notes": [
+              "Cursor reads the first it can of the plugin's `.claude-plugin/plugin.json` or `plugin.json` instead of this file."
+            ],
+            "warnings": []
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+            "project": "E:\\cd-throwaway\\project",
+            "location": {
+              "id": "local-mcp",
+              "key_path": [
+                "projects",
+                "E:/cd-throwaway/project",
+                "mcpServers"
+              ]
+            },
+            "kind": "shape",
+            "position": null,
+            "reaction": "unknown",
+            "sentence": "Claude Code cannot read the MCP servers at E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#projects.E:/cd-throwaway/project.mcpServers: it holds a list, not an object, so it reads no Entries from there.",
+            "notes": [],
+            "warnings": []
+          }
+        ],
+        "store_read_failures": [],
+        "agent_flags": []
+      }
+    },
+    {
+      "project": "E:\\cd-throwaway\\scope-none",
+      "inventory": {
+        "read_at": "2026-10-01T12:00:00Z",
+        "project": "E:\\cd-throwaway\\scope-none",
+        "projects": [
+          {
+            "path": "E:\\cd-throwaway\\claude-code-home",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": [
+              {
+                "agent": "claude-code",
+                "code": "walk_down_left_out",
+                "sentence": "Claude Code also loads the `.claude\\skills` folders below this Project, but config-digger does not read them here: outside a git repo, that would walk every folder below a home folder or a drive."
+              }
+            ]
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-01",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-02",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-03",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-04",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-05",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-06",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-07",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-08",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-09",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-10",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-11",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-12",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-13",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-14",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-15",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-16",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-17",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-18",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-19",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-20",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-21",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-22",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-23",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-24",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-25",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-26",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-27",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-28",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-29",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-30",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\many\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 12,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\project-long",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 3,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-extra",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [],
+            "added": true,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\project-gone",
+            "missing": true,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 1,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-none",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 0,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-off",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-on",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-repo",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          },
+          {
+            "path": "E:\\cd-throwaway\\scope-worktree",
+            "missing": false,
+            "workspace_file": false,
+            "members": [],
+            "registered_by": [
+              "claude-code"
+            ],
+            "added": false,
+            "hidden": false,
+            "entries": 2,
+            "last_opened": [],
+            "notes": []
+          }
+        ],
+        "homes": [
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\claude-code-home",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "vscode",
+            "agent_name": "VS Code",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Code\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "workspace-folder",
+              "workspace",
+              "user",
+              "plugin",
+              "extension",
+              "discovered"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 4,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of VS Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "cursor",
+            "agent_name": "Cursor",
+            "home": "default",
+            "folder": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+            "source": {
+              "kind": "default"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user",
+              "project",
+              "built-in",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "marketplace_plugins_not_on_disk",
+                "installation": null,
+                "sentence": "Cursor keeps the plugins you install for yourself from its Marketplace in your account, so they are not listed here. Those a Project installs are."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "codex",
+            "agent_name": "Codex",
+            "home": "codex-home",
+            "folder": "E:\\cd-throwaway\\codex-home",
+            "source": {
+              "kind": "environment",
+              "variable": "CODEX_HOME"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "user",
+              "project",
+              "system",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Codex that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-desktop",
+            "agent_name": "Claude Desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "folder": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "user"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Desktop's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Desktop that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "folder": "E:\\cd-throwaway\\claude-code-shape-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "folder": "E:\\cd-throwaway\\claude-code-synced-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 7,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "folder": "E:\\cd-throwaway\\claude-code-many-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 30,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "folder": "E:\\cd-throwaway\\claude-code-logout-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 1,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "folder": "E:\\cd-throwaway\\claude-code-market-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 2,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
+          }
+        ],
+        "items": [
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-logout-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-logout-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-logout-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-logout-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "not_signed_in",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code keeps no sign-in credentials at E:\\cd-throwaway\\claude-code-logout-home\\.claude\\.credentials.json, so it is signed out of its claude.ai account, and reads this only while signed in."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-logout-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-logout-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-01",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-01"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-01",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-01"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-02",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-02"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-02",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-02"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-03",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-03"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-03",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-03"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-04",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-04"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-04",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-04"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-05",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-05"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-05",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-05"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-06",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-06"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-06",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-06"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-07",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-07"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-07",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-07"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-08",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-08"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-08",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-08"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-09",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-09"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-09",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-09"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-10",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-10"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-10",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-10"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-11",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-11"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-11",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-11"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-12",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-12"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-12",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-12"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-13",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-13"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-13",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-13"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-14",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-14"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-14",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-14"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-15",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-15"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-15",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-15"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-16",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-16"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-16",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-16"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-17",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-17"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-17",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-17"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-18",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-18"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-18",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-18"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-19",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-19"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-19",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-19"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-20",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-20"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-20",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-20"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-21",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-21"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-21",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-21"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-22",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-22"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-22",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-22"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-23",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-23"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-23",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-23"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-24",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-24"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-24",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-24"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-25",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-25"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-25",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-25"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-26",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-26"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-26",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-26"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-27",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-27"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-27",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-27"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-28",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-28"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-28",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-28"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-29",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-29"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-29",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-29"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-many-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-many-30",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-many-30"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-many-home\\.claude.json#mcpServers.cd-throwaway-many-30",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-many-30"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-listed:cd-throwaway-listed-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-listed@cd-throwaway-market",
+                  "name": "cd-throwaway-listed",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-listed-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-listed@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-listed@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-listed@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-listed@cd-throwaway-market with `claude plugin uninstall cd-throwaway-listed@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-market-home",
+            "kind": "skill",
+            "name": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+            "state": "invalid",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+                "scope": "plugin",
+                "provenance": "plugin",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-notlisted@cd-throwaway-market",
+                  "name": "cd-throwaway-notlisted",
+                  "scope": "user",
+                  "version": "1.0.0",
+                  "folder": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "invalid",
+                "reason": {
+                  "code": "plugin_failed_to_load",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Invalid: Claude Code does not load the plugin `cd-throwaway-notlisted`, since the manifest of its marketplace `cd-throwaway-market`, E:\\cd-throwaway\\market\\.claude-plugin\\marketplace.json, does not list it."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-notlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `enabledPlugins.cd-throwaway-notlisted@cd-throwaway-market` to false in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project. This Disables the whole plugin cd-throwaway-notlisted@cd-throwaway-market, with every server and skill it carries."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "plugin",
+                  "sentence": "Not in v0.1: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market in Claude Code.",
+                  "how_to_remove": {
+                    "command": "claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user",
+                    "sentence": "How to remove: uninstall the plugin cd-throwaway-notlisted@cd-throwaway-market with `claude plugin uninstall cd-throwaway-notlisted@cd-throwaway-market --scope user`. It takes every server and skill of the plugin with it."
+                  }
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-shape-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-shape-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-shape-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-shape-home\\.claude.json#mcpServers.cd-throwaway-shape-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-shape-user"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-overridden-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-overridden-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-overridden-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-overridden-skill` to \"off\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-shared-off-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-shared-off-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-shared-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-shared-off-skill` to \"off\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-spread-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-spread-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-spread-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-spread-skill` to \"off\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "anthropic-skills:cd-throwaway-toggle-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\synced\\cd-org_cd-acct\\cd-throwaway-toggle-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-toggle-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.anthropic-skills:cd-throwaway-toggle-skill` to \"off\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_assumed",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_skills_sync_enabled`: assumed off; cannot be read."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-synced:cd-throwaway-synced-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2\\skills\\cd-throwaway-synced-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-synced@synced",
+                  "name": "cd-throwaway-synced",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-synced~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-synced-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Disable is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-unlisted:cd-throwaway-unlisted-skill",
+            "state": "unread",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2\\skills\\cd-throwaway-unlisted-skill",
+                "scope": "user",
+                "provenance": "cloud_mirror",
+                "skill_manager": null,
+                "plugin": {
+                  "id": "cd-throwaway-unlisted@synced",
+                  "name": "cd-throwaway-unlisted",
+                  "scope": null,
+                  "version": null,
+                  "folder": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\cd-throwaway-unlisted~g2"
+                },
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "unread",
+                "reason": {
+                  "code": "plugin_not_listed",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Claude Code loads only the plugins that E:\\cd-throwaway\\claude-code-synced-home\\.claude\\plugins\\synced\\cd-org_cd-acct\\manifest.json lists, and it does not list this one: Claude Code does not load it, and deletes its folder the next time it updates its plugins."
+                },
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-unlisted-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "unread",
+                  "sentence": "Disable is not offered: the Agent never reads the Entry, so it can only be Removed."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "not_offered",
+                  "code": "read_only",
+                  "sentence": "Remove is not offered: this Entry is managed, or a copy of the user's account, and config-digger only reads it.",
+                  "how_to_remove": null
+                },
+                "caveats": [
+                  {
+                    "code": "gate_cached",
+                    "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude.json",
+                    "sentence": "Depends on Claude Code gate `tengu_claudeai_plugins_sync_enabled`: on as of 2 Oct 2026 07:40 UTC."
+                  }
+                ],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "E:\\cd-throwaway\\claude-code-synced-home",
+            "kind": "skill",
+            "name": "cd-throwaway-user-off-skill",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\skills\\cd-throwaway-user-off-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "disabled",
+                "reason": {
+                  "code": "disabled_by_name",
+                  "effective": null,
+                  "switch": "E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json#skillOverrides.cd-throwaway-user-off-skill",
+                  "sentence": "Disabled by name: `skillOverrides.cd-throwaway-user-off-skill` is \"off\" in E:\\cd-throwaway\\claude-code-synced-home\\.claude\\settings.json, so Claude Code skips the Entries with that name."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-off-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable sets `skillOverrides.cd-throwaway-user-off-skill` to \"on\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "mcp",
+            "name": "cd-throwaway-user",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude.json",
+                "key_path": [
+                  "mcpServers",
+                  "cd-throwaway-user"
+                ],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude.json#mcpServers.cd-throwaway-user",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "@modelcontextprotocol/server-github"
+                  ],
+                  "env": {
+                    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_••••"
+                  }
+                },
+                "masked": [
+                  [
+                    "env",
+                    "GITHUB_PERSONAL_ACCESS_TOKEN"
+                  ]
+                ],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "no_mechanism",
+                  "sentence": "Disable is not offered: Claude Code Disables this Entry per Project, and has nowhere to keep the switch for this Project: it has not recorded the Project, or its folder is gone."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-code",
+            "home": "default",
+            "kind": "skill",
+            "name": "cd-throwaway-user-skill",
+            "state": "effective",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "key_path": [],
+                "locator": "E:\\cd-throwaway\\claude-code-home\\.claude\\skills\\cd-throwaway-user-skill",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": null,
+                "state": "effective",
+                "reason": null,
+                "secondary": [],
+                "what_if": null,
+                "notes": [],
+                "config": {
+                  "name": "cd-throwaway-user-skill",
+                  "description": "Throwaway skill for testing config-digger. Does nothing."
+                },
+                "masked": [],
+                "disable": {
+                  "status": "offered",
+                  "path": "E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json",
+                  "sentence": "Disable sets `skillOverrides.cd-throwaway-user-skill` to \"off\" in E:\\cd-throwaway\\scope-none\\.claude\\settings.local.json for this Project."
+                },
+                "enable": null,
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [
+                  {
+                    "agent": "cursor",
+                    "agent_name": "Cursor",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by Cursor (home default): Effective."
+                  },
+                  {
+                    "agent": "vscode",
+                    "agent_name": "VS Code",
+                    "home": "default",
+                    "state": "effective",
+                    "sentence": "Also read by VS Code (home default): Effective."
+                  }
+                ],
+                "copied_from": null
+              }
+            ],
+            "built": null,
+            "caveats": []
+          },
+          {
+            "agent": "claude-desktop",
+            "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+            "kind": "mcp",
+            "name": "cd-throwaway-desktop",
+            "state": "disabled",
+            "entries": [
+              {
+                "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
+                "key_path": [
+                  "entries",
+                  "cd-throwaway-desktop"
+                ],
+                "locator": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json#entries.cd-throwaway-desktop",
+                "scope": "user",
+                "provenance": "file",
+                "skill_manager": null,
+                "plugin": null,
+                "git_versioned": false,
+                "link": null,
+                "parked": {
+                  "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+                  "key_path": [
+                    "mcpServers",
+                    "cd-throwaway-desktop"
+                  ],
+                  "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+                  "parked_at": "2026-10-01T12:00:00Z"
+                },
+                "state": "disabled",
+                "reason": {
+                  "code": "parked",
+                  "effective": null,
+                  "switch": null,
+                  "sentence": "Disabled: config-digger parked it in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json, out of E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json, so Claude Desktop no longer reads it."
+                },
+                "secondary": [],
+                "what_if": {
+                  "state": "effective",
+                  "effective": null,
+                  "sentence": "Disabled: would be Effective once Enabled."
+                },
+                "notes": [],
+                "config": {
+                  "command": "npx",
+                  "args": [
+                    "-y",
+                    "cd-throwaway-desktop"
+                  ]
+                },
+                "masked": [],
+                "disable": {
+                  "status": "not_offered",
+                  "code": "already_disabled",
+                  "sentence": "Disable is not offered: the Entry is Disabled already."
+                },
+                "enable": {
+                  "status": "offered",
+                  "sentence": "Enable puts `cd-throwaway-desktop` back into E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json and takes it out of config-digger's parked-Entry store."
+                },
+                "remove": {
+                  "status": "offered"
+                },
+                "caveats": [],
+                "also_read_by": [],
                 "copied_from": null
               }
             ],
@@ -13380,6 +33553,76 @@ export const fixtures: Fixtures = {
         "entries": 0,
         "last_opened": [],
         "notes": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\scope-none",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 0,
+        "last_opened": [],
+        "notes": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\scope-off",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 2,
+        "last_opened": [],
+        "notes": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\scope-on",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 2,
+        "last_opened": [],
+        "notes": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\scope-repo",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 2,
+        "last_opened": [],
+        "notes": []
+      },
+      {
+        "path": "E:\\cd-throwaway\\scope-worktree",
+        "missing": false,
+        "workspace_file": false,
+        "members": [],
+        "registered_by": [
+          "claude-code"
+        ],
+        "added": false,
+        "hidden": false,
+        "entries": 2,
+        "last_opened": [],
+        "notes": []
       }
     ],
     "leftovers": [
@@ -14419,6 +34662,42 @@ export const fixtures: Fixtures = {
                 "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
               }
             ]
+          },
+          {
+            "agent": "claude-code",
+            "agent_name": "Claude Code",
+            "home": "E:\\cd-throwaway\\claude-code-scope-home",
+            "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+            "source": {
+              "kind": "added"
+            },
+            "hidden": false,
+            "not_read": null,
+            "mirror": null,
+            "no_configuration": null,
+            "scopes": [
+              "managed",
+              "local",
+              "project",
+              "user",
+              "plugin"
+            ],
+            "installations": [],
+            "out_of_range": false,
+            "last_ran": null,
+            "entries": 0,
+            "notes": [
+              {
+                "code": "cloud_connectors_not_on_disk",
+                "installation": null,
+                "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+              },
+              {
+                "code": "no_installation_found",
+                "installation": null,
+                "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+              }
+            ]
           }
         ]
       },
@@ -15170,6 +35449,76 @@ export const fixtures: Fixtures = {
           "added": false,
           "hidden": true,
           "entries": 0,
+          "last_opened": [],
+          "notes": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\scope-none",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 0,
+          "last_opened": [],
+          "notes": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\scope-off",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 2,
+          "last_opened": [],
+          "notes": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\scope-on",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 2,
+          "last_opened": [],
+          "notes": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\scope-repo",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 2,
+          "last_opened": [],
+          "notes": []
+        },
+        {
+          "path": "E:\\cd-throwaway\\scope-worktree",
+          "missing": false,
+          "workspace_file": false,
+          "members": [],
+          "registered_by": [
+            "claude-code"
+          ],
+          "added": false,
+          "hidden": false,
+          "entries": 2,
           "last_opened": [],
           "notes": []
         }
@@ -16168,6 +36517,42 @@ export const fixtures: Fixtures = {
                   "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
                 }
               ]
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "folder": "E:\\cd-throwaway\\claude-code-scope-home",
+              "source": {
+                "kind": "added"
+              },
+              "hidden": false,
+              "not_read": null,
+              "mirror": null,
+              "no_configuration": null,
+              "scopes": [
+                "managed",
+                "local",
+                "project",
+                "user",
+                "plugin"
+              ],
+              "installations": [],
+              "out_of_range": false,
+              "last_ran": null,
+              "entries": 0,
+              "notes": [
+                {
+                  "code": "cloud_connectors_not_on_disk",
+                  "installation": null,
+                  "sentence": "Claude Code's connectors live in your account, with no copy on disk, so they are not listed here."
+                },
+                {
+                  "code": "no_installation_found",
+                  "installation": null,
+                  "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+                }
+              ]
             }
           ]
         },
@@ -16388,7 +36773,7 @@ export const fixtures: Fixtures = {
   },
   "history": [
     {
-      "id": "20261001-120000-5e0",
+      "id": "20261001-120000-dd7",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -16414,7 +36799,7 @@ export const fixtures: Fixtures = {
       "not_undoable": null
     },
     {
-      "id": "20261001-120000-175",
+      "id": "20261001-120000-f30",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -16437,10 +36822,10 @@ export const fixtures: Fixtures = {
         "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
       ],
       "undoable": false,
-      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175"
+      "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30"
     },
     {
-      "id": "20261001-120000-c8e",
+      "id": "20261001-120000-cc7",
       "created_at": "2026-10-01T12:00:00Z",
       "action": "disable",
       "title": "Disable 1 Entry",
@@ -16468,7 +36853,7 @@ export const fixtures: Fixtures = {
   "details": [
     {
       "summary": {
-        "id": "20261001-120000-5e0",
+        "id": "20261001-120000-dd7",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -16923,12 +37308,67 @@ export const fixtures: Fixtures = {
           "project": "E:\\cd-throwaway\\project-hide",
           "before": "effective",
           "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\scope-none",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\scope-off",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\scope-on",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\scope-repo",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\claude-desktop-stranded-home",
+          "item": "cd-throwaway-stranded",
+          "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json#mcpServers.cd-throwaway-stranded",
+          "project": "E:\\cd-throwaway\\scope-worktree",
+          "before": "effective",
+          "after": "disabled"
         }
       ],
       "locations": [
         {
           "path": "E:\\cd-throwaway\\claude-desktop-stranded-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -16948,7 +37388,7 @@ export const fixtures: Fixtures = {
         },
         {
           "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0\\2-manifest.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7\\2-manifest.json",
           "edits": [
             {
               "op": "set",
@@ -16967,7 +37407,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -16976,7 +37416,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-175",
+        "id": "20261001-120000-f30",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -16999,7 +37439,7 @@ export const fixtures: Fixtures = {
           "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json"
         ],
         "undoable": false,
-        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175"
+        "not_undoable": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30"
       },
       "project": null,
       "changes": [
@@ -17431,12 +37871,67 @@ export const fixtures: Fixtures = {
           "project": "E:\\cd-throwaway\\project-hide",
           "before": "effective",
           "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\scope-none",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\scope-off",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\scope-on",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\scope-repo",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "claude-desktop",
+          "agent_name": "Claude Desktop",
+          "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+          "item": "cd-throwaway-desktop",
+          "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+          "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+          "project": "E:\\cd-throwaway\\scope-worktree",
+          "before": "effective",
+          "after": "disabled"
         }
       ],
       "locations": [
         {
           "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175\\1-claude_desktop_config.json",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30\\1-claude_desktop_config.json",
           "edits": [
             {
               "op": "remove",
@@ -17474,16 +37969,16 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30",
       "cause": null,
       "rollback": [],
       "verify": "verified",
       "differences": [],
       "undo_refusal": {
         "code": "undo_refused",
-        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175",
+        "message": "`entries` in E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json changed since the Operation, so the Undo is refused; the files as they were before the Operation are in E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30",
         "candidates": [],
-        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175",
+        "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30",
         "diffs": [
           {
             "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
@@ -17498,7 +37993,7 @@ export const fixtures: Fixtures = {
     },
     {
       "summary": {
-        "id": "20261001-120000-c8e",
+        "id": "20261001-120000-cc7",
         "created_at": "2026-10-01T12:00:00Z",
         "action": "disable",
         "title": "Disable 1 Entry",
@@ -17952,12 +38447,67 @@ export const fixtures: Fixtures = {
           "project": "E:\\cd-throwaway\\project-hide",
           "before": "effective",
           "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\scope-none",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\scope-off",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\scope-on",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\scope-repo",
+          "before": "effective",
+          "after": "disabled"
+        },
+        {
+          "agent": "codex",
+          "agent_name": "Codex",
+          "home": "codex-home",
+          "item": "cd-throwaway-codex",
+          "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+          "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+          "project": "E:\\cd-throwaway\\scope-worktree",
+          "before": "effective",
+          "after": "disabled"
         }
       ],
       "locations": [
         {
           "path": "E:\\cd-throwaway\\codex-home\\config.toml",
-          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e\\1-config.toml",
+          "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7\\1-config.toml",
           "edits": [
             {
               "op": "set",
@@ -17977,7 +38527,7 @@ export const fixtures: Fixtures = {
           }
         }
       ],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7",
       "cause": null,
       "rollback": [],
       "verify": "verified",
@@ -17990,10 +38540,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\codex-home\\config.toml",
       "backups": [
         {
-          "operation": "20261001-120000-c8e",
+          "operation": "20261001-120000-cc7",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e\\1-config.toml"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7\\1-config.toml"
         }
       ]
     },
@@ -18001,10 +38551,10 @@ export const fixtures: Fixtures = {
       "path": "E:\\cd-throwaway\\localappdata\\config-digger\\parked\\manifest.json",
       "backups": [
         {
-          "operation": "20261001-120000-5e0",
+          "operation": "20261001-120000-dd7",
           "created_at": "2026-10-01T12:00:00Z",
           "title": "Disable 1 Entry",
-          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0\\2-manifest.json"
+          "copy": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7\\2-manifest.json"
         }
       ]
     }
@@ -20404,6 +40954,61 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project-hide",
               "before": "effective",
               "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\scope-none",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\scope-off",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\scope-on",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-listed:cd-throwaway-listed-skill",
+              "path": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "locator": "E:\\cd-throwaway\\market\\plugins\\cd-throwaway-listed\\skills\\cd-throwaway-listed-skill",
+              "project": "E:\\cd-throwaway\\scope-worktree",
+              "before": "effective",
+              "after": "disabled"
             }
           ],
           "effective": [
@@ -20910,6 +41515,61 @@ export const fixtures: Fixtures = {
               "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
               "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
               "project": "E:\\cd-throwaway\\project-hide",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\scope-none",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\scope-off",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\scope-on",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "invalid",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-notlisted:cd-throwaway-notlisted-skill",
+              "path": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "locator": "E:\\cd-throwaway\\claude-code-market-home\\.claude\\plugins\\cache\\cd-throwaway-market\\cd-throwaway-notlisted\\1.0.0\\skills\\cd-throwaway-notlisted-skill",
+              "project": "E:\\cd-throwaway\\scope-worktree",
               "before": "invalid",
               "after": "disabled"
             }
@@ -21709,6 +42369,61 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project-hide",
               "before": "disabled",
               "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\scope-none",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\scope-off",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\scope-on",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "claude-desktop",
+              "agent_name": "Claude Desktop",
+              "home": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home",
+              "item": "cd-throwaway-desktop",
+              "path": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json",
+              "locator": "E:\\cd-throwaway\\paths-that-wrap\\in-the-smallest-window\\of-config-digger\\claude-desktop-home\\claude_desktop_config.json#mcpServers.cd-throwaway-desktop",
+              "project": "E:\\cd-throwaway\\scope-worktree",
+              "before": "disabled",
+              "after": "effective"
             }
           ],
           "effective": [
@@ -22300,6 +43015,61 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project-hide",
               "before": "disabled",
               "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-none",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-off",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-on",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-worktree",
+              "before": "disabled",
+              "after": "effective"
             }
           ],
           "effective": [
@@ -22559,6 +43329,17 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-project",
+              "path": "E:\\cd-throwaway\\project\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project\\.mcp.json#mcpServers.cd-throwaway-project",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "blocked",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-shape-home",
               "item": "cd-throwaway-project",
               "path": "E:\\cd-throwaway\\project\\.mcp.json",
@@ -22705,6 +43486,17 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-shape-home",
               "item": "cd-throwaway-project-skill",
               "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
@@ -22760,6 +43552,16 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-project-skill",
+              "before": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-project-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
               "item": "cd-throwaway-project-skill",
               "before": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
               "after": null,
@@ -22886,6 +43688,17 @@ export const fixtures: Fixtures = {
               "agent": "claude-code",
               "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-project-skill",
+              "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
+              "project": "E:\\cd-throwaway\\project",
+              "before": "effective",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
               "item": "cd-throwaway-project-skill",
               "path": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
               "locator": "E:\\cd-throwaway\\project\\.claude\\skills\\cd-throwaway-project-skill",
@@ -23198,6 +44011,17 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-extra",
+              "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "blocked",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-shape-home",
               "item": "cd-throwaway-extra",
               "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
@@ -23253,6 +44077,16 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "home": "E:\\cd-throwaway\\claude-code-market-home",
+              "item": "cd-throwaway-extra",
+              "before": null,
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-extra in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
               "item": "cd-throwaway-extra",
               "before": null,
               "after": null,
@@ -23383,6 +44217,17 @@ export const fixtures: Fixtures = {
             {
               "agent": "claude-code",
               "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-extra",
+              "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\project-extra\\.mcp.json#mcpServers.cd-throwaway-extra",
+              "project": "E:\\cd-throwaway\\project-extra",
+              "before": "blocked",
+              "after": "removed"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
               "home": "E:\\cd-throwaway\\claude-code-shape-home",
               "item": "cd-throwaway-extra",
               "path": "E:\\cd-throwaway\\project-extra\\.mcp.json",
@@ -23474,11 +44319,241 @@ export const fixtures: Fixtures = {
     },
     {
       "request": {
+        "kind": "entry",
+        "verb": "disable",
+        "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+        "project": "E:\\cd-throwaway\\scope-repo"
+      },
+      "preview": {
+        "plan_id": "plan-52",
+        "preview": {
+          "action": "disable",
+          "title": "Disable 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": "E:\\cd-throwaway\\scope-repo",
+          "changes": [
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+              "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+              "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "effective",
+              "after": "disabled"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+              "before": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+              "after": null,
+              "sentence": "No Entry is Effective for plugin:cd-throwaway-scoped:cd-throwaway-scoped-server in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+              "before": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-scoped:cd-throwaway-scoped-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\claude-code-home",
+              "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+              "git_versioned": false,
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "set",
+                  "key_path": [
+                    "enabledPlugins"
+                  ]
+                }
+              ],
+              "diff": null,
+              "diff_unavailable": "no_reader",
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json`, so nothing says where its Secrets are; 5 lines differ.",
+              "changed_lines": 5
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [
+          {
+            "class": "wide-reach",
+            "sentence": "This Disable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill.",
+            "advice": [
+              {
+                "todo": "Check that everything it reaches should change.",
+                "why": "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.",
+                "paths": [
+                  "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill"
+                ]
+              }
+            ]
+          }
+        ],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
+        "kind": "entry",
+        "verb": "disable",
+        "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+        "project": "E:\\cd-throwaway\\scope-repo"
+      },
+      "preview": {
+        "plan_id": "plan-53",
+        "preview": {
+          "action": "disable",
+          "title": "Disable 1 Entry",
+          "undo_of": null,
+          "backup_of": null,
+          "project": "E:\\cd-throwaway\\scope-repo",
+          "changes": [
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+              "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json",
+              "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "effective",
+              "after": "disabled"
+            },
+            {
+              "agent": "claude-code",
+              "agent_name": "Claude Code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+              "path": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "locator": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "effective",
+              "after": "disabled"
+            }
+          ],
+          "effective": [
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "plugin:cd-throwaway-scoped:cd-throwaway-scoped-server",
+              "before": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server",
+              "after": null,
+              "sentence": "No Entry is Effective for plugin:cd-throwaway-scoped:cd-throwaway-scoped-server in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            },
+            {
+              "agent": "claude-code",
+              "home": "E:\\cd-throwaway\\claude-code-scope-home",
+              "item": "cd-throwaway-scoped:cd-throwaway-scoped-skill",
+              "before": "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\skills\\cd-throwaway-scoped-skill",
+              "after": null,
+              "sentence": "No Entry is Effective for cd-throwaway-scoped:cd-throwaway-scoped-skill in Claude Code afterwards.",
+              "built_before": null,
+              "built_after": null
+            }
+          ],
+          "info": [
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\claude-code-home",
+              "sentence": "No installation of Claude Code that reads this Agent home was found, so its version could not be checked."
+            },
+            {
+              "code": "no_installation_found",
+              "path": "E:\\cd-throwaway\\appdata\\Cursor\\User",
+              "sentence": "No installation of Cursor that reads this Agent home was found, so its version could not be checked."
+            }
+          ],
+          "files": [
+            {
+              "path": "E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json",
+              "git_versioned": false,
+              "store_class": "plain",
+              "edits": [
+                {
+                  "op": "set",
+                  "key_path": [
+                    "enabledPlugins"
+                  ]
+                }
+              ],
+              "diff": null,
+              "diff_unavailable": "no_reader",
+              "diff_note": "Can't show a masked diff: no Agent reads Entries from `E:\\cd-throwaway\\scope-repo\\.claude\\settings.local.json`, so nothing says where its Secrets are; 5 lines differ.",
+              "changed_lines": 5
+            }
+          ],
+          "folders": [],
+          "deleted": [],
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups",
+          "backup_note": "Each touched file is copied to E:\\cd-throwaway\\localappdata\\config-digger\\backups before anything is written."
+        },
+        "warnings": [
+          {
+            "class": "wide-reach",
+            "sentence": "This Disable reaches more than what it targets: what it writes also changes the State of E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server.",
+            "advice": [
+              {
+                "todo": "Check that everything it reaches should change.",
+                "why": "This Disable reaches more than what it targets: what it writes also changes the State of this Entry.",
+                "paths": [
+                  "E:\\cd-throwaway\\scope-market\\plugins\\cd-throwaway-scoped\\.mcp.json#mcpServers.cd-throwaway-scoped-server"
+                ]
+              }
+            ]
+          }
+        ],
+        "blocks": []
+      }
+    },
+    {
+      "request": {
         "kind": "leftovers",
         "project": "E:\\cd-throwaway\\many\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-52",
+        "plan_id": "plan-54",
         "preview": {
           "action": "remove",
           "title": "Remove 12 Entries",
@@ -23763,7 +44838,7 @@ export const fixtures: Fixtures = {
         "project": "E:\\cd-throwaway\\project-gone"
       },
       "preview": {
-        "plan_id": "plan-53",
+        "plan_id": "plan-55",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -23830,7 +44905,7 @@ export const fixtures: Fixtures = {
         "project": null
       },
       "preview": {
-        "plan_id": "plan-54",
+        "plan_id": "plan-56",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -23880,7 +44955,7 @@ export const fixtures: Fixtures = {
         "kind": "stranded"
       },
       "preview": {
-        "plan_id": "plan-55",
+        "plan_id": "plan-57",
         "preview": {
           "action": "remove",
           "title": "Remove 1 Entry",
@@ -23928,14 +45003,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-5e0"
+        "operation": "20261001-120000-dd7"
       },
       "preview": {
-        "plan_id": "plan-56",
+        "plan_id": "plan-58",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-5e0 \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-5e0",
+          "title": "Undo 20261001-120000-dd7 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-dd7",
           "backup_of": null,
           "project": null,
           "changes": [],
@@ -23991,15 +45066,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-5e0"
+        "operation": "20261001-120000-dd7"
       },
       "preview": {
-        "plan_id": "plan-57",
+        "plan_id": "plan-59",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-5e0 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-dd7 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-5e0",
+          "backup_of": "20261001-120000-dd7",
           "project": null,
           "changes": [],
           "effective": [],
@@ -24007,11 +45082,11 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0\\1-claude_desktop_config.json",
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0\\2-manifest.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7\\1-claude_desktop_config.json",
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7\\2-manifest.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-5e0",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-5e0 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-dd7",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-dd7 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -24020,15 +45095,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-175"
+        "operation": "20261001-120000-f30"
       },
       "preview": {
-        "plan_id": "plan-58",
+        "plan_id": "plan-60",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-175 \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-f30 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-175",
+          "backup_of": "20261001-120000-f30",
           "project": null,
           "changes": [],
           "effective": [],
@@ -24036,10 +45111,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175\\1-claude_desktop_config.json"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30\\1-claude_desktop_config.json"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-175",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-175 can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-f30",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-f30 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -24048,14 +45123,14 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "undo",
-        "operation": "20261001-120000-c8e"
+        "operation": "20261001-120000-cc7"
       },
       "preview": {
-        "plan_id": "plan-59",
+        "plan_id": "plan-61",
         "preview": {
           "action": "undo",
-          "title": "Undo 20261001-120000-c8e \"Disable 1 Entry\"",
-          "undo_of": "20261001-120000-c8e",
+          "title": "Undo 20261001-120000-cc7 \"Disable 1 Entry\"",
+          "undo_of": "20261001-120000-cc7",
           "backup_of": null,
           "project": null,
           "changes": [
@@ -24487,6 +45562,61 @@ export const fixtures: Fixtures = {
               "project": "E:\\cd-throwaway\\project-hide",
               "before": "disabled",
               "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-none",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-off",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-on",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-repo",
+              "before": "disabled",
+              "after": "effective"
+            },
+            {
+              "agent": "codex",
+              "agent_name": "Codex",
+              "home": "codex-home",
+              "item": "cd-throwaway-codex",
+              "path": "E:\\cd-throwaway\\codex-home\\config.toml",
+              "locator": "E:\\cd-throwaway\\codex-home\\config.toml#mcp_servers.cd-throwaway-codex",
+              "project": "E:\\cd-throwaway\\scope-worktree",
+              "before": "disabled",
+              "after": "effective"
             }
           ],
           "effective": [
@@ -24541,15 +45671,15 @@ export const fixtures: Fixtures = {
     {
       "request": {
         "kind": "delete_backup",
-        "operation": "20261001-120000-c8e"
+        "operation": "20261001-120000-cc7"
       },
       "preview": {
-        "plan_id": "plan-60",
+        "plan_id": "plan-62",
         "preview": {
           "action": "delete_backup",
-          "title": "Delete the backup of 20261001-120000-c8e \"Disable 1 Entry\"",
+          "title": "Delete the backup of 20261001-120000-cc7 \"Disable 1 Entry\"",
           "undo_of": null,
-          "backup_of": "20261001-120000-c8e",
+          "backup_of": "20261001-120000-cc7",
           "project": null,
           "changes": [],
           "effective": [],
@@ -24557,10 +45687,10 @@ export const fixtures: Fixtures = {
           "files": [],
           "folders": [],
           "deleted": [
-            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e\\1-config.toml"
+            "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7\\1-config.toml"
           ],
-          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e",
-          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-c8e can no longer be undone."
+          "backup_folder": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7",
+          "backup_note": "Nothing is copied first: the backup is deleted for good, with the values of the Operation's edits in History, and Operation 20261001-120000-cc7 can no longer be undone."
         },
         "warnings": [],
         "blocks": []
@@ -24570,11 +45700,11 @@ export const fixtures: Fixtures = {
   "executed": {
     "kind": "applied",
     "outcome": {
-      "operation": "20261001-120000-c8e",
+      "operation": "20261001-120000-cc7",
       "verify": "verified",
       "differences": [],
-      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-c8e",
-      "sentence": "Disabled 1 Entry. Operation 20261001-120000-c8e: verified.",
+      "backup": "E:\\cd-throwaway\\localappdata\\config-digger\\backups\\20261001-120000-cc7",
+      "sentence": "Disabled 1 Entry. Operation 20261001-120000-cc7: verified.",
       "hints": []
     }
   },
@@ -24622,7 +45752,7 @@ export const fixtures: Fixtures = {
   },
   "about": {
     "version": "0.1.0-rc.3",
-    "commit": "ddd88eb",
+    "commit": "aaa90ce",
     "date": "2026-11-04",
     "platform": "Windows x64",
     "pages": [

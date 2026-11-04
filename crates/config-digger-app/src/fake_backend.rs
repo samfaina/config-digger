@@ -11,8 +11,10 @@
 //! Project, and disables two servers, so that History holds Operations and
 //! Settings a parked Entry. It then parks the server of a second Claude Desktop home
 //! and forgets the home, so that Projects & homes lists a Stranded Entry.
-//! Every path under the folder is then written as under
-//! [`UAT_ROOT`], where the UAT's steps have it.
+//! It records the Inventory of no Project, of `project`, of `project-extra`
+//! and of each Project of `claude-code-scope-home`, whose project-scope
+//! plugin UAT section 39 walks. Every path under the folder is then written
+//! as under [`UAT_ROOT`], where the UAT's steps have it.
 
 use crate::about::About;
 use crate::actions::{ActionRequest, Actions, Executed, Verb};
@@ -35,6 +37,16 @@ pub const UAT_ROOT: &str = r"E:\cd-throwaway";
 /// to wrap in Projects & homes, as the script makes it.
 const DESKTOP_HOME: &str =
     r"paths-that-wrap\in-the-smallest-window\of-config-digger\claude-desktop-home";
+
+/// The Projects of `claude-code-scope-home`, whose project-scope plugin the
+/// Inventory of each lists or leaves out, as UAT section 39 sees it.
+const SCOPE_PROJECTS: [&str; 5] = [
+    "scope-repo",
+    "scope-worktree",
+    "scope-on",
+    "scope-off",
+    "scope-none",
+];
 
 /// The header of the generated fixtures.
 const HEADER: &str =
@@ -61,11 +73,10 @@ pub fn record(root: &Path) -> Result<Value, Error> {
         None,
         Some(root.join("project")),
         Some(root.join("project-extra")),
-    ];
-    let inventories: Vec<Inventory> = contexts
-        .into_iter()
-        .map(|project| session.resolve(project))
-        .collect();
+    ]
+    .into_iter()
+    .chain(SCOPE_PROJECTS.map(|project| Some(root.join(project))));
+    let inventories: Vec<Inventory> = contexts.map(|project| session.resolve(project)).collect();
     let history = actions.history()?;
     let details = history
         .iter()
@@ -118,9 +129,9 @@ pub fn record(root: &Path) -> Result<Value, Error> {
 
 /// Adds the Claude Desktop home, three more Claude Code homes, whose last
 /// parts fill a tile in the smallest window, the signed-out Claude Code
-/// home, the one with plugins of a `directory` marketplace, the extra
-/// Project and the user's folder as a Project, then hides a Project, as the
-/// UAT does: what the last change did.
+/// home, the one with plugins of a `directory` marketplace, the one with a
+/// project-scope plugin, the extra Project and the user's folder as a
+/// Project, then hides a Project, as the UAT does: what the last change did.
 fn change_lists(root: &Path) -> Result<ListChanged, Error> {
     let kept = SessionState::default();
     let scanned = root.to_path_buf();
@@ -148,6 +159,10 @@ fn change_lists(root: &Path) -> Result<ListChanged, Error> {
         },
         ListChange::AddHome {
             folder: root.join("claude-code-market-home"),
+            agent: "claude-code".to_owned(),
+        },
+        ListChange::AddHome {
+            folder: root.join("claude-code-scope-home"),
             agent: "claude-code".to_owned(),
         },
         ListChange::AddProject {
