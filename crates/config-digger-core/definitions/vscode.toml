@@ -140,9 +140,12 @@ workspace_files = true
 #    [test]: a plugin with no other manifest is not loaded.
 # VS Code 1.143.1 also finds no reference in a marketplace whose path has
 # a `.` or `..` segment, or a segment Windows cannot name a file by
-# [binary], which config-digger reads as 1.141.0 does. The manifest the
-# name comes from is the one its servers come from (see
-# `plugin-manifest-mcp`), but for the `$schema` one. VS Code reads each
+# [binary], which config-digger reads as 1.141.0 does. The `$schema`
+# manifest makes the plugin one of the Open Plugins format, whose servers
+# come from its `mcp.json` and that manifest's `extensions` (see
+# `plugin-mcp`); in a plugin of the other formats, the manifest the name
+# comes from is the one its servers come from (see `plugin-manifest-mcp`).
+# VS Code reads each
 # manifest with its JSONC parser, which takes comments and trailing commas,
 # and reads one that does not parse around its error, as `plugin-mcp` reads
 # a `.mcp.json`: a plugin whose `.claude-plugin\plugin.json` does not parse
@@ -397,18 +400,36 @@ secrets.fields = [
 on_read_failure = "ignores_file"
 risks = ["agent_may_drop_entries"]
 
-# An agent plugin's servers are in the `.mcp.json` at its root, whatever
-# its manifest [test], unless the manifest's `mcpServers` takes its place,
-# and in the files that `mcpServers` names: `plugin-manifest-mcp` reads it,
-# and reads this location first, through its `references`, in the plugins
-# whose `mcpServers` leaves it read. VS Code reads a `.mcp.json` it cannot
+# VS Code decides an agent plugin's format before it reads its servers
+# [binary]: a plugin whose root `plugin.json` parses to an object whose
+# `$schema` is a string starting with `https://agent-plugins.org/schemas/`
+# and ending with `/plugin.schema.json` is of the Open Plugins format, the
+# test that names it first (see `agent-plugins`), and no other format is
+# tried [binary]. Such a plugin reads `open-plugin-mcp` and
+# `open-plugin-manifest-mcp` and neither of these two: its `.mcp.json`'s
+# server, its root manifest's top-level `mcpServers` and the file its
+# `.plugin\plugin.json`'s `mcpServers` names start on none of 1.135.0,
+# 1.141.0 and 1.143.1 [test], so `unless` leaves these two locations out of
+# it. VS Code 1.129.1 has no such format and reads the plugin as one of the
+# others, its `.mcp.json` and the `mcpServers` of its first manifest
+# [test]; this definition follows 1.135.0 and later.
+#
+# A plugin of the other formats has its servers in the `.mcp.json` at its
+# root, whichever of `.plugin\plugin.json`, `.claude-plugin\plugin.json`
+# and `plugin.json` is its manifest, or none [test], unless the manifest's
+# `mcpServers` takes its place, and in the files that `mcpServers` names:
+# `plugin-manifest-mcp` reads it, and reads this location first, through
+# its `references`, in the plugins whose `mcpServers` leaves it read. VS
+# Code substitutes `${PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_ROOT}` in these
+# servers and writes a bare `${NAME}` as `${env:NAME}` [binary], which
+# config-digger shows as written. VS Code reads a `.mcp.json` it cannot
 # parse around the error, and starts the servers it finds there [test]: it keeps what `node-jsonc-parser`'s code keeps
 # around `,,`, a missing comma, a key with no value, which drops that key,
 # an object left open at the end of the file, and a string left open in a
 # server, which takes the next server into it [test].
 [[locations]]
 id = "plugin-mcp"
-anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json" }
+anchor = { block = "plugin", plugins = "agent-plugins", path = ".mcp.json", unless = { file = "plugin.json", dialect = "jsonc", on_read_failure = "reads_around_error", key_path = ["$schema"], starts_with = "https://agent-plugins.org/schemas/", ends_with = "/plugin.schema.json" } }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
 bare = true
@@ -419,8 +440,9 @@ provenance = "plugin"
 store_class = "plain"
 on_read_failure = "reads_around_error"
 
-# The servers an agent plugin's manifest gives in `mcpServers`, the
-# manifest at its root, in `.claude-plugin` or in `.plugin` [test]. A
+# The servers the manifest of an agent plugin of a format other than Open
+# Plugins (see `plugin-mcp`) gives in `mcpServers`, the manifest at its
+# root, in `.claude-plugin` or in `.plugin` [test]. A
 # manifest in `.github\plugin` is not read: its `mcpServers` adds nothing
 # [test], though VS Code 1.143.1 reads it [test]. VS Code takes the first
 # of `.plugin`, `.claude-plugin` and the root that exists for the
@@ -457,10 +479,69 @@ on_read_failure = "reads_around_error"
 # first. The servers VS Code does not read are not listed.
 [[locations]]
 id = "plugin-manifest-mcp"
-anchor = { block = "plugin", plugins = "agent-plugins", path = [".plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"] }
+anchor = { block = "plugin", plugins = "agent-plugins", path = [".plugin/plugin.json", ".claude-plugin/plugin.json", "plugin.json"], unless = { file = "plugin.json", dialect = "jsonc", on_read_failure = "reads_around_error", key_path = ["$schema"], starts_with = "https://agent-plugins.org/schemas/", ends_with = "/plugin.schema.json" } }
 references = { root = ["mcpServers"], first = "plugin-mcp", skips_other_values = true, trims = true, paths_object = { paths = "paths", exclusive = "exclusive" } }
 format = { block = "json", dialect = "jsonc" }
 root = ["mcpServers"]
+kind = "mcp"
+switch_id = "plugin.{plugin_uri}.{name}"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "reads_around_error"
+
+# The servers file of an Open Plugins plugin (see `plugin-mcp`) is the
+# `mcp.json` at its root, whose server starts [test], unless its
+# `extensions["com.github.copilot"].mcpServers` takes its place
+# (`open-plugin-manifest-mcp`, which reads this location first, through
+# its `references`, in the plugins where it is read). VS Code reads it as
+# it reads a `.mcp.json`, with the same JSONC reader and under
+# `mcpServers` or as a bare object of servers [binary], and only while its
+# real path, its links resolved, stays in the plugin's real folder
+# [binary]. It post-processes these servers otherwise than the other
+# formats' [binary]: it substitutes `${PLUGIN_ROOT}` but not
+# `${CLAUDE_PLUGIN_ROOT}`, and leaves a bare `${NAME}` as written, which
+# config-digger shows as written; a stdio `command` starting with `./` is
+# resolved against the plugin's folder, and the server is dropped when the
+# command leaves it, which config-digger does not model.
+[[locations]]
+id = "open-plugin-mcp"
+anchor = { block = "plugin", plugins = "agent-plugins", path = "mcp.json", real_path_in_plugin = true, only_when = { file = "plugin.json", dialect = "jsonc", on_read_failure = "reads_around_error", key_path = ["$schema"], starts_with = "https://agent-plugins.org/schemas/", ends_with = "/plugin.schema.json" } }
+format = { block = "json", dialect = "jsonc" }
+root = ["mcpServers"]
+bare = true
+kind = "mcp"
+switch_id = "plugin.{plugin_uri}.{name}"
+scope = "plugin"
+provenance = "plugin"
+store_class = "plain"
+on_read_failure = "reads_around_error"
+
+# The servers an Open Plugins plugin's root `plugin.json` gives in
+# `extensions["com.github.copilot"].mcpServers`, where it takes the place
+# of every manifest's top-level `mcpServers` (see `plugin-mcp`). VS Code
+# 1.135.0, 1.141.0 and 1.143.1 read it as `plugin-manifest-mcp` reads
+# `mcpServers`, with the `mcp.json` in the place of the `.mcp.json`:
+# - An object with no `paths` key holds the plugin's servers, and takes the
+#   place of the `mcp.json`, whose server does not start [test].
+# - A string names a file read after the `mcp.json` [test], as does each
+#   string of a list or of `{ "paths": [...] }`, each trimmed, an empty
+#   one naming no file [binary], and `"exclusive": true` beside `paths`
+#   reads the named files without the `mcp.json` [test].
+# Unlike `plugin-manifest-mcp`'s, a path is relative to the
+# `com.github.copilot` folder at the plugin's root, whose `servers.json`
+# starts for `./servers.json` [test], and VS Code drops a path that leaves
+# that folder: `../servers.json` names no file, the root's `servers.json`
+# included [test]. It reads a named file as it reads `mcp.json`, under
+# `mcpServers` or as a bare object, and only while its real path stays in
+# the plugin's real folder [binary]. Of a server two files name, the first
+# read wins [binary], so `open-plugin-mcp` ranks first.
+[[locations]]
+id = "open-plugin-manifest-mcp"
+anchor = { block = "plugin", plugins = "agent-plugins", path = "plugin.json", only_when = { file = "plugin.json", dialect = "jsonc", on_read_failure = "reads_around_error", key_path = ["$schema"], starts_with = "https://agent-plugins.org/schemas/", ends_with = "/plugin.schema.json" } }
+references = { root = ["mcpServers"], bare = true, first = "open-plugin-mcp", skips_other_values = true, trims = true, paths_object = { paths = "paths", exclusive = "exclusive" }, base = "com.github.copilot", real_path_in_plugin = true }
+format = { block = "json", dialect = "jsonc" }
+root = ["extensions", "com.github.copilot", "mcpServers"]
 kind = "mcp"
 switch_id = "plugin.{plugin_uri}.{name}"
 scope = "plugin"
@@ -579,7 +660,7 @@ sources = [
 # For a profile that shares the default profile's settings, its own
 # `settings.json` is read all the same.
 [items.mcp]
-precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+precedence = ["folder-mcp", "dot-mcp", "workspace-mcp", "user-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "open-plugin-mcp", "open-plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
 checks = ["rules", "disable", "plugin-load", "precedence", "trust", "approval"]
 
 [items.mcp.competition]
@@ -624,7 +705,7 @@ sources = [
 [[items.mcp.rules]]
 block = "global-switch"
 off = "registry"
-locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
+locations = ["folder-mcp", "dot-mcp", "workspace-mcp", "extension-mcp", "plugin-mcp", "plugin-manifest-mcp", "open-plugin-mcp", "open-plugin-manifest-mcp", "claude-desktop-mcp", "cursor-workspace-mcp", "cursor-global-mcp", "windsurf-mcp"]
 sources = [
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcp"], sqlite = true, policy = true, map = [[false, "none"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "tokenEntitlementsFetchedAt"] },
   { anchor = { block = "machine", path = "%APPDATA%/Code/User/globalStorage/state.vscdb" }, key_path = ["defaultAccount.cachedPolicyData", "accountPolicyData", "policyData", "mcpAccess"], sqlite = true, policy = true, map = [["registry_only", "registry"]], cached_at = ["defaultAccount.cachedPolicyData", "accountPolicyData", "mcpRegistryDataFetchedAt"] },

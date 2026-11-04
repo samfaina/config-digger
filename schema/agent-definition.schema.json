@@ -591,6 +591,33 @@
               "description": "A `/`-separated path relative to the plugin's folder, or several,\nof which the first that exists is read, such as the first manifest\nCursor finds of `.cursor-plugin/plugin.json` and\n`.claude-plugin/plugin.json`; for a location that reacts with\n`reads_next_path`, the first that exists and is no Read failure.",
               "$ref": "#/$defs/RelativePaths"
             },
+            "only_when": {
+              "description": "The format of the plugins the path is read in: only those whose\nfile holds the string, as VS Code reads `mcp.json` only in a plugin\nwhose root `plugin.json` has an Open Plugins `$schema`. Without it,\nthe path is read whatever the plugin's format.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginGate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unless": {
+              "description": "The format of the plugins the path is not read in: those whose file\nholds the string, as VS Code reads no `.mcp.json` in a plugin whose\nroot `plugin.json` has an Open Plugins `$schema`.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PluginGate"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "real_path_in_plugin": {
+              "description": "Whether the path is read only while its real path, its links\nresolved, stays in the plugin's real folder, as VS Code reads an\nOpen Plugins plugin's `mcp.json`.",
+              "type": "boolean",
+              "default": false
+            },
             "block": {
               "type": "string",
               "const": "plugin"
@@ -817,6 +844,63 @@
         }
       ]
     },
+    "PluginGate": {
+      "description": "A string a JSON file of a plugin's folder holds, in an object, that\ntells the plugin's format, as an Open Plugins `$schema` in the root\n`plugin.json` of a VS Code agent plugin. A location in plugins reads\nits path only in the plugins of one format, as its anchor's `only_when`\nor `unless` says.",
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "A `/`-separated path relative to the plugin's folder.",
+          "type": "string"
+        },
+        "dialect": {
+          "description": "The dialect the Agent reads the file in. Omitted for strict JSON.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonDialect"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_read_failure": {
+          "description": "What the Agent does with the file when it does not parse:\n`reads_around_error` reads the string from what parses on both\nsides of the error, as VS Code reads a plugin's manifest. Without\nit, a file that does not parse holds no string.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReadFailureReaction"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "key_path": {
+          "description": "The key path of the string, one key per segment.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "starts_with": {
+          "description": "The text it starts with.",
+          "type": "string"
+        },
+        "ends_with": {
+          "description": "The text it ends with.",
+          "type": "string"
+        },
+        "unverified": {
+          "$ref": "#/$defs/Unverified"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "key_path",
+        "starts_with",
+        "ends_with"
+      ]
+    },
     "JsonDialect": {
       "description": "How much a reader accepts beyond strict JSON. A file one reader\nrejects can still yield Entries for a reader with a looser dialect.",
       "oneOf": [
@@ -834,6 +918,46 @@
           "description": "Comments and trailing commas, such as Cursor's and VS Code's files.",
           "type": "string",
           "const": "jsonc"
+        }
+      ]
+    },
+    "ReadFailureReaction": {
+      "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
+      "oneOf": [
+        {
+          "description": "It keeps what parses on both sides of an error, as VS Code reads a\nJSONC file through `node-jsonc-parser`: the location contributes the\nEntries config-digger recovers the same way. Only a location read as\nJSON takes it.",
+          "type": "string",
+          "const": "reads_around_error"
+        },
+        {
+          "description": "It reads the next path of the location's plugin anchor in its\nplace, such as the next manifest of a Cursor plugin, and so on down\nthe list: the file contributes no Entries, and when no path is\nleft, neither does the location, but for the default folder of\nmanifest skills. Only a location anchored on several paths in\nplugins takes it.",
+          "type": "string",
+          "const": "reads_next_path"
+        },
+        {
+          "description": "It starts without the location's Entries.",
+          "type": "string",
+          "const": "ignores_file"
+        },
+        {
+          "description": "It asks the user at startup what to do with the file, and otherwise\nstarts without its Entries.",
+          "type": "string",
+          "const": "asks_user"
+        },
+        {
+          "description": "What it does is not known: every Item of the location's kinds in the\ncontexts it reaches gets a caveat.",
+          "type": "string",
+          "const": "unknown"
+        },
+        {
+          "description": "It does not load the plugin the location is in, so every Entry of\nevery location in that plugin is Invalid, at the `plugin-load`\ncheck. Only a location in plugins takes it.",
+          "type": "string",
+          "const": "fails_plugin"
+        },
+        {
+          "description": "It refuses to start in the contexts the location reaches.",
+          "type": "string",
+          "const": "stops_agent"
         }
       ]
     },
@@ -1547,46 +1671,6 @@
             "block",
             "path"
           ]
-        }
-      ]
-    },
-    "ReadFailureReaction": {
-      "description": "What an Agent does with a location it cannot read. Declared from the\nmildest to the strongest: a file several locations of one Agent read\ntakes the strongest of their reactions.",
-      "oneOf": [
-        {
-          "description": "It keeps what parses on both sides of an error, as VS Code reads a\nJSONC file through `node-jsonc-parser`: the location contributes the\nEntries config-digger recovers the same way. Only a location read as\nJSON takes it.",
-          "type": "string",
-          "const": "reads_around_error"
-        },
-        {
-          "description": "It reads the next path of the location's plugin anchor in its\nplace, such as the next manifest of a Cursor plugin, and so on down\nthe list: the file contributes no Entries, and when no path is\nleft, neither does the location, but for the default folder of\nmanifest skills. Only a location anchored on several paths in\nplugins takes it.",
-          "type": "string",
-          "const": "reads_next_path"
-        },
-        {
-          "description": "It starts without the location's Entries.",
-          "type": "string",
-          "const": "ignores_file"
-        },
-        {
-          "description": "It asks the user at startup what to do with the file, and otherwise\nstarts without its Entries.",
-          "type": "string",
-          "const": "asks_user"
-        },
-        {
-          "description": "What it does is not known: every Item of the location's kinds in the\ncontexts it reaches gets a caveat.",
-          "type": "string",
-          "const": "unknown"
-        },
-        {
-          "description": "It does not load the plugin the location is in, so every Entry of\nevery location in that plugin is Invalid, at the `plugin-load`\ncheck. Only a location in plugins takes it.",
-          "type": "string",
-          "const": "fails_plugin"
-        },
-        {
-          "description": "It refuses to start in the contexts the location reaches.",
-          "type": "string",
-          "const": "stops_agent"
         }
       ]
     },
@@ -4435,6 +4519,18 @@
               "type": "null"
             }
           ]
+        },
+        "base": {
+          "description": "A `/`-separated path relative to the plugin's folder of the folder\na path at the root or the `default` is relative to, a path\nleaving it naming no file, as VS Code reads the paths of an Open Plugins plugin's\n`extensions[\"com.github.copilot\"].mcpServers` in its\n`com.github.copilot` folder. Omitted for the plugin's folder.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "real_path_in_plugin": {
+          "description": "Whether a file a path names is read only while its real path, its\nlinks resolved, stays in the plugin's real folder, as VS Code reads\nthe files an Open Plugins plugin's manifest names.",
+          "type": "boolean",
+          "default": false
         },
         "unverified": {
           "$ref": "#/$defs/Unverified"

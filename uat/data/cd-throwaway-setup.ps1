@@ -447,8 +447,43 @@ Write-TestFile "$vsPlugin\root.json" @"
 }
 "@
 $vsPluginUri = ([System.Uri]$vsPlugin).AbsoluteUri
+
+# And the Open Plugins plugin cd-throwaway-openplugin, whose root
+# plugin.json has an Open Plugins `$schema`: VS Code starts the server of
+# its mcp.json and that of the file its
+# extensions["com.github.copilot"].mcpServers names in its
+# com.github.copilot folder, and neither its .mcp.json's nor its manifest's
+# top-level mcpServers. Step 37.1 starts the app as step 31.1 does.
+$openPlugin = "$Root\claude-code-home\.vscode\agent-plugins\cd-throwaway.invalid\cd-throwaway\cd-throwaway-openplugin"
+Write-TestFile "$openPlugin\plugin.json" @"
+{
+  "`$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "cd-throwaway-openplugin",
+  "mcpServers": {
+    "cd-throwaway-openplugin-top": { "command": "npx", "args": ["-y", "cd-throwaway-openplugin-top"] }
+  },
+  "extensions": { "com.github.copilot": { "mcpServers": "./servers.json" } }
+}
+"@
+foreach ($server in @(
+        @{ File = "mcp.json"; Name = "cd-throwaway-openplugin-server" },
+        @{ File = ".mcp.json"; Name = "cd-throwaway-openplugin-dot" },
+        @{ File = "com.github.copilot\servers.json"; Name = "cd-throwaway-openplugin-copilot" }
+    )) {
+    Write-TestFile "$openPlugin\$($server.File)" @"
+{
+  "mcpServers": {
+    "$($server.Name)": { "command": "npx", "args": ["-y", "$($server.Name)"] }
+  }
+}
+"@
+}
+$openPluginUri = ([System.Uri]$openPlugin).AbsoluteUri
 Write-TestFile "$Root\claude-code-home\.vscode\agent-plugins\installed.json" @"
-{ "version": 1, "installed": [{ "pluginUri": "$vsPluginUri", "marketplace": "https://cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin.git", "name": "cd-throwaway-vsplugin" }] }
+{ "version": 1, "installed": [
+  { "pluginUri": "$vsPluginUri", "marketplace": "https://cd-throwaway.invalid/cd-throwaway/cd-throwaway-vsplugin.git", "name": "cd-throwaway-vsplugin" },
+  { "pluginUri": "$openPluginUri", "marketplace": "https://cd-throwaway.invalid/cd-throwaway/cd-throwaway-openplugin.git", "name": "cd-throwaway-openplugin" }
+] }
 "@
 
 # With -VsCode, VS Code's files as they would be in an %APPDATA% of their

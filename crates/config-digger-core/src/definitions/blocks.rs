@@ -1024,6 +1024,30 @@ pub(crate) struct PluginAnchor {
     /// `.claude-plugin/plugin.json`; for a location that reacts with
     /// `reads_next_path`, the first that exists and is no Read failure.
     pub path: RelativePaths,
+    /// The format of the plugins the path is read in: only those whose
+    /// file holds the string, as VS Code reads `mcp.json` only in a plugin
+    /// whose root `plugin.json` has an Open Plugins `$schema`. Without it,
+    /// the path is read whatever the plugin's format.
+    pub only_when: Option<Box<super::PluginGate>>,
+    /// The format of the plugins the path is not read in: those whose file
+    /// holds the string, as VS Code reads no `.mcp.json` in a plugin whose
+    /// root `plugin.json` has an Open Plugins `$schema`.
+    pub unless: Option<Box<super::PluginGate>>,
+    /// Whether the path is read only while its real path, its links
+    /// resolved, stays in the plugin's real folder, as VS Code reads an
+    /// Open Plugins plugin's `mcp.json`.
+    #[serde(default)]
+    pub real_path_in_plugin: bool,
+}
+
+impl PluginAnchor {
+    /// The gates of the plugins' format, each with whether the plugins
+    /// whose file holds its string are read (`only_when`) or not
+    /// (`unless`).
+    pub fn gates(&self) -> impl Iterator<Item = (&super::PluginGate, bool)> {
+        let only_when = self.only_when.iter().map(|gate| (&**gate, true));
+        only_when.chain(self.unless.iter().map(|gate| (&**gate, false)))
+    }
 }
 
 impl Validate for PluginAnchor {
@@ -1034,6 +1058,9 @@ impl Validate for PluginAnchor {
         }
         if self.path.all().is_empty() {
             return Err("a plugin anchor needs a path".into());
+        }
+        for (gate, _) in self.gates() {
+            gate.validate()?;
         }
         self.path
             .all()

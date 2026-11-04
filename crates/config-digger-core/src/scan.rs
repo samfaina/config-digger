@@ -9,10 +9,10 @@ use crate::definitions::blocks::{
     HoldsHere, InstallationFolders, JsonDialect, JsonFormat, LastOpenedHomes, LaunchFolder,
     ListPlugins, ListedIn, ListedMarketplaces, Locate, Locator, LookUp, Malformed, ManifestCause,
     ManifestFailure, ManifestSkills, McpbCache, NAME_KEY, NameFrom, NameRuleOn, NamingFile,
-    NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginCache, PluginFolders, PluginList,
-    PluginPlace, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach, ProjectWalk,
-    Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect, SkillFallback,
-    SkillFolder, SkillList, Spelling, StoreClass, Unlisted, is_entry_key,
+    NonceHash, NotListed, PLUGIN_KEY, Parse, ParseError, PluginAnchor, PluginCache, PluginFolders,
+    PluginList, PluginPlace, PluginRecord, PluginRegistry, ProjectPluginKeys, ProjectReach,
+    ProjectWalk, Register, Registry, RelativePaths, SettingKey, SettingsSource, SkillDefect,
+    SkillFallback, SkillFolder, SkillList, Spelling, StoreClass, Unlisted, is_entry_key,
 };
 use crate::definitions::skill_managers::{Detector, SkillManagerDefinition, Strength};
 use crate::definitions::{
@@ -4092,15 +4092,33 @@ impl Scanner<'_> {
                 .iter()
                 .filter(|plugin| anchor.plugins.names(&plugin.plugins))
             {
+                if !self.of_format(anchor, plugin) {
+                    continue;
+                }
                 let replaced =
                     self.read_plugin_location(home, definition, location, plugin, &anchor.path);
                 if let Some(first) = first.filter(|_| !replaced)
                     && let Some(first_anchor) = first.anchor.plugin()
+                    && self.of_format(first_anchor, plugin)
                 {
                     self.read_plugin_location(home, definition, first, plugin, &first_anchor.path);
                 }
             }
         }
+    }
+
+    /// Whether `plugin` is of the format whose plugins `anchor` reads its
+    /// path in, as its `only_when` and `unless` say.
+    fn of_format(&mut self, anchor: &PluginAnchor, plugin: &ScannedPlugin) -> bool {
+        anchor.gates().all(|(gate, holds)| {
+            let document = self.plugin_json(
+                &plugin.folder,
+                &gate.file,
+                &gate.format(),
+                gate.reads_around_error(),
+            );
+            document.is_some_and(|document| gate.opens(&document)) == holds
+        })
     }
 
     /// The plugins of `plugins` that the Agent home installed, each record
@@ -5238,7 +5256,15 @@ impl Scanner<'_> {
     ) -> bool {
         let start = self.entries.len();
         let failures = self.reader.failures.len();
-        let path = self.plugin_path(home, location, plugin, relative);
+        let path = self
+            .plugin_path(home, location, plugin, relative)
+            .filter(|path| {
+                let checked = location
+                    .anchor
+                    .plugin()
+                    .is_some_and(|anchor| anchor.real_path_in_plugin);
+                !checked || self.stays_in_plugin(plugin, path)
+            });
         let replaces_first = match (&location.references, path) {
             (None, path) if let Format::ManifestSkills(block) = &location.format => {
                 self.read_manifest_skills(home, location, block, plugin, path);
@@ -5276,6 +5302,17 @@ impl Scanner<'_> {
             entry.plugin = Some(plugin.clone());
         }
         replaces_first
+    }
+
+    /// Whether the real path of the file at `path`, its links resolved,
+    /// stays in the real folder of `plugin`, or nothing is there.
+    fn stays_in_plugin(&self, plugin: &ScannedPlugin, path: &Path) -> bool {
+        let fs = self.reader.fs;
+        match (fs.real_path(path), fs.real_path(&plugin.folder)) {
+            (Some(real), Some(folder)) => real.starts_with(folder),
+            (None, _) => true,
+            (Some(_), None) => false,
+        }
     }
 
     /// The path of `plugin` that `location` reads of those `relative`
@@ -5449,6 +5486,10 @@ impl Scanner<'_> {
             .and_then(|document| lookup(document, &location.root))
             .filter(|value| !references.ignores(value));
         let declared = references.declared(declared.or(default.as_ref()));
+        let base = match &references.base {
+            Some(base) => paths::lexical(&blocks::join_relative(&plugin.folder, base)),
+            None => plugin.folder.clone(),
+        };
         for (below, value) in declared.values {
             let mut key_path = location.root.clone();
             key_path.extend(below);
@@ -5460,9 +5501,11 @@ impl Scanner<'_> {
                         self.read_bundle(home, definition, location, bundles, plugin, relative);
                         continue;
                     }
-                    let file = paths::lexical(&plugin.folder.join(relative));
-                    if !file.starts_with(&plugin.folder) {
-                        tracing::debug!(plugin = %plugin.id, "reference outside the plugin");
+                    let file = paths::lexical(&base.join(relative));
+                    if !file.starts_with(&base)
+                        || (references.real_path_in_plugin && !self.stays_in_plugin(plugin, &file))
+                    {
+                        tracing::debug!(plugin = %plugin.id, "reference outside its folder");
                         continue;
                     }
                     self.add_reader(home, location, &file);
