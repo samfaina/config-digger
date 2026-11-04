@@ -6675,6 +6675,71 @@ name = [{name}, {{ file = ".plugin/plugin.json", dialect = "jsonc", key_path = [
     }
 
     #[test]
+    fn a_plugin_record_reaches_projects_whose_files_name_it_only_with_project_and_marketplaces() {
+        const MARKETPLACES: &str = r#", marketplaces = { anchor = { block = "home", root = "plugins", path = "known.json" }, kind = ["kind"], folder_kind = "directory", folder = [["location"]], manifest = "marketplace.json", plugins = ["plugins"], name = "name", source = "source" }"#;
+        let records = |fields: &str| {
+            with_plugins("")
+                .replace(
+                    r#"folder = "path" }"#,
+                    &format!(r#"folder = "path"{fields} }}"#),
+                )
+                .replace(
+                    "uninstall = \"agent plugin uninstall",
+                    "id_separator = \"@\"
+uninstall = \"agent plugin uninstall",
+                )
+        };
+        let named_in = |anchor: &str| {
+            format!(r#", named_in = [{{ anchor = {anchor}, key_path = ["enabledPlugins"] }}]"#)
+        };
+        let fields = format!(
+            r#", project = "projectPath"{}{MARKETPLACES}"#,
+            named_in(IN_PROJECT)
+        );
+        let text = records(&fields);
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        let text = records(&format!(
+            r#", project = "projectPath"{MARKETPLACES}, named_in = []"#
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for (fields, message) in [
+            (
+                format!("{}{MARKETPLACES}", named_in(IN_PROJECT)),
+                "`named_in` needs `project` and `marketplaces`",
+            ),
+            (
+                format!(r#", project = "projectPath"{}"#, named_in(IN_PROJECT)),
+                "`named_in` needs `project` and `marketplaces`",
+            ),
+            (
+                format!(
+                    r#", project = "projectPath"{}{MARKETPLACES}"#,
+                    named_in(r#"{ block = "home", root = "plugins", path = "x.json" }"#)
+                ),
+                "named_in[0]: the files that name plugins lie in the Project folder",
+            ),
+            (
+                format!(
+                    r#", project = "projectPath"{}{MARKETPLACES}"#,
+                    named_in(
+                        r#"{ block = "project", path = ".test.json", walk = "up-to-repo-root" }"#
+                    )
+                ),
+                "named_in[0]: the files that name plugins cannot walk from the Project folder",
+            ),
+            (
+                format!(
+                    r#", project = "projectPath", named_in = [{{ anchor = {IN_PROJECT}, key_path = [] }}]{MARKETPLACES}"#
+                ),
+                "named_in[0]:",
+            ),
+        ] {
+            let text = records(&fields);
+            assert!(error(&text).contains(message), "{fields}: {}", error(&text));
+        }
+    }
+
+    #[test]
     fn a_project_s_plugins_marketplace_is_one_folder_name() {
         let keys = |marketplace: &str| {
             with_plugins("").replace(

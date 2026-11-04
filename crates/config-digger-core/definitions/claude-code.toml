@@ -229,13 +229,28 @@ registries = [
 # Project's own local file, in a worktree as in the main checkout.
 # `project_reach = "checkouts"` reads a record bound to the root of one
 # checkout at the root of every other checkout of the repository among the
-# Projects. Claude Code does not hold the record to its repository either:
-# it loads the plugin in any folder whose own settings turn it on, another
-# repository, the one holding a submodule, or a folder outside any
-# repository [test]; config-digger does not read it there (a Ticket, not
-# yet filed). A worktree session the desktop app starts reads all project
-# configuration from the main checkout's root [docs], which config-digger
-# does not read apart.
+# Projects.
+#
+# A plugin read from its `directory` marketplace's folder is not held to
+# its record's repository either: Claude Code loads it in any folder whose
+# own `.claude/settings.json` or `.claude/settings.local.json` turns it on,
+# another repository, the one holding a submodule, or a folder outside any
+# repository, a `local` record's as a `project` one's [test]. `named_in`
+# reads such a record in every other Project whose own two files name its
+# id, `true` or `false`: its Entries there are switched by that Project's
+# files, so a plugin one turns off is Disabled, Enable on offer, and
+# Disable's `false` keeps it listed. A plugin read from its copy in the
+# cache, whose marketplace entry names no folder below the marketplace's,
+# does not load in such a folder [test], nor is it read there. Of several
+# records of one id bound to other Projects, the first in the file is read;
+# a plugin read from its marketplace's folder loads from that folder
+# whichever record it is [test]. A Project a record of that id is already
+# bound to, or a user-scope record applies in, gets no other. Claude Code
+# also loads a project-scope plugin in a folder no file of which names it
+# when the user settings turn it on [test], which config-digger does not
+# read (see `release-gate.md`). A worktree session the desktop app starts
+# reads all project configuration from the main checkout's root [docs],
+# which config-digger does not read apart.
 [[plugins]]
 id = "installed"
 superseded_marker = ".orphaned_at"
@@ -251,6 +266,10 @@ folder = "installPath"
 scope = "scope"
 project = "projectPath"
 project_reach = "checkouts"
+named_in = [
+  { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins"] },
+  { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins"] },
+]
 version = "version"
 
 # A plugin of a `directory` marketplace, a folder of the user's, is read
@@ -321,7 +340,7 @@ unverified = [
   "A synced plugin folder with no manifest `name` is taken to be named by its folder up to `~g<generation>`.",
   "With the account's `manifest.json` missing, or not parsing, Claude Code is taken to load none of the account's synced plugins.",
   "An installed plugin of a synced plugin's name that is off, by `enabledPlugins` or forced off by the managed settings, or that no settings file names, is taken to leave the synced one loaded.",
-  "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone, and in each other checkout of its repository `project_reach` reads it in.",
+  "An installed plugin of a synced plugin's name bound to one Project, by its record's `projectPath`, is taken to keep the synced one out in that Project alone, and in each other Project `project_reach` or `named_in` reads it in.",
   "An installed plugin of a synced plugin's name that fails to load, its manifest failing, is taken to keep the synced one out still.",
   "A synced plugin is taken to carry the servers of its `.mcp.json` and its manifest's `mcpServers`, and the skills of its manifest's `skills`, as an installed plugin does; its servers compete by endpoint as an installed plugin's do.",
 ]
