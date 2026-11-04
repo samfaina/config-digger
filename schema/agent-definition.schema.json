@@ -2162,7 +2162,7 @@
               "$ref": "#/$defs/ProjectReach"
             },
             "named_in": {
-              "description": "With `project` and `marketplaces`, the files of a Project that name\nplugins by their ids, in any order: a record bound to one Project,\nwhose plugin is read from its marketplace's folder, also applies in\nevery other Project among the Projects whose own files name its id,\nwhatever the value, such as Claude Code's `enabledPlugins` in the\nProject's two settings files. A plugin read from its record's\nfolder, one its marketplace's manifest fails included, reaches no\nsuch Project. Of several records of one id, the\nfirst applies there. A Project a plugin of that id already applies\nin, by a record bound to it, a record bound to no Project or\n`project_reach`, gets no other. Without it, none.",
+              "description": "With `project` and `marketplaces`, the files that name plugins by\ntheir ids, in any order, each in the Project folder or the Agent\nhome: a record bound to one Project, whose plugin is read from its\nmarketplace's folder, also applies in every other Project among the\nProjects whose own files name its id, or in every one of them when\na file of the Agent home names it, whatever the value, such as\nClaude Code's `enabledPlugins` in the Project's two settings files\nand in the user settings. A plugin read from its record's folder,\none its marketplace's manifest fails included, reaches no such\nProject. Of several records of one id, the first applies there. A\nProject a plugin of that id already applies in, by a record bound to\nit, a record bound to no Project or `project_reach`, gets no other.\nWithout it, none.",
               "type": "array",
               "items": {
                 "$ref": "#/$defs/NamingFile"
@@ -2511,11 +2511,11 @@
       ]
     },
     "NamingFile": {
-      "description": "A strict JSON file of each Project folder whose object at `key_path`\nnames plugins by their ids, its keys, such as Claude Code's\n`.claude/settings.json` and its `enabledPlugins`.",
+      "description": "A strict JSON file of each Project folder, or of the Agent home, whose\nobject at `key_path` names plugins by their ids, its keys, such as\nClaude Code's `.claude/settings.json` and its `enabledPlugins`. A file\nof the Agent home names them for every Project, such as Claude Code's\nuser settings.",
       "type": "object",
       "properties": {
         "anchor": {
-          "description": "The file, in the Project folder.",
+          "description": "The file, in the Project folder or the Agent home.",
           "$ref": "#/$defs/Anchor"
         },
         "key_path": {
@@ -5239,6 +5239,11 @@
             },
             "layered": {
               "description": "Whether the field is one layer of a setting the Agent merges across\nfiles, such as Claude Code's `enabledPlugins`: among the layered\nmechanisms of the Item kind, in the definition's order, the first\nwhose field holds a value for the Entry decides. With `also_names`,\nthe layers are read key by key, and within each key layer by layer,\nas Claude Code reads `skillOverrides` merged: the first key that\nholds a value in any layer decides, from the first layer that holds\nit, and a later key is read only while every earlier one is missing\nfrom every layer.",
+              "type": "boolean",
+              "default": false
+            },
+            "sets_over_later_layers": {
+              "description": "With `layered` and `enable_action = \"set\"`, in a switch\nconfig-digger writes: whether Enable sets `enabled_value` here when a\nlater layer would still Disable the Entry, whether config-digger\nwrites that layer or only reads it, rather than setting the later\none, so that Enable writes the file Disable writes. Such as Claude\nCode's local `enabledPlugins`, which decides over the shared Project\nsettings and the user settings, which apply in every Project.",
               "type": "boolean",
               "default": false
             },

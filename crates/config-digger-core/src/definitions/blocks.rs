@@ -1189,6 +1189,11 @@ impl Anchor {
         }
     }
 
+    /// Whether it names a file or folder in the Agent home.
+    pub fn in_home(&self) -> bool {
+        matches!(self, Anchor::Home(_))
+    }
+
     /// Whether it names the workspace file a Project is, rather than a path
     /// in a Project folder.
     pub fn project_file(&self) -> bool {
@@ -2068,8 +2073,9 @@ impl PluginRegistry {
         }
     }
 
-    /// The files of a Project that bring in a plugin read from its
-    /// marketplace's folder by naming its id, if any.
+    /// The files of a Project, or of the Agent home for every Project, that
+    /// bring in a plugin read from its marketplace's folder by naming its
+    /// id, if any.
     pub fn named_in(&self) -> &[NamingFile] {
         match self {
             PluginRegistry::JsonPluginRecords(block) => &block.named_in,
@@ -2610,17 +2616,19 @@ pub(crate) struct JsonPluginRecords {
     /// in. Without it, that Project alone.
     #[serde(default)]
     pub project_reach: ProjectReach,
-    /// With `project` and `marketplaces`, the files of a Project that name
-    /// plugins by their ids, in any order: a record bound to one Project,
-    /// whose plugin is read from its marketplace's folder, also applies in
-    /// every other Project among the Projects whose own files name its id,
-    /// whatever the value, such as Claude Code's `enabledPlugins` in the
-    /// Project's two settings files. A plugin read from its record's
-    /// folder, one its marketplace's manifest fails included, reaches no
-    /// such Project. Of several records of one id, the
-    /// first applies there. A Project a plugin of that id already applies
-    /// in, by a record bound to it, a record bound to no Project or
-    /// `project_reach`, gets no other. Without it, none.
+    /// With `project` and `marketplaces`, the files that name plugins by
+    /// their ids, in any order, each in the Project folder or the Agent
+    /// home: a record bound to one Project, whose plugin is read from its
+    /// marketplace's folder, also applies in every other Project among the
+    /// Projects whose own files name its id, or in every one of them when
+    /// a file of the Agent home names it, whatever the value, such as
+    /// Claude Code's `enabledPlugins` in the Project's two settings files
+    /// and in the user settings. A plugin read from its record's folder,
+    /// one its marketplace's manifest fails included, reaches no such
+    /// Project. Of several records of one id, the first applies there. A
+    /// Project a plugin of that id already applies in, by a record bound to
+    /// it, a record bound to no Project or `project_reach`, gets no other.
+    /// Without it, none.
     #[serde(default)]
     pub named_in: Vec<NamingFile>,
     /// The field of a record that holds its version.
@@ -2632,13 +2640,15 @@ pub(crate) struct JsonPluginRecords {
     pub marketplaces: Option<FolderMarketplaces>,
 }
 
-/// A strict JSON file of each Project folder whose object at `key_path`
-/// names plugins by their ids, its keys, such as Claude Code's
-/// `.claude/settings.json` and its `enabledPlugins`.
+/// A strict JSON file of each Project folder, or of the Agent home, whose
+/// object at `key_path` names plugins by their ids, its keys, such as
+/// Claude Code's `.claude/settings.json` and its `enabledPlugins`. A file
+/// of the Agent home names them for every Project, such as Claude Code's
+/// user settings.
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct NamingFile {
-    /// The file, in the Project folder.
+    /// The file, in the Project folder or the Agent home.
     pub anchor: Anchor,
     /// The key path of the object whose keys are plugin ids.
     pub key_path: Vec<String>,
@@ -2648,8 +2658,10 @@ impl Validate for NamingFile {
     fn validate(&self) -> Result<(), String> {
         self.anchor.validate()?;
         self.anchor.one_file()?;
-        if !self.anchor.in_project() || self.anchor.project_file() {
-            return Err("the files that name plugins lie in the Project folder".into());
+        if !self.anchor.in_home() && (!self.anchor.in_project() || self.anchor.project_file()) {
+            return Err(
+                "the files that name plugins lie in the Project folder or the Agent home".into(),
+            );
         }
         if self.anchor.walk() != &ProjectWalk::None {
             return Err("the files that name plugins cannot walk from the Project folder".into());
@@ -6464,6 +6476,14 @@ pub(crate) trait Disables {
         None
     }
 
+    /// Whether Enable sets the switch to the value
+    /// [`Self::enabled_over_later_layers`] gives over a later layer
+    /// config-digger writes too, not only over one it only reads, so that
+    /// Enable writes the file Disable writes.
+    fn sets_over_later_layers(&self) -> bool {
+        false
+    }
+
     /// Whether it holds an Entry only by the id its location's `switch_id`
     /// makes, so that it cannot hold one of a location without it.
     fn by_id(&self) -> bool {
@@ -6690,6 +6710,10 @@ impl Disables for Switched<'_> {
 
     fn enabled_over_later_layers(&self) -> Option<&Value> {
         self.block().enabled_over_later_layers()
+    }
+
+    fn sets_over_later_layers(&self) -> bool {
+        self.block().sets_over_later_layers()
     }
 
     fn by_id(&self) -> bool {
@@ -7072,6 +7096,15 @@ pub(crate) struct JsonField {
     /// from every layer.
     #[serde(default)]
     pub layered: bool,
+    /// With `layered` and `enable_action = "set"`, in a switch
+    /// config-digger writes: whether Enable sets `enabled_value` here when a
+    /// later layer would still Disable the Entry, whether config-digger
+    /// writes that layer or only reads it, rather than setting the later
+    /// one, so that Enable writes the file Disable writes. Such as Claude
+    /// Code's local `enabledPlugins`, which decides over the shared Project
+    /// settings and the user settings, which apply in every Project.
+    #[serde(default)]
+    pub sets_over_later_layers: bool,
     /// Whether the field is managed policy, such as `enabledPlugins` in
     /// Claude Code's managed settings, which forces a plugin on or off: an
     /// Entry it Disables is Blocked, by `policy`, and while it holds a
@@ -7112,6 +7145,14 @@ impl Validate for JsonField {
         }
         if self.policy && self.enable_offered {
             return Err("a policy switch is only read: enable_offered must be false".into());
+        }
+        if self.sets_over_later_layers
+            && (!self.layered || !self.enable_offered || self.enable_action != EnableAction::Set)
+        {
+            return Err(
+                "sets_over_later_layers needs `layered`, `enable_action = \"set\"` and a switch config-digger writes"
+                    .into(),
+            );
         }
         // Of several keys, none would say which one's missing value the
         // default stands for, or which one policy forces the Entry on or
@@ -7180,9 +7221,13 @@ impl Disables for JsonField {
     }
 
     fn enabled_over_later_layers(&self) -> Option<&Value> {
-        self.enabled_value
-            .as_ref()
-            .filter(|_| self.enable_action == EnableAction::DeleteKey)
+        self.enabled_value.as_ref().filter(|_| {
+            self.enable_action == EnableAction::DeleteKey || self.sets_over_later_layers
+        })
+    }
+
+    fn sets_over_later_layers(&self) -> bool {
+        self.sets_over_later_layers
     }
 
     fn layered(&self) -> bool {

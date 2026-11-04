@@ -3693,8 +3693,9 @@ fn switch_id(template: &str, entry: &ScannedEntry, root: &[String]) -> String {
 /// The Entries, each one once: an Entry several locations of an Agent home
 /// reach, such as a skill folder through a linked folder, is
 /// kept once, from the location the Agent ranks highest, and the nearest
-/// Project folder among equals. An Entry keyed to one Project and another
-/// keyed to a second Project are not the same.
+/// Project folder among equals, and of equals one that applies in every
+/// Project over each one keyed to a Project. An Entry keyed to one Project
+/// and another keyed to a second Project are not the same.
 fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) -> Vec<ScannedEntry> {
     let rank = |entry: &ScannedEntry| {
         let definition = &definitions[entry.agent_index];
@@ -3705,7 +3706,7 @@ fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) ->
     };
     let mut kept: Vec<ScannedEntry> = Vec::new();
     for entry in entries {
-        let same = kept.iter().position(|known| {
+        let same = |known: &ScannedEntry| {
             known.agent_index == entry.agent_index
                 && known.home == entry.home
                 && known.path == entry.path
@@ -3713,12 +3714,32 @@ fn one_per_entry(definitions: &[AgentDefinition], entries: Vec<ScannedEntry>) ->
                 && (known.project.is_none()
                     || entry.project.is_none()
                     || known.project == entry.project)
-        });
-        match same {
-            Some(index) if rank(&entry) < rank(&kept[index]) => kept[index] = entry,
-            Some(_) => {}
-            None => kept.push(entry),
+        };
+        // Of one rank, an Entry that applies in every Project takes the
+        // place of one bound to a Project, which it covers too, whatever
+        // the order they were read in, such as a plugin's file both its
+        // record bound to a Project and its user-scope record read.
+        let replaces = |known: &ScannedEntry| {
+            rank(&entry) < rank(known)
+                || (rank(&entry) == rank(known)
+                    && known.project.is_some()
+                    && entry.project.is_none())
+        };
+        let Some(index) = kept.iter().position(same) else {
+            kept.push(entry);
+            continue;
+        };
+        if !replaces(&kept[index]) {
+            continue;
         }
+        // One that applies in every Project takes the place of each other
+        // it is the same as and replaces, each bound to another Project.
+        let mut at = 0;
+        kept.retain(|known| {
+            at += 1;
+            at - 1 <= index || !(same(known) && replaces(known))
+        });
+        kept[index] = entry;
     }
     kept
 }
@@ -4300,7 +4321,8 @@ impl Scanner<'_> {
     /// Adds to `found`, for each plugin of `found` at `from_records`, read
     /// from its record bound to one Project, the plugin bound to each other
     /// Project among the Projects whose own files of `named_in` name its
-    /// id, unless `found` already applies a plugin of its id there, bound
+    /// id, or every one when a file of `named_in` in the Agent home names
+    /// it, unless `found` already applies a plugin of its id there, bound
     /// to that Project or to none.
     fn copy_to_naming_projects(
         &mut self,
@@ -4340,8 +4362,8 @@ impl Scanner<'_> {
         }
     }
 
-    /// Whether a file of `named_in` in the Project folder `folder` names
-    /// the plugin `id`.
+    /// Whether a file of `named_in` in the Project folder `folder`, or in
+    /// the Agent home, names the plugin `id`.
     fn project_names_plugin(
         &mut self,
         home: &FoundHome,

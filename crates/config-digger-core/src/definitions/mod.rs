@@ -3894,6 +3894,33 @@ session_files = { block = "pid-named", folder = { block = "path", path = "~/s" }
     }
 
     #[test]
+    fn a_json_field_sets_over_later_layers_only_layered_set_on_enable_and_written() {
+        let field = |extra: &str| {
+            with_disable(&format!(
+                r#"{{ block = "json-field", switch = {{ anchor = {{ block = "home", root = "state" }}, key_path = ["on", "{{name}}"], store_class = "plain" }}, target = "name", context = "all", reason = "disabled_by_name", disabled_value = false{extra} }}"#
+            ))
+        };
+        let set = r#", enable_action = "set", enabled_value = true"#;
+        let text = field(&format!(
+            "{set}, layered = true, sets_over_later_layers = true"
+        ));
+        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        for extra in [
+            format!("{set}, sets_over_later_layers = true"),
+            format!("{set}, layered = true, enable_offered = false, sets_over_later_layers = true"),
+            r#", enable_action = "delete-key", layered = true, sets_over_later_layers = true"#
+                .to_owned(),
+        ] {
+            let text = field(&extra);
+            assert!(
+                error(&text).contains("sets_over_later_layers needs `layered`"),
+                "{extra}: {}",
+                error(&text)
+            );
+        }
+    }
+
+    #[test]
     fn a_json_field_deleted_on_enable_takes_an_enabled_value_only_layered_and_written() {
         let on = r#", enabled_value = "on""#;
         let text = with_disable(&also_named(
@@ -6795,12 +6822,23 @@ uninstall = \"agent plugin uninstall",
         let named_in = |anchor: &str| {
             format!(r#", named_in = [{{ anchor = {anchor}, key_path = ["enabledPlugins"] }}]"#)
         };
-        let fields = format!(
-            r#", project = "projectPath"{}{MARKETPLACES}"#,
-            named_in(IN_PROJECT)
-        );
-        let text = records(&fields);
-        assert!(parse("test.toml", &text).is_ok(), "{}", error(&text));
+        // A file of the Project folder, or of the Agent home, which names
+        // plugins for every Project (#555).
+        for anchor in [
+            IN_PROJECT,
+            r#"{ block = "home", root = "plugins", path = "x.json" }"#,
+        ] {
+            let fields = format!(
+                r#", project = "projectPath"{}{MARKETPLACES}"#,
+                named_in(anchor)
+            );
+            let text = records(&fields);
+            assert!(
+                parse("test.toml", &text).is_ok(),
+                "{anchor}: {}",
+                error(&text)
+            );
+        }
         let text = records(&format!(
             r#", project = "projectPath"{MARKETPLACES}, named_in = []"#
         ));
@@ -6817,9 +6855,9 @@ uninstall = \"agent plugin uninstall",
             (
                 format!(
                     r#", project = "projectPath"{}{MARKETPLACES}"#,
-                    named_in(r#"{ block = "home", root = "plugins", path = "x.json" }"#)
+                    named_in(r#"{ block = "machine", path = "C:/Test/x.json" }"#)
                 ),
-                "named_in[0]: the files that name plugins lie in the Project folder",
+                "named_in[0]: the files that name plugins lie in the Project folder or the Agent home",
             ),
             (
                 format!(

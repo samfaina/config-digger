@@ -240,22 +240,28 @@ registries = [
 # its record's repository either: Claude Code loads it in any folder whose
 # own `.claude/settings.json` or `.claude/settings.local.json` turns it on,
 # another repository, the one holding a submodule, or a folder outside any
-# repository, a `local` record's as a `project` one's [test]. `named_in`
-# reads such a record in every other Project whose own two files name its
-# id, `true` or `false`: its Entries there are switched by that Project's
-# files, so a plugin one turns off is Disabled, Enable on offer, and
-# Disable's `false` keeps it listed. A plugin read from its copy in the
-# cache, whose marketplace entry names no folder below the marketplace's,
-# does not load in such a folder [test], nor is it read there. Of several
-# records of one id bound to other Projects, the first in the file is read;
-# a plugin read from its marketplace's folder loads from that folder
-# whichever record it is [test]. A Project a record of that id is already
-# bound to, or a user-scope record applies in, gets no other. Claude Code
-# also loads a project-scope plugin in a folder no file of which names it
-# when the user settings turn it on [test], which config-digger does not
-# read (see `release-gate.md`). A worktree session the desktop app starts
-# reads all project configuration from the main checkout's root [docs],
-# which config-digger does not read apart.
+# repository, a `local` record's as a `project` one's [test]. The user
+# settings turning it on bring it into any folder too, none of whose files
+# name it, a `local` record's as a `project` one's, and a folder whose own
+# `.claude/settings.local.json` turns it off does not load it [test]
+# (#555). `named_in` reads such a record in every other Project whose own
+# two files name its id, and in every Project when the user settings name
+# it, `true` or `false`: its Entries there are switched by the plugin's
+# switches below, so a plugin they turn off is Disabled, Enable on offer,
+# and Disable's `false` in the Project's local file keeps it listed. The
+# first session in a folder no record applies in, the user settings
+# turning the plugin on, installs it at user scope, adding a `user` record
+# [test], which then applies in every Project. A plugin read from its copy
+# in the cache, whose marketplace entry names no folder below the
+# marketplace's, does not load in such a folder, by its own settings
+# [test] or by the user settings until that `user` record stands [test],
+# nor is it read there. Of several records of one id bound to other
+# Projects, the first in the file is read; a plugin read from its
+# marketplace's folder loads from that folder whichever record it is
+# [test]. A Project a record of that id is already bound to, or a
+# user-scope record applies in, gets no other. A worktree session the
+# desktop app starts reads all project configuration from the main
+# checkout's root [docs], which config-digger does not read apart.
 [[plugins]]
 id = "installed"
 superseded_marker = ".orphaned_at"
@@ -274,6 +280,7 @@ project_reach = "checkouts"
 named_in = [
   { anchor = { block = "project", path = ".claude/settings.json" }, key_path = ["enabledPlugins"] },
   { anchor = { block = "project", path = ".claude/settings.local.json" }, key_path = ["enabledPlugins"] },
+  { anchor = { block = "home", root = "settings_file" }, key_path = ["enabledPlugins"] },
 ]
 version = "version"
 
@@ -804,9 +811,12 @@ enable_offered = false
 # The managed settings force a plugin on or off [docs]: what they turn off
 # is Blocked, and config-digger only reads them. Disable writes `false` to
 # the local settings in a Project, and to the user settings otherwise;
-# Enable sets `true`. The shared Project settings belong to the team, so
-# config-digger only reads them. A plugin no settings file names is off
-# [test]. These switches are repeated for skills below.
+# Enable sets `true` there; in a Project it sets the local `true` over
+# the shared or user settings that turn the plugin off, as the local
+# settings win [docs, test] (`sets_over_later_layers`). The shared Project
+# settings belong to the team, so config-digger only reads them. A plugin
+# no settings file names is off [test]. These switches are repeated for
+# skills below.
 [[items.mcp.disable]]
 block = "json-field"
 switch = { anchor = { block = "settings", settings = "managed" }, key_path = ["enabledPlugins", "{plugin_id}"], store_class = "plain" }
@@ -831,6 +841,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
+sets_over_later_layers = true
 locations = ["plugin-mcp", "plugin-manifest-mcp", "synced-plugin-manifest-mcp", "synced-plugin-mcp"]
 
 [[items.mcp.disable]]
@@ -1239,6 +1250,7 @@ enabled_value = true
 disabled_value = false
 reason = "plugin_disabled"
 layered = true
+sets_over_later_layers = true
 locations = ["plugin-skills", "synced-plugin-skills"]
 
 [[items.skill.disable]]
