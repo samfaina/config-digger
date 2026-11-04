@@ -582,20 +582,13 @@ fn switch_keys<'e>(mechanism: Switched, entry: &'e ScannedEntry) -> Vec<Cow<'e, 
     keys
 }
 
-/// Whether config-digger writes `mechanism`'s switch for the Entries of
-/// `location`, as their Provenance says.
-fn writes_switch(location: &LocationDefinition, mechanism: Switched) -> bool {
-    location
-        .provenance
-        .writes_switch(mechanism.target(), &mechanism.switch().anchor)
-}
-
-/// Whether `mechanism` covers `entry`, an Entry of `location`: an Entry of
-/// a plugin is Disabled through the plugin's own switch, or through a
-/// switch per Entry the definition says holds plugin Entries by an id that
-/// names their plugin. A switch keyed by plugin never holds an Entry of no
-/// plugin.
-fn covers(mechanism: Switched, location: &LocationDefinition, entry: &ScannedEntry) -> bool {
+/// Whether config-digger writes the switch of `mechanism` for `entry`, an
+/// Entry of `location`: the switch covers it, and its Provenance lets
+/// config-digger write it. An Entry of a plugin is Disabled through the
+/// plugin's own switch, or through a switch per Entry the definition says
+/// holds plugin Entries by an id that names their plugin. A switch keyed by
+/// plugin never holds an Entry of no plugin.
+fn writable(mechanism: Switched, location: &LocationDefinition, entry: &ScannedEntry) -> bool {
     mechanism.covers(&location.id)
         && mechanism.covers_plugin(plugin_scope(entry))
         && if entry.plugin.is_some() {
@@ -603,11 +596,12 @@ fn covers(mechanism: Switched, location: &LocationDefinition, entry: &ScannedEnt
         } else {
             !mechanism.switch().plugins()
         }
+        && location.provenance.writes_switch(mechanism)
 }
 
 /// Whether config-digger only reads `entry`, an Entry of `location`: it
 /// writes none of its files, and no switch that covers it.
-fn read_only(
+fn entry_read_only(
     definition: &AgentDefinition,
     location: &LocationDefinition,
     entry: &ScannedEntry,
@@ -618,9 +612,7 @@ fn read_only(
             .disable
             .iter()
             .filter_map(DisableMechanism::switched)
-            .any(|mechanism| {
-                covers(mechanism, location, entry) && writes_switch(location, mechanism)
-            })
+            .any(|mechanism| writable(mechanism, location, entry))
 }
 
 /// What Enable writes to lift `disabling`, the switches that Disable an
@@ -630,7 +622,7 @@ fn read_only(
 pub(crate) fn enable(location: &LocationDefinition, disabling: &[&Hit]) -> Result<String, String> {
     if !disabling
         .iter()
-        .all(|hit| writes_switch(location, hit.mechanism))
+        .all(|hit| location.provenance.writes_switch(hit.mechanism))
     {
         return Err(explain::read_only_enable());
     }
@@ -718,7 +710,7 @@ pub(crate) fn choose(
             explain::mirrored_option("Disable", &mirror.owner, mirror.source_folder.as_deref());
         return Err((DisableNotOffered::Mirrored, sentence));
     }
-    if read_only(definition, location, entry) {
+    if entry_read_only(definition, location, entry) {
         return Err((DisableNotOffered::ReadOnly, explain::read_only_option()));
     }
     let context = project.map(|project| project.key);
@@ -743,7 +735,7 @@ pub(crate) fn choose(
         .enumerate()
         .filter_map(|(index, mechanism)| Some((index, mechanism.switched()?)))
         .filter(|(_, mechanism)| {
-            covers(*mechanism, location, entry)
+            writable(*mechanism, location, entry)
                 && switch_read(
                     definition,
                     snapshot,
@@ -752,7 +744,6 @@ pub(crate) fn choose(
                     project.map(|project| project.key),
                 )
                 && mechanism.disable_offered()
-                && writes_switch(location, *mechanism)
         })
         .collect();
     switched.sort_by_key(|(index, mechanism)| (mechanism.target(), mechanism.context(), *index));

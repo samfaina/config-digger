@@ -3632,15 +3632,16 @@ impl Provenance {
         }
     }
 
-    /// Whether config-digger Disables and Enables the Entries through a
-    /// switch of `target` in the file `anchor` names. Of a copy of the
-    /// user's account, only a switch outside the copy and any plugin's
-    /// folder that holds one Entry, by its name.
-    pub fn writes_switch(self, target: MechanismTarget, anchor: &Anchor) -> bool {
+    /// Whether config-digger Disables and Enables the Entries through the
+    /// switch of `mechanism`. Of a copy of the user's account, only a switch
+    /// outside the copy and any plugin's folder that holds one Entry, by its
+    /// name.
+    pub fn writes_switch(self, mechanism: Switched) -> bool {
         match self {
             Provenance::File | Provenance::Plugin | Provenance::Extension => true,
             Provenance::CloudMirror => {
-                target != MechanismTarget::Plugin
+                let anchor = &mechanism.switch().anchor;
+                mechanism.target() != MechanismTarget::Plugin
                     && anchor.entry().is_none()
                     && anchor.plugin().is_none()
             }

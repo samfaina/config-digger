@@ -316,7 +316,13 @@ description: Throwaway skill for testing config-digger. Does nothing.
 # in the Project writes `off` for it in the Project's local settings, and
 # Enable takes it away. Step 38.1 walks it. `cd-throwaway-shared-off-skill`
 # is `off` in the Project's shared settings, above. Step 38.2 walks it.
-foreach ($folder in "synced\cd-org_cd-acct\cd-throwaway-spread-skill", "cd-throwaway-user-off-skill", "synced\cd-org_cd-acct\cd-throwaway-toggle-skill", "synced\cd-org_cd-acct\cd-throwaway-shared-off-skill") {
+$folders = @(
+    "synced\cd-org_cd-acct\cd-throwaway-spread-skill",
+    "cd-throwaway-user-off-skill",
+    "synced\cd-org_cd-acct\cd-throwaway-toggle-skill",
+    "synced\cd-org_cd-acct\cd-throwaway-shared-off-skill"
+)
+foreach ($folder in $folders) {
     $name = Split-Path $folder -Leaf
     Write-TestFile "$Root\claude-code-synced-home\.claude\skills\$folder\SKILL.md" @"
 ---

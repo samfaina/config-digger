@@ -1199,6 +1199,38 @@ fn a_synced_skill_off_under_both_keys_in_the_local_settings_is_enabled_by_deleti
     assert_eq!(values_of(&fs, &[&local]), before);
 }
 
+#[test]
+fn an_unread_synced_skill_in_a_project_offers_nothing_whatever_its_local_settings_hold() {
+    // Signed out: the home names the account but keeps no credentials.
+    let signed_out = FakeFileSystem::new().with_file(
+        in_home(".claude.json"),
+        json!({ "oauthAccount": { "organizationUuid": "org", "accountUuid": "acct" } }).to_string(),
+    );
+    let fs = with_skill(
+        signed_out.with_folder(PROJECT),
+        in_home(r".claude\skills\synced\org_acct\pdf"),
+        &skill_md("pdf"),
+    );
+    for overrides in [json!({}), json!({ "anthropic-skills:pdf": "off" })] {
+        let fs = with_overrides(fs.clone(), &[(&settings_local(), overrides.clone())]);
+        let core = core(&fs);
+
+        let inventory = inventory(&core, &in_project());
+
+        let entry = entry_json(&skill(&inventory, "anthropic-skills:pdf").entries[0]);
+        assert_eq!(entry["state"], "unread", "{overrides} {entry}");
+        assert_eq!(entry["disable"]["code"], "unread", "{overrides} {entry}");
+        assert_ne!(entry["enable"]["status"], "offered", "{overrides} {entry}");
+        assert_eq!(entry["remove"]["code"], "read_only", "{overrides} {entry}");
+        for action in [Action::Disable, Action::Enable, Action::Remove] {
+            let refused = plan(&core, &in_project(), action, &["anthropic-skills:pdf"])
+                .err()
+                .unwrap();
+            assert_eq!(code(refused.code), "blocked", "{overrides} {action:?}");
+        }
+    }
+}
+
 /// What Disable and Enable offer the skill `name` and what their plans
 /// answer, in a Project whose local settings are git-versioned, with the
 /// Entry's name and locator left out, so that two skills compare.
